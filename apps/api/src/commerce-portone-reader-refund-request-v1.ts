@@ -165,7 +165,7 @@ function responseCancellation(value: unknown): Readonly<{id: string; status: 'RE
   return {id:record.id,status:record.status};
 }
 
-async function postFullRefund(input: {
+export async function postFullRefund(input: {
   paymentId: string; reason: string; amount: number; authorizationId: string;
   apiSecret: string; timeoutMs: number; fetchImpl: ReaderPrivateRefundFetchV1;
 }): Promise<{id:string;status:'REQUESTED'|'SUCCEEDED'|'FAILED'}> {

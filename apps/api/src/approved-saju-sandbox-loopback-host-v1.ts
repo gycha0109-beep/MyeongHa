@@ -18,6 +18,7 @@ const BIRTH_CREATE_PATH = '/api/birth-profiles';
 const BIRTH_CURRENT_PATH = '/api/me/birth-profile';
 const SAJU_CALCULATION_PATH = '/api/me/saju/calculation';
 const TEST_REFUND_RECONCILE_PATH = '/api/me/saju/checkout-test/reconcile-cancellation';
+const TEST_REFUND_REQUEST_PATH = '/api/me/saju/checkout-test/request-cancellation';
 const MAX_BIRTH_BODY_BYTES = 4096;
 const TARGETS_PATH = '/api/target-persons';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -76,6 +77,7 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
   signedPairReader?: Readonly<{ handleRequest: (request: Request) => Promise<Response | null> }>;
   /** Verified PortOne TEST full-cancellation readback; no refund POST authority. */
   refundReconciler?: Readonly<{ reconcile: (purchaseIntentId: string) => Promise<Response> }>;
+  refundRequester?: Readonly<{ request: (purchaseIntentId: string) => Promise<Response> }>;
 }>) {
   const url = new URL(input.origin);
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1'
@@ -248,8 +250,9 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
       return;
     }
 
-    if (requestUrl.pathname === TEST_REFUND_RECONCILE_PATH) {
-      if (input.refundReconciler === undefined) { req.resume(); reply(404); return; }
+    if (requestUrl.pathname === TEST_REFUND_RECONCILE_PATH || requestUrl.pathname === TEST_REFUND_REQUEST_PATH) {
+      const handler = requestUrl.pathname === TEST_REFUND_REQUEST_PATH ? input.refundRequester : input.refundReconciler;
+      if (handler === undefined) { req.resume(); reply(404); return; }
       if (req.method !== 'POST') { req.resume(); reply(405); return; }
       if (requestUrl.search !== '' || req.headers.origin !== input.origin ||
         req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
@@ -281,7 +284,9 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
           || typeof parsed.purchaseIntentId !== 'string' || !UUID.test(parsed.purchaseIntentId)) {
           reply(400); return;
         }
-        const result = await input.refundReconciler.reconcile(parsed.purchaseIntentId);
+        const result = requestUrl.pathname === TEST_REFUND_REQUEST_PATH
+          ? await input.refundRequester!.request(parsed.purchaseIntentId)
+          : await input.refundReconciler!.reconcile(parsed.purchaseIntentId);
         if (!(result instanceof Response) || result.status >= 300 && result.status < 400 ||
           result.headers.has('set-cookie') || result.headers.has('location')) {
           reply(503); return;

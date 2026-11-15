@@ -107,5 +107,47 @@ revoke all on function public.qry_approved_saju_owner_test_cancel_candidate_v1(u
   from public,anon,authenticated,service_role,myeongha_api_executor;
 grant execute on function public.qry_approved_saju_owner_test_cancel_candidate_v1(uuid)
   to myeongha_commerce_internal_executor;
+
+-- Exactly-once owner TEST cancellation dispatch in the disposable Commerce DB.
+-- No production migration, grant, or customer payment route is created.
+create table commerce_saju_private.owner_test_full_refund_dispatch_v1 (
+  purchase_intent_id uuid primary key references public.purchase_intents(id),
+  payment_id text not null unique,
+  reserved_at timestamptz not null default clock_timestamp()
+);
+revoke all on commerce_saju_private.owner_test_full_refund_dispatch_v1
+  from public,anon,authenticated,service_role,myeongha_api_executor,
+       myeongha_commerce_internal_executor;
+
+create function public.internal_reserve_approved_saju_owner_test_refund_v1(p_purchase uuid)
+returns boolean language plpgsql volatile security definer set search_path=pg_catalog
+as $reserve_test_refund$
+declare
+  candidate jsonb;
+  inserted uuid;
+begin
+  if current_database() <> 'myeongha_saju_sandbox_v1'
+    or to_regclass('commerce_saju_private.owner_test_full_refund_dispatch_v1') is null then
+    raise exception 'HOLD_ONLY_DISPOSABLE_TEST_REFUND';
+  end if;
+  select public.qry_approved_saju_owner_test_cancel_candidate_v1(p_purchase)
+    into candidate;
+  if candidate is null
+    or candidate->>'receiptStatus' <> 'verified'
+    or nullif(candidate->>'paymentId','') is null then
+    return false;
+  end if;
+  insert into commerce_saju_private.owner_test_full_refund_dispatch_v1
+    (purchase_intent_id,payment_id)
+  values (p_purchase,candidate->>'paymentId')
+  on conflict do nothing returning purchase_intent_id into inserted;
+  return inserted is not null;
+end
+$reserve_test_refund$;
+revoke all on function public.internal_reserve_approved_saju_owner_test_refund_v1(uuid)
+  from public,anon,authenticated,service_role,myeongha_api_executor;
+grant execute on function public.internal_reserve_approved_saju_owner_test_refund_v1(uuid)
+  to myeongha_commerce_internal_executor;
+
 commit;
 select 'SAJU14_VERIFIED_SANDBOX_ONLY_ISSUANCE_READY' as state;
