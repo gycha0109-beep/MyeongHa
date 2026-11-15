@@ -51,6 +51,50 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
   }, [selection?.sequence, busy]);
   const offer = getApprovedSajuOfferV1(offerId);
   const needsTarget = offer?.counterpartOrder !== undefined;
+  const pollingWindow = useRef<{ purchaseIntentId: string; openedAt: number; failed: number } | null>(null);
+
+  // Official Readings are signed asynchronously after the verified payment.
+  // Continue checking the already-authorized, purchase-scoped archive until
+  // every purchased component is issued. Never create another payment attempt.
+  useEffect(() => {
+    const purchaseIntentId = binding?.purchaseIntentId;
+    if (!verified || !purchaseIntentId || ports.readArchive === undefined
+      || !archive.some(item => item.state === 'pending')) return;
+
+    if (pollingWindow.current?.purchaseIntentId !== purchaseIntentId) {
+      pollingWindow.current = { purchaseIntentId, openedAt: Date.now(), failed: 0 };
+    }
+    if (Date.now() - pollingWindow.current.openedAt >= 120_000
+      || pollingWindow.current.failed >= 3) {
+      setMessage('발급이 지연되고 있습니다. 보관함에서 다시 확인할 수 있습니다.');
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      if (!active) return;
+      if (document.visibilityState === 'hidden') {
+        // Avoid unnecessary polling while the owner is away from the page.
+        setArchive(current => [...current]);
+        return;
+      }
+      try {
+        const current = await ports.readArchive!(purchaseIntentId);
+        if (!active) return;
+        if (pollingWindow.current?.purchaseIntentId !== purchaseIntentId) return;
+        pollingWindow.current.failed = 0;
+        setArchive(current);
+        setMessage(current.every(item => item.state === 'ready')
+          ? '구매한 정식 풀이가 모두 발급됐습니다. 아래에서 바로 확인할 수 있습니다.'
+          : '결제 확인 완료. 정식 풀이를 발급 중이며 자동으로 상태를 확인합니다.');
+      } catch {
+        if (!active || pollingWindow.current?.purchaseIntentId !== purchaseIntentId) return;
+        pollingWindow.current.failed++;
+        setMessage('발급 상태 조회를 재시도 중입니다. 추가 결제는 진행되지 않습니다.');
+        setArchive(current => [...current]);
+      }
+    }, 4_000);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [verified, binding?.purchaseIntentId, archive, ports]);
 
   async function loadArchive(purchaseIntentId: string) {
     if (ports.readArchive === undefined) {
@@ -58,8 +102,11 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
       return;
     }
     try {
-      setArchive(await ports.readArchive(purchaseIntentId));
-      setMessage('보관함의 풀이 상태를 확인했습니다.');
+      const items = await ports.readArchive(purchaseIntentId);
+      setArchive(items);
+      setMessage(items.every(item => item.state === 'ready')
+        ? '구매한 정식 풀이가 모두 발급됐습니다. 아래에서 바로 확인할 수 있습니다.'
+        : '결제 확인 완료. 정식 풀이를 발급 중이며 자동으로 상태를 확인합니다.');
     } catch {
       setArchive([]);
       setMessage('보관함을 아직 열 수 없습니다. 발급 상태를 다시 확인해 주세요.');

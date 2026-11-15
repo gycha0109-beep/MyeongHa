@@ -26,6 +26,26 @@ const adminPw = randomBytes(36).toString('base64url');
 let created = false;
 let child;
 
+function rebuildCurrentCheckout() {
+  // The local host serves /public, not Vite's dev server. Always compile the
+  // exact checked-out React checkout before accepting TEST credentials.
+  const tasks = [
+    [resolve(root, 'node_modules/typescript/bin/tsc'), ['-p', 'tsconfig.build.json']],
+    [resolve(root, 'scripts/build-web-static.mjs'), []],
+    [resolve(root, 'node_modules/vite/bin/vite.js'), ['build', '--config', 'apps/web/vite.config.ts']],
+  ];
+  for (const [entrypoint, args] of tasks) {
+    const result = spawnSync(process.execPath, [entrypoint, ...args], {
+      cwd: root, encoding: 'utf8', timeout: 90_000,
+      maxBuffer: 5 * 1024 * 1024, windowsHide: true,
+    });
+    if (result.status !== 0) {
+      throw Error('Current Saju checkout build failed: ' +
+        String(result.stderr || result.stdout || result.error?.message).slice(-1500));
+    }
+  }
+}
+
 function docker(args, timeout = 90_000) {
   const r = spawnSync('docker', args, {
     cwd: root, encoding: 'utf8', timeout, windowsHide: true,
@@ -67,6 +87,7 @@ if (mode !== '--check' && mode !== '--serve') {
         'MYEONGHA_SAJU_TEST_EVIDENCE_HMAC_SECRET', 'MYEONGHA_SUPABASE_API_KEY'];
       const missing = required.filter(key => !process.env[key]?.trim());
       if (missing.length) throw Error('PortOne TEST / Auth settings are missing: ' + missing.join(', '));
+      rebuildCurrentCheckout();
     }
     const context = docker(['context', 'show']);
     const endpoint = docker(['context', 'inspect', context, '--format', '{{.Endpoints.docker.Host}}']);
