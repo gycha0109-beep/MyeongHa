@@ -1184,3 +1184,84 @@
 - **관측:** [CI #42494024682](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42494024682)의 `Work Track · commerce`에서 TypeScript 구문 검사 RED. 처음 적용한 Recorded S7 SQL 템플릿에 패턴 교체가 인용문 내 `$'`을 치환용 특수 토큰으로 해석하여 원본 SQL 뒷부분을 중복 삽입했고, 원래 Receipt JOIN보다 뒤에 선언된 Grant 별칭을 그 JOIN 안에서 참조하는 위험도 확인했습니다.
 - **수정:** 원본 GREEN S7 SQL 파일에서 다시 구성하고 **정확한 취소 검증 조건을 모든 테이블이 연결된 후의 WHERE 절**에 배치했습니다. 기존 Receipt JOIN, 반환 열·변환 함수·S5/S7 상태 분류는 유지합니다. 검증된 2420 비공개 SQL 함수를 기준으로 원본 Provider Event·HMAC·Grant/Effect 시각·결제 시도 조건을 복사하며, 코드 생성이나 원본 대체에 특수 치환 문자열은 사용하지 않습니다. SQL 템플릿 구분자가 정확히 하나이고 중복 본문이 없는지 확인했습니다.
 - **검증:** 해당 실패 CI를 통과로 표기하지 않습니다. 새 커밋 CI와 실제 Reader 통합 PG17 결과 확인 후 상태를 갱신합니다. 운영 DB/PG/LIVE 변경 없음.
+
+## 2026-11-14 — 테스트 결제 후 상품별 발급 상태 연결
+
+- 비공개 테스트 결제 확인 후 기존 구매별 보관함 조회를 호출한다. 발급 대기와 열 수 있는 공식 풀이를 표시하고, 조회 중 계정이 변경되면 이전 계정의 응답을 버린다.
+- 14개 상품의 결제 요청 계약을 포함한 관련 검사 28건, 웹 타입 검사·빌드 통과. #3174의 PG17 격리 후보 구매·발급·회수 흐름도 실제 DB에서 확인했다. 실결제와 14개 전체의 실제 발급 증거는 별도로 필요하다.
+
+Watchtower-Track: commerce
+
+### 2026-11-15 — 14 approved Saju Owner TEST checkout executable runtime
+- Implemented npm run start:saju-owner-test with separate loopback PostgreSQL TEST principals, existing verified member login, 14-offer checkout, purchased-reading archive, counterpart reads, and pinned PortOne TEST SDK. PR #3322, development branch only; production sale remains OFF.
+- Read-only linked Supabase production check: commerce_saju_private.approved_purchase_scope_v1, approved_component_reading_v1, source issue proof and issuer role are absent. No production DDL or payment was executed.
+- TEST PG roles / provider credentials are not configured in the accessible local environment. Real 14-offer payment-to-issuance-to-refund is blocked, not claimed complete.
+
+### 2026-11-15 — 결제 확인 후 개인·궁합 공식 발급 실행 연결
+- 구매 영수증 검증으로 발생한 기존 승인 사주 발급 큐를 개인 사주/궁합 발급 작업자가 함께 처리하는 독립 실행기를 추가. `npm run start:saju-issuer`.
+- 구매 권한·기간·상대 동의·고정 Release·서명 Source·발급 완료 DB 검증을 유지하며, 확인되지 않은 결제 요청은 발급하지 않는다.
+- 실제 운영 DB·판매는 수정하지 않았다. 발급 전용 로컬 DB와 독립 궁합 보관함 역할·서명 검증 키가 없으면 실행하지 않는다. 실제 구매 발급은 아직 차단 상태다.
+
+### 2026-11-15 — Approved 14-offer disposable PostgreSQL 17 deployment
+- Installed the existing approved-Saju purchase, receipt, issue, pair-reader, archive and cancellation SQL candidates into a new zero-network-exposure disposable PostgreSQL 17 database; no Production schema was changed.
+- Added a guarded isolated installer plus 14 synthetic Offer/Charge Terms/Capability Set/Release registrations derived from the approved November 6 catalog, with no synthetic paid receipts or signed Reading artifacts.
+- Actual local result: `STAGED_SAJU14_LOCAL_READY`; 14 Offer mappings and 14 distinct Release registrations, repeat-safe. Owner authentication, PortOne TEST secrets, real Source signing and hosted release remain separate unfulfilled gates.
+
+### 2026-11-15 — 폐기형 사주 14상품 DB 실행 권한 연결
+- 기존 격리 PostgreSQL 17의 승인 상품 14개·서명 발급 SQL에 회원 조회, Commerce, 공식 사주 발급, 궁합 보관함 전용 로그인 네 개를 별도로 연결. 각 계정은 해당 실행 역할 하나만 `SET ROLE` 할 수 있으며 관리자 권한·DB 생성·RLS 우회 권한을 갖지 않는다.
+- 로컬 비밀번호는 실행시 임시 환경변수에서만 받아 DB에 반영하고 저장소/로그에는 기록하지 않는다. 운영 Supabase 역할·데이터·판매 설정은 변경하지 않았다.
+- 실제 로컬 PostgreSQL TCP 연결에서 4계정 모두 인증·역할 전환 성공, 회원 계정의 Commerce 역할 전환은 권한 거부를 확인했다. PortOne TEST·공식 Source 키가 없어 결제→실발급 종단은 아직 HOLD.
+
+### 2026-11-15 — Windows PC ↔ 폐기형 사주 14상품 DB 실제 연결
+- `npm run saju:local:db`: 로컬 Docker PG17을 PC의 127.0.0.1 임시 포트에만 연결, 기존 14상품 SQL/Release 등록, 별도 4계정 권한을 일괄 적용하고 Node.js PostgreSQL 연결 확인 후 자동 폐기.
+- 실제 Windows 실행: `SAJU14_LOCAL_HOST_DB_READY` (14개 Offer 및 분리된 4개 실행 역할의 TCP 연결 성공, 임시 DB 컨테이너 자동 정리).
+- `npm run start:saju-owner-local-test`: 테스트 PortOne·Supabase Auth 자격증명이 준비된 경우에만 격리 결제 호스트를 실행하도록 진입점 추가. 운영 판매는 계속 비활성, 고객 데이터/운영 DB 미접촉.
+- 초기 실행에서 확인된 PG initdb 중간 기동과 Windows CRLF 문제는 최종 PostgreSQL 준비 신호 및 `scripts/local/*.sh` LF 고정으로 해결.
+
+### 2026-11-15 — 공식 사주 비동기 발급 후 보관함 자동 갱신
+- 승인 14개 상품의 결제 확인 이후 발급 큐가 아직 완료되지 않으면 구매별 보관함을 제한된 간격으로 재조회하여 모든 개인 사주·궁합 풀이가 발급될 때 열람 링크를 자동 표시하도록 연결했다.
+- 다른 구매 선택/페이지 이탈 시 갱신을 중단하고, 최대 2분·연속 오류 3회에서 자동 요청을 멈춘다. 발급 지연은 사용자에게 알리며 중복 결제나 추가 발급 명령은 보내지 않는다.
+- 격리 Owner 테스트 서버 시작 시 현재 브랜치의 서버 빌드·정적 웹·React 상품 화면을 먼저 빌드하여 예전 UI가 노출되는 문제를 차단했다. 기존 PortOne TEST와 발급/구매 권한 검증은 그대로 유지한다.
+- 이번 코드는 사용자 보관함 표시 연결이며, 실제 PG 영수증 및 서명 발급 종단 성공을 뜻하지 않는다.
+
+### 2026-11-15 — 결제 서버와 개인·궁합 발급 실행기를 동시 기동하도록 연결
+- PC 격리 14개 상품 스택은 PortOne TEST/회원 Auth뿐 아니라 개인·궁합 Source·Release·서명 검증 설정이 모두 존재할 때만 결제 서버를 준비한다.
+- 격리 DB에서 발급 전용 로그인과 독립 궁합 Reader 로그인으로 공식 발급 실행기를 **먼저 기동**하고 정상 시작 상태를 확인한 다음에만 기존 Owner TEST 결제 서버를 실행하도록 수정했다.
+- 발급 실행기가 중단되면 결제 화면도 종료하며 두 프로세스·폐기형 DB를 함께 정리한다. 실제 사용자 결제 승인이나 영수증·서명 발급을 가정하지 않는다.
+- 현재 접근 가능한 PC에는 외부 TEST/Source 자격증명이 없어 실제 PortOne TEST 결제 및 Source 발급은 아직 시작할 수 없다. 운영 DB와 판매 플래그는 변경하지 않았다.
+
+### 2026-11-15 — T10 궁합 공식 서명 원본 직접 재열람 연결
+- 격리 14상품 결제 보관함에서 발급된 궁합 Reading의 구매 Intent/Reading ID/Reader를 지정해 별도 `/api/approved-saju/pair/reader`로 직접 다시 읽는 기능을 연결.
+- 기존 T10 Reader가 현재 회원 소유·유효 구매 권한·상대방 동의·정확한 Release와 Source Ed25519 원본 서명을 검증한 경우에만 구매자에게 저장된 한국어 풀이를 표시한다. 서버는 Owner 인증을 추가 검사하고 전용 읽기 DB 역할로만 조회한다.
+- 관리자 결제 테스트 서버에 독립 궁합 Reader DB 로그인·고정 공개키 설정을 연결, 일반 회원·다른 출처·비정상 요청은 차단한다. 검증 실패 시 풀이를 숨기고 다시 접근 권한 확인을 안내한다.
+- TypeScript 검사 및 HTTP/T10 관련 검사 21건 통과. 실제 PortOne TEST 영수증·서명 원본 연동 및 운영 판매·배포는 아직 진행되지 않았음.
+
+### 2026-11-15 — 공식 발급 작업 중단 시 결제 서버 동시 차단
+- 개인 사주·궁합 발급 실행기의 주기 처리에서 선택적 기록 함수 때문에 실제 발급 큐 실행을 생략할 수 있던 코드를 수정하여 발급 처리를 필수 실행으로 분리했다.
+- Source 서명·DB 작업 오류가 발생하면 발급 실행기를 종료하고 전용 DB 연결을 해제해 상위 격리 결제 서버가 함께 종료되도록 연결했다. 작업자 출력의 파이프도 소비해 로그 정체로 발급이 멈추지 않도록 수정했다.
+- 관련 TypeScript 검사와 발급 작업자 검사 18건 통과. 별도 상용 서명키·PortOne TEST 영수증을 사용한 실제 유료 발급은 아직 완료되지 않았다.
+- 현재 승인 후보 SQL에는 `receipt.environment='production'` 조건이 남아 있으므로, 격리 TEST 영수증을 실제 공식 발급 근거로 승격하지 않는다. 전용 테스트 승인 계약의 승인·구현 전까지 실제 TEST 발급 종단 성공을 주장하지 않는다.
+
+### 2026-11-15 — 14개 상품의 공식 발급 버전값 연결
+- 격리 PostgreSQL 17에 임시로 등록됐던 `isolated-*` 발급 버전과 공식 Saju Source의 고정 ReleaseRef가 일치하지 않아 발급 작업자가 구매별 큐를 받지 못하는 문제를 해결했다.
+- TEST 서버 실행 전에 개인 사주 6종 및 궁합 1종의 공식 ReleaseRef를 기존 승인 14개 Offer의 구성요소 7개에 직접 고정한다. 구매가 이미 존재하면 버전 변경을 거부하며 운영 DB에는 적용하지 않는다.
+- 별도 폐기형 PostgreSQL 17에서 승인 Offer 14개, 7개 구성요소, 7개 버전 매핑 확인. 테스트용 임시 버전 문자열로 DB 등록 경로만 검증했고 실제 서명/결제 검증으로 간주하지 않는다.
+- 기존 공식 SQL의 `receipt.environment='production'` 조건은 변경하지 않았다. TEST sandbox 영수증→실제 공식 발급에는 별도 격리 정책과 서명 원본 연결이 필요하다.
+
+### 2026-11-15 — 격리 14상품 로그인·출생정보·계산·구매 화면 연결
+- 기존 격리 DB에서 빠져 Owner TEST 접근을 항상 거절하던 Owner 관리자 테이블·조회 함수를 기존 승인된 마이그레이션에서 직접 설치하도록 수정했다. 단일 명시 Auth 사용자 ID를 **폐기형 DB에만** 등록하며 로그인 시 실제 Supabase 회원 토큰을 계속 검증한다.
+- 격리 읽기 페이지에 빠져 있던 출생 프로필 생성·현재 프로필 조회 및 Saju 계산 HTTP 경로를 기존 회원 권한 처리기에 연결했다. 출생 입력 HMAC은 매 실행마다 임시 생성되며 운영 DB/개인정보는 복제하지 않는다.
+- 회원 로그인/로그아웃이나 다른 탭의 로그인 상태가 변경되면 14상품 Owner 결제 화면 권한을 재확인해 갱신하도록 수정했다. Provider TEST·공식 Source 키 없이 운영 판매는 열지 않는다.
+- 남은 실거래 과제: 승인 후보 SQL의 production-only 영수증 발급 근거와 PortOne sandbox 검증을 분리한 테스트 발급 흐름, 실제 공식 Source 서명 및 구매→환불 최종 경로.
+
+### 2026-11-15 — verified PortOne TEST 영수증을 격리 사주 발급 큐에 연결
+- 보호된 Owner TEST 결제의 서버 검증 영수증이 저장된 뒤 기존 승인 사주 영수증→구성요소 권한→발급 Outbox로 처리되도록 연결했다. 브라우저 응답이나 임의 테스트 값은 발급 근거가 아니다.
+- `production` 전용 승인 SQL 원본은 그대로 두고, **폐기형 로컬 PostgreSQL 17의 소유자 한 계정·구매 시작 전 DB에만** `sandbox` 영수증을 인식하는 격리 DB 함수 오버레이를 설치한다. 설치 대상 DB·함수 목록·사용자 권한이 어긋나면 결제 시작 자체를 거부한다.
+- 별도 격리 PG17에 위 SQL을 실제 설치하고 `SAJU14_VERIFIED_SANDBOX_ONLY_ISSUANCE_READY` 확인, 임시 DB 삭제. 운영 DB와 실제 상품 판매 플래그는 변경하지 않았다.
+- 외부 PortOne TEST 자격증명과 Saju 공식 서명 Source가 현재 미설정이라 실제 결제→공식 서명→환불 종단 완료를 뜻하지 않는다.
+
+### 2026-11-15 — Owner 전용 PortOne TEST 전체 취소 확인과 발급 권한 회수
+- `POST /api/me/saju/checkout-test/reconcile-cancellation`: 구매 ID만 받아 서버가 실제 격리 영수증·결제 시도를 조회한 뒤 PortOne V2 REST `GET`으로 **이미 완료된 전체 취소**를 재검증한다. 취소 요청 API를 호출하지 않으며 미취소·부분 취소는 권한을 회수하지 않는다.
+- 영수증의 결제 ID·거래 ID·금액·통화와 PortOne의 정확히 한 건 성공한 전체 취소를 일치시킨 후에만 기존 승인 취소 SQL로 Grant·구매 영수증을 원자적으로 회수한다. UI에서는 회수 후 기존 풀이 링크를 지운다.
+- 14상품 격리 DB의 Commerce 전용 역할에 누락됐던 승인 사주 영수증 발급 및 취소 처리 실행 권한을 **폐기형 DB에서만** 부여하며, 일반 회원·다른 출처는 차단한다.
+- 실제 폐기형 PostgreSQL 17에 SQL 설치와 역할을 확인해 OWNER_TEST_REFUND_SQL_READY. 실제 PortOne TEST 결제·취소 증거는 자격증명이 없어 아직 실행하지 않았다. 상용 DB·판매/환불 기능은 변경하지 않는다.

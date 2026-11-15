@@ -65,6 +65,9 @@ body.saju-hub-page .saju-design-chart-content [hidden] { display: none !importan
 
 .saju-design-product-card a { text-align:center; align-self:stretch; padding:8px 7px; border:1px solid #b26f7c; border-radius:8px; text-decoration:none; color:#834256; font-size:12px; font-weight:700; }
 .saju-design-product-card a:hover { background:#f7e8e6; }
+.saju-design-product-test-button { width:100%; margin-top:8px; padding:9px 7px; border:1px solid #b26f7c; border-radius:8px; background:#8c485b; color:#fff; font:700 12px/1.35 var(--mh-sans); cursor:pointer; }
+.saju-design-product-test-button:hover { background:#73374b; }
+.saju-design-product-test-button:focus-visible { outline:3px solid #b46e81; outline-offset:3px; }
 .saju-design-product-card .saju-design-product-disabled { display:block; text-align:center; align-self:stretch; padding:8px 7px; border:1px solid #d6c2bc; border-radius:8px; background:rgba(174,150,142,.09); color:#8d7771; font-size:12px; font-weight:700; cursor:default; }
 .saju-design-example { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:center; margin:19px 35px 25px; padding:15px 20px; border-radius:10px; border:1px solid #eed9d6; background:linear-gradient(110deg,#f5e0df,#f4dedd 65%,#f7e7e5); }
 .saju-design-example h2 span { display:inline-block; padding:2px 13px; margin-left:7px; border-radius:999px; background:#e5bec3; color:#fff; font:600 11px/1.6 var(--mh-sans,sans-serif); vertical-align:middle; }

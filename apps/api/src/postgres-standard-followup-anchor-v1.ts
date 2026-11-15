@@ -5,7 +5,7 @@ import type {
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 
 /**
- * DB-owner delivery contract, NOT a deployed function.
+ * Standard Reading DB-owner delivery contract. The approved purchase uses its private candidate function.
  *
  * The DB track must implement this security-definer query with subject-context
  * assertion, exact current Reader Grant/Product/Thread/Reading recheck and a
@@ -50,6 +50,10 @@ from public.qry_official_reader_followup_anchor_runtime_v1(
   $4::uuid
 )
 `.trim();
+
+const APPROVED_READ_SQL = READ_SQL.replace(
+  'qry_official_reader_followup_anchor_runtime_v1', 'qry_approved_saju_reader_followup_anchor_v1',
+);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const GROUNDING_HASH = /^[0-9a-f]{64}$/u;
@@ -132,6 +136,7 @@ function assertAnchor(
  */
 export function createPostgresStandardFollowupAnchorAuthorityPortV1(
   client: PostgresTransactionQueryV1,
+  purchaseKind: 'standard' | 'approved_saju' = 'standard',
 ): ValidatedStandardFollowupAnchorAuthorityPortV1 {
   return Object.freeze({
     async readLatestValidatedAnchor(
@@ -140,7 +145,8 @@ export function createPostgresStandardFollowupAnchorAuthorityPortV1(
       validateInput(scope);
       let rows: unknown;
       try {
-        const result = await client.query<AnchorRowV1>(READ_SQL, [
+        const query = purchaseKind === 'approved_saju' ? APPROVED_READ_SQL : READ_SQL;
+        const result = await client.query<AnchorRowV1>(query, [
           scope.subjectId, scope.threadId, scope.readerCharacterId, scope.readingRef,
         ]);
         rows = result.rows;

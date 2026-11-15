@@ -1,3 +1,4 @@
+import { getApprovedSajuOfferV1 } from '../../../packages/contracts/src/approved-saju-catalog.js';
 import { ApiCommandError } from './api-error.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
@@ -28,6 +29,7 @@ export interface HandlePaymentAttemptHandoffContextRequestInputV1 {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
+  readonly approvedSajuSandbox?: true;
 }
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -45,16 +47,21 @@ function requireServerTime(value: unknown): string {
   return serverTime;
 }
 
-function parsePublicRequestBody(value: unknown): Readonly<{ paymentAttemptId: string }> | null {
+function parseRequestBody(value: unknown, approvedSajuSandbox: boolean):
+  Readonly<{ paymentAttemptId: string; approvedOfferId?: string }> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const body = value as Record<string, unknown>;
   const keys = Object.keys(body);
   if (
-    keys.length !== 1 ||
+    keys.length !== (approvedSajuSandbox ? 2 : 1) ||
     !Object.prototype.hasOwnProperty.call(body, 'paymentAttemptId') ||
     typeof body.paymentAttemptId !== 'string' ||
     body.paymentAttemptId.trim().length === 0
   ) return null;
+  if (approvedSajuSandbox) {
+    if (typeof body.approvedOfferId !== 'string' || !getApprovedSajuOfferV1(body.approvedOfferId)) return null;
+    return Object.freeze({ paymentAttemptId: body.paymentAttemptId, approvedOfferId: body.approvedOfferId });
+  }
   return Object.freeze({ paymentAttemptId: body.paymentAttemptId });
 }
 
@@ -111,7 +118,7 @@ function methodNotAllowed(): Response {
   });
 }
 
-async function readBodyAfterSubjectResolution(request: Request): Promise<{ paymentAttemptId: string }> {
+async function readBodyAfterSubjectResolution(request: Request, approvedSajuSandbox: boolean) {
   let rawBody: unknown;
   try {
     rawBody = await request.json();
@@ -119,7 +126,7 @@ async function readBodyAfterSubjectResolution(request: Request): Promise<{ payme
     throw new ApiCommandError('INVALID_REQUEST', 'Payment Attempt handoff request is invalid.');
   }
 
-  const requestBody = parsePublicRequestBody(rawBody);
+  const requestBody = parseRequestBody(rawBody, approvedSajuSandbox);
   if (requestBody === null) {
     throw new ApiCommandError('INVALID_REQUEST', 'Payment Attempt handoff request is invalid.');
   }
@@ -164,10 +171,10 @@ export async function handlePaymentAttemptHandoffContextRequestV1(
       pool: input.pool,
       verifiedEvidence,
       execute: async (scope) => {
-        const requestBody = await readBodyAfterSubjectResolution(input.request);
+        const requestBody = await readBodyAfterSubjectResolution(input.request, input.approvedSajuSandbox === true);
         return loadPaymentAttemptHandoffContextV1({
           scope,
-          paymentAttemptId: requestBody.paymentAttemptId,
+          ...requestBody,
         });
       },
     });

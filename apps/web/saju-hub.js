@@ -563,8 +563,9 @@ async function loadExistingSaju() {
   const { token } = activeBearer;
   setState('loading', '현재 세션의 명식을 확인하는 중입니다…');
 
+  let profile = null;
   try {
-    const profile = await readDisplayBirthProfile(token);
+    profile = await readDisplayBirthProfile(token);
 
     if (profile && !storedProfileHasSupportedBirthDate(profile)) {
       clearBirthSession();

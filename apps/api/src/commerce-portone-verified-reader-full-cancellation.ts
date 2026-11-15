@@ -9,6 +9,12 @@ select public.cmd_apply_verified_portone_reader_full_cancellation_v1(
   $6::text,$7::text,$8::text,$9::text
 ) as "result"
 `;
+const APPLY_APPROVED_SAJU_SQL = `
+select public.internal_apply_approved_saju_full_cancellation_v1(
+  $1::text,$2::text,$3::text,$4::timestamptz,$5::bigint,
+  $6::text,$7::text,$8::text,$9::text
+) as "result"
+`;
 
 export type AppliedPortOneV2ReaderFullCancellationV1 =
   | Readonly<{ kind: 'unrelated_commerce' }>
@@ -22,6 +28,14 @@ export type AppliedPortOneV2ReaderFullCancellationV1 =
     receiptId: string; readonly providerEventId: string; grantCount: number }>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
+
+function cancellationResult(rows: readonly {result?: unknown}[]): Record<string, unknown> {
+  const result = rows[0]?.result;
+  if (rows.length !== 1 || typeof result !== 'object' || result === null || Array.isArray(result)) {
+    throw new Error('Verified cancellation did not return one result.');
+  }
+  return result as Record<string, unknown>;
+}
 
 /**
  * Inspect the actual 1900/1910 DB effect contracts, not merely their counts.
@@ -95,9 +109,14 @@ function inspectAuthoritativeGrantEffects(
 export async function applyVerifiedPortOneV2ReaderFullCancellationV1(input: {
   readonly pool: PostgresSubjectPoolV1;
   readonly evidence: VerifiedPortOneV2FullCancellationV1;
+  readonly privateApprovedSajuFullCancellationEnabled?: boolean;
+  /** Never set outside the isolated Owner-only 127.0.0.1 Saju TEST host. */
+  readonly isolatedOwnerSandbox?: true;
 }): Promise<AppliedPortOneV2ReaderFullCancellationV1> {
   const e = input.evidence;
-  if (e.environment !== 'production') {
+  const environment = input.isolatedOwnerSandbox === true ? 'sandbox' : 'production';
+  if (e.environment !== environment ||
+    (input.isolatedOwnerSandbox === true && input.privateApprovedSajuFullCancellationEnabled !== true)) {
     throw new ApiCommandError(
       'INVALID_REQUEST',
       'Reader cancellation requires an original production receipt.',
@@ -106,17 +125,42 @@ export async function applyVerifiedPortOneV2ReaderFullCancellationV1(input: {
   return executePostgresCommerceInternalTransactionV1({
     pool: input.pool,
     execute: async ({ client }) => {
-      const response = await client.query<{result?: unknown}>(APPLY_SQL,[
+      if (input.isolatedOwnerSandbox === true) {
+        const { rows } = await client.query<{ isolated: boolean }>(
+          "select current_database()='myeongha_saju_sandbox_v1' " +
+          "and to_regclass('public.myeongha_owner_administrators_v1') is not null " +
+          "as isolated",
+        );
+        if (rows.length !== 1 || rows[0]?.isolated !== true) {
+          throw new Error('Only the disposable Owner TEST database may revoke sandbox receipts.');
+        }
+      }
+      const args = [
         e.paymentId,e.transactionId,e.cancellationId,e.cancelledAt,
         e.verifiedAmountMinor,e.verifiedCurrency,e.environment,
         e.evidenceFingerprint,e.verifierRevision,
-      ]);
-      if (response.rows.length !== 1 || typeof response.rows[0]?.result !== 'object'
-          || response.rows[0]?.result === null
-          || Array.isArray(response.rows[0]?.result)) {
-        throw new Error('Verified Reader cancellation did not return one committed result.');
+      ];
+      if (input.privateApprovedSajuFullCancellationEnabled === true) {
+        const approved = cancellationResult((await client.query<{result?: unknown}>(APPLY_APPROVED_SAJU_SQL, args)).rows);
+        if (approved.disposition !== 'unrelated_commerce') {
+          const { disposition: kind, receiptId, providerEventId, grantCount } = approved;
+          if (typeof receiptId === 'string' && UUID.test(receiptId)
+            && typeof providerEventId === 'string' && UUID.test(providerEventId)) {
+            if (kind === 'cancelled_before_grant' && grantCount === 0) {
+              return Object.freeze({ kind, receiptId, providerEventId, grantCount });
+            }
+            if ((kind === 'revoked' || kind === 'cancellation_recorded_unattributed_grants')
+              && typeof grantCount === 'number' && Number.isSafeInteger(grantCount) && grantCount > 0) {
+              return Object.freeze({ kind, receiptId, providerEventId, grantCount });
+            }
+          }
+          throw new Error('Approved Saju cancellation result was not authoritative.');
+        }
       }
-      const result = response.rows[0].result as Record<string,unknown>;
+      // Local sandbox may only touch the exact approved-Saju command. Never
+      // fall through to the production Reader cancellation role/SQL.
+      if (input.isolatedOwnerSandbox === true) return Object.freeze({ kind: 'unrelated_commerce' as const });
+      const result = cancellationResult((await client.query<{result?: unknown}>(APPLY_SQL, args)).rows);
       if (result.contractVersion === 'portone-reader-full-cancellation-v1'
           && result.disposition === 'unrelated_commerce') {
         return Object.freeze({ kind: 'unrelated_commerce' as const });

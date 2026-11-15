@@ -57,7 +57,7 @@ describe('PortOne V2 webhook HTTP static authority', () => {
     expect(source).not.toContain('refund');
     expect(source.match(/reader\.cancel\(\)/gu)).toHaveLength(1);
     const timeoutBoundary = source.match(
-      /if \(error instanceof IngressRequestBodyCompletionDeadlineExceededV1\) \{[\s\S]*?throw error;\n    \}/u,
+      /if \(error instanceof IngressRequestBodyCompletionDeadlineExceededV1\) \{[\s\S]*?throw error;\r?\n    \}/u,
     )?.[0];
     expect(timeoutBoundary).toContain('void reader.cancel().catch(() => undefined);');
     expect(source).not.toContain('body.cancel()');

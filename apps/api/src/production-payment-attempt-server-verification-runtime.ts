@@ -58,6 +58,7 @@ export interface CreateProductionPaymentAttemptServerVerificationRuntimeInputV1 
    * Defaults to OFF until DB Owner's private Writer is accepted.
    */
   readonly privateReaderReceiptFulfillmentEnabled?: boolean;
+  readonly privateApprovedSajuReceiptFulfillmentEnabled?: true;
 }
 
 /**
@@ -112,6 +113,8 @@ export function createProductionPaymentAttemptServerVerificationRuntimeV1(
           { onVerifiedReceiptCommitted: observer }),
         privateReaderReceiptFulfillmentEnabled:
           input.privateReaderReceiptFulfillmentEnabled === true,
+        ...(input.privateApprovedSajuReceiptFulfillmentEnabled === true
+          ? { privateApprovedSajuReceiptFulfillmentEnabled: true } : {}),
       });
     },
     close() {

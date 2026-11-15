@@ -8,6 +8,14 @@
 > Reader: **구매 시 선택한 Character; 공식 Reading identity와 분리**  
 > Supersedes as current Product direction: `saju.general_natal.deep.v1` / KRW 9,900 historical inactive candidate
 
+## 2026-11-13 — 내부 상용 해석 기준 적용과 기존 상품 계약의 분리
+
+> [현행 명하 Saju 인계 기준](SAJU_INTERNAL_COMMERCIAL_INTERPRETATION_HANDOFF_20261113.md). 아래 `SAJU HOLD` 기록은 외부 논문·전문가 승인 대기를 뜻하지 않는다. **내부 채택 규칙의 실제 해석 구현·품질과 운영 발급·권한 검증**이 미완료된 부분만 차단한다.
+
+- 기존 **연애·관계 단독 본인 T8 상품**과 **두 사람 관계 비교 T10**은 별개의 구매 의미다. T8 문단을 T10 궁합 해석으로 전용하지 않으며, 신규 T10 구현은 Saju [#2763](https://github.com/gycha0109-beep/Saju/pull/2763)의 두 명식 전용 경로에서 검증한다.
+- 이 문서의 이전 `PRODUCTION INTERPRETATION AUTHORITY = BLOCKED`는 당시 검사/실행 상태다. 명하가 채택한 서비스 규칙의 한국어 풀이·정확한 명식/기간·모순 방지와 정식 서명·Grant/Reader·개인정보/결제·철회 검증이 **현재 완료 조건**이며 외부 독립 학술 승인 자체는 조건이 아니다.
+- [MyeongHa #3174](https://github.com/gycha0109-beep/MyeongHa/pull/3174)의 실제 보호 발급과 운영 결제 검증 완료 전에는 Offer/판매가 여전히 HOLD다. 기존 가격·상품 단위·과거 감사·권한/서명 계약은 변경하지 않는다.
+
 ## 2026-10-28 current product scope clarification
 
 **The twelve Saju topics are peer products in one Standard Reading layer.** This document defines the historical, already-specified relationship Product contract only; it is **not** authority to prioritize, launch, or architect relationship ahead of the other eleven Saju products. The earlier "first Standard Reading Product" wording and CURRENT_FIRST_STANDARD_PRODUCT marker below record the historical sequencing decision, not today's product hierarchy. The separate Saju eight-menu research roadmap is not a catalog reduction.

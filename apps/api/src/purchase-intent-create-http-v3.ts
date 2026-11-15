@@ -1,7 +1,10 @@
 import { ApiCommandError } from './api-error.js';
+import { getApprovedSajuOfferV1 } from '../../../packages/contracts/src/approved-saju-catalog.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   createPostgresPurchaseIntentRuntimePortsV3,
+  createPostgresApprovedSajuPurchaseAuthorityV1,
+  selectPostgresApprovedSajuCheckoutV1,
   POSTGRES_PURCHASE_INTENT_CREATE_AUTHORITY_BINDING_V3,
   POSTGRES_PURCHASE_INTENT_RUNTIME_SNAPSHOT_BINDING_V3,
 } from './postgres-purchase-intent-create-v3.js';
@@ -35,6 +38,8 @@ export interface HandlePurchaseIntentCreateRequestInputV3 {
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly idPort: PurchaseIntentIdPortV1;
+  /** Private catalog mode. Public activation and DB privileges are separate. */
+  readonly privateApprovedSajuCheckoutEnabled?: true;
 }
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -67,6 +72,26 @@ function parsePublicRequestBody(value: unknown): Readonly<{ productOfferId: stri
     productOfferId: body.productOfferId,
     idempotencyKey: body.idempotencyKey,
   });
+}
+
+function parseApprovedSajuRequest(value: unknown) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const body = value as Record<string, unknown>;
+  if (Object.keys(body).some(key => key !== 'approvedOfferId' && key !== 'idempotencyKey' && key !== 'targetPersonId')
+    || typeof body.approvedOfferId !== 'string' || typeof body.idempotencyKey !== 'string'
+    || body.idempotencyKey.length < 1 || body.idempotencyKey.length > 200
+    || body.idempotencyKey.trim() !== body.idempotencyKey) return null;
+  const offer = getApprovedSajuOfferV1(body.approvedOfferId);
+  const targetPersonId = body.targetPersonId;
+  if (offer === undefined || (offer.counterpartOrder === undefined
+    ? targetPersonId !== undefined
+    : typeof targetPersonId !== 'string' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(targetPersonId))) {
+    return null;
+  }
+  return {
+    offer, idempotencyKey: body.idempotencyKey,
+    ...(typeof targetPersonId === 'string' ? { targetPersonId: targetPersonId.toLowerCase() } : {}),
+  };
 }
 
 function jsonError(input: {
@@ -157,8 +182,10 @@ export async function handlePurchaseIntentCreateRequestV3(
       requestId,
     });
   }
-  const requestBody = parsePublicRequestBody(rawBody);
-  if (requestBody === null) {
+  const catalogMode = input.privateApprovedSajuCheckoutEnabled === true;
+  const approved = catalogMode ? parseApprovedSajuRequest(rawBody) : null;
+  const requestBody = catalogMode ? null : parsePublicRequestBody(rawBody);
+  if (requestBody === null && approved === null) {
     return jsonError({
       status: 400,
       code: 'INVALID_REQUEST',
@@ -172,16 +199,32 @@ export async function handlePurchaseIntentCreateRequestV3(
     const data = await executePostgresSubjectTransactionV1({
       pool: input.pool,
       verifiedEvidence,
-      execute: ({ resolvedSubject, client }) => {
+      execute: async ({ resolvedSubject, client }) => {
         const ports = createPostgresPurchaseIntentRuntimePortsV3(client);
-        return createPurchaseIntentV3({
+        const common = {
           resolvedSubjectId: resolvedSubject.subjectId,
-          request: requestBody,
           offerSnapshotPort: ports.offerSnapshotPort,
           capabilitySnapshotPort: ports.capabilitySnapshotPort,
           idPort: input.idPort,
           authorityPort: ports.authorityPort,
+        };
+        if (approved === null) return createPurchaseIntentV3({ ...common, request: requestBody });
+        const { offer, idempotencyKey, targetPersonId } = approved;
+        const target = targetPersonId === undefined ? {} : { targetPersonId };
+        const selection = await selectPostgresApprovedSajuCheckoutV1(client, {
+          subjectId: resolvedSubject.subjectId, approvedOfferId: offer.id, idempotencyKey, ...target,
         });
+        if (selection === null) throw new ApiCommandError('NOT_FOUND', 'Selected product offer is unavailable.');
+        const result = await createPurchaseIntentV3({
+          ...common,
+          request: { productOfferId: selection.productOfferId, idempotencyKey },
+          sajuOrigin: {
+            sajuRecordId: selection.sajuRecordId, birthRevisionId: selection.birthRevisionId,
+            purchaseKind: 'original', sourceReceiptIds: [],
+          },
+          approvedSaju: { offerId: offer.id, authority: createPostgresApprovedSajuPurchaseAuthorityV1(client), ...target },
+        });
+        return { ...result, approvedOfferId: offer.id, amountMinor: offer.priceKrw, currency: 'KRW' };
       },
     });
     return successResponse(data, requestId, serverTime);
@@ -196,7 +239,7 @@ export async function handlePurchaseIntentCreateRequestV3(
     if (error.code === 'FORBIDDEN') {
       return jsonError({ status: 403, code: error.code, messageKey: 'purchase_intent.forbidden', retryable: false, requestId });
     }
-    if (error.code === 'NOT_FOUND') {
+    if (error.code === 'NOT_FOUND' || (catalogMode && error.code === 'CAPABILITY_UNAVAILABLE')) {
       return jsonError({ status: 404, code: error.code, messageKey: 'purchase_intent.offer_unavailable', retryable: false, requestId });
     }
     if (error.code === 'IDEMPOTENCY_CONFLICT') {

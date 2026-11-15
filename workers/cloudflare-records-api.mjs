@@ -37,7 +37,7 @@ function unavailable() {
   },{status:503,headers:SECURITY_HEADERS});
 }
 
-export function allowedCloudflareRecordsReadQueryV1(route,url) {
+export function allowedCloudflareRecordsReadQueryV1(route,url,approvedSajuArchiveEnabled=false) {
   if (!RECORD_IDS.has(route?.id)) return false;
   if (url.hash!=='') return false;
   // The current-grant query accepts only the exact original Memory URL.
@@ -45,6 +45,10 @@ export function allowedCloudflareRecordsReadQueryV1(route,url) {
   if (route.id==='rewrite.seyeon.memory.grant.status') return url.search==='';
   if (url.search==='') return true;
   const keys=[...url.searchParams.keys()];
+  if (url.searchParams.has('purchaseIntentId')) {
+    return approvedSajuArchiveEnabled && route.id==='rewrite.readings' && keys.length===1
+      && UUID.test(url.searchParams.get('purchaseIntentId'));
+  }
   if (new Set(keys).size!==keys.length || keys.some(key=>
     !['cursor','pageSize',...(route.id==='rewrite.readings'?['readingId']:[])].includes(key))) return false;
   const values=[...url.searchParams.values()];
@@ -79,7 +83,9 @@ export async function tryHandleCloudflareApprovedRecordsV1(request,bindings,rout
   const origin=approvedCloudflareAuthOriginV1(request,bindings);
   if(origin===null) return null;
   if(!approvedCloudflareStage5HandoffV1(bindings,origin,false)) return null;
-  if(!allowedCloudflareRecordsReadQueryV1(route,new URL(request.url))) return denied();
+  const approvedSajuArchiveEnabled=bindings.MYEONGHA_APPROVED_SAJU_ARCHIVE==='v1';
+  if(!allowedCloudflareRecordsReadQueryV1(route,new URL(request.url),
+    request.method==='GET' && approvedSajuArchiveEnabled)) return denied();
   const readings=route.id==='rewrite.readings';
   const expected=readings?'GET, POST':'GET';
   if (request.method!=='GET' && (!readings || request.method!=='POST')) {
@@ -112,7 +118,8 @@ export async function tryHandleCloudflareApprovedRecordsV1(request,bindings,rout
       runtime=route.id==='rewrite.life-record'
         ?createProductionLifeRecordReadRuntimeV1({env:bindings,pool})
         :readings
-          ?createProductionReadingHistoryReadRuntimeV1({env:bindings,pool})
+          ?createProductionReadingHistoryReadRuntimeV1({env:bindings,pool,
+            ...(approvedSajuArchiveEnabled?{approvedSajuArchiveEnabled:true}:{})})
           :createProductionMemoryItemsReadRuntimeV1({env:bindings,pool});
       result=await runtime.handleRequest(requestInput);
     }

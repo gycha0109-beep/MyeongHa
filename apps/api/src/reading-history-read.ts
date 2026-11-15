@@ -1,4 +1,5 @@
 import { SAJU_DOMAINS } from '../../../packages/contracts/src/index.js';
+import { SAJU_READING_COMPONENTS_V1, type SajuReadingComponentV1 } from '../../../packages/contracts/src/approved-saju-catalog.js';
 import { ApiCommandError } from './api-error.js';
 
 export const READING_HISTORY_READ_AUTHORITY_BINDING_V1 =
@@ -16,6 +17,7 @@ export interface ReadingHistoryAuthorityRowV1 {
   readonly readerCharacterIds: readonly string[];
   readonly createdAt: string;
   readonly completedAt: string;
+  readonly approvedComponent?: unknown;
 }
 
 export type ReadingHistoryReadAuthorityFailureCodeV1 = 'INVALID_INPUT';
@@ -47,6 +49,7 @@ export interface ReadingHistoryItemV1 {
   readonly readerCharacterIds: readonly string[];
   readonly createdAt: string;
   readonly completedAt: string;
+  readonly approvedComponent?: SajuReadingComponentV1;
 }
 
 export interface ReadingHistoryReadResponseV1 {
@@ -115,11 +118,18 @@ function compareStoredOrder(
   left: ReadingHistoryAuthorityRowV1,
   right: ReadingHistoryAuthorityRowV1,
 ): number {
-  const completedDelta = Date.parse(right.completedAt) - Date.parse(left.completedAt);
+  const completedDelta = compareTimestamp(right.completedAt, left.completedAt);
   if (completedDelta !== 0) return completedDelta;
-  const createdDelta = Date.parse(right.createdAt) - Date.parse(left.createdAt);
+  const createdDelta = compareTimestamp(right.createdAt, left.createdAt);
   if (createdDelta !== 0) return createdDelta;
   return right.readingId.localeCompare(left.readingId);
+}
+
+function compareTimestamp(left: string, right: string): number {
+  const milliseconds = Date.parse(left) - Date.parse(right);
+  if (milliseconds !== 0) return milliseconds;
+  const micros = (value: string) => Number(/\.\d{3}(\d{3})Z$/u.exec(value)?.[1] ?? 0);
+  return micros(left) - micros(right);
 }
 
 function projectHistory(
@@ -132,11 +142,19 @@ function projectHistory(
       throw new Error('Reading History authority returned a duplicate Reading identity.');
     }
     seenIds.add(readingId);
+    const sajuDomain = requireSajuDomain(row.sajuDomain);
+    const component = row.approvedComponent as SajuReadingComponentV1 | undefined;
+    if (component !== undefined && (typeof component !== 'string'
+      || !Object.hasOwn(SAJU_READING_COMPONENTS_V1, component)
+      || SAJU_READING_COMPONENTS_V1[component].domain !== sajuDomain)) {
+      throw new Error('Reading History authority returned an invalid approved Saju component.');
+    }
 
     return Object.freeze({
       readingId,
       readingSessionId: requireStoredUuid('Reading Session identity', row.readingSessionId),
-      sajuDomain: requireSajuDomain(row.sajuDomain),
+      sajuDomain,
+      ...(component === undefined ? {} : { approvedComponent: component }),
       readingContractVersion: requireStoredString(
         'Reading contract version',
         row.readingContractVersion,

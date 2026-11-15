@@ -1,4 +1,5 @@
 import type { BirthProfileReadResponseV1 } from './birth-profile-read.js';
+import type { SajuBirthRevisionBindingV1 } from '../../../packages/domain/src/index.js';
 
 // Reject malformed prepared identities before any paid Saju network execution.
 // The canonical owner, attempt and session are still rechecked by the governed DB transaction.
@@ -7,6 +8,8 @@ const OFFICIAL_ISSUE_UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab]
 import { bindCurrentBirthProfileRevisionForSajuV1 } from './saju-production-calculation-execution.js';
 import {
   buildSajuProductionReadingRequestV1,
+  SAJU_PRODUCTION_ISSUE_BIRTH_HASH_V1,
+  SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1,
   SajuProductionReadingHttpAdapterErrorV1,
   type SajuProductionReadingHttpAdapterV1,
 } from './saju-production-reading-http-adapter.js';
@@ -74,11 +77,14 @@ export interface SajuOfficialIssuancePreflightPortV1 {
  * share the same governed connection. An upstream success alone is not a grant.
  */
 export interface SajuOfficialIssuedDbTransactionPortV1 {
+  readonly mappingVerification?: 'transaction';
   run(input: Readonly<{
     readonly subjectId: string;
+    readonly executionAttemptId?: string;
     readonly commit: (ports: Readonly<{
       currentAuthority: SajuOfficialCurrentAuthorityPortV1;
       commitPort: SajuOfficialImmutableCommitPortV1;
+      mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
     }>) => Promise<SajuOfficialIssuanceResultV1>;
   }>): Promise<SajuOfficialIssuanceResultV1>;
 }
@@ -94,24 +100,42 @@ export interface SajuOfficialIssuedDbTransactionPortV1 {
  * On completion the existing DB finalize command stores the immutable record,
  * source native ID, response hash and outbox entry as a single DB transaction.
  */
-export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<AdmittedResponse>(
-  input: Readonly<{
-    profile: BirthProfileReadResponseV1;
-    readingText: string;
-    targetPersonRef?: string;
-    adapter: SajuProductionReadingHttpAdapterV1<AdmittedResponse>;
-    subjectId: string;
-    readingId: string;
-    readingSessionId: string;
-    executionAttemptId: string;
-    outboxEventId: string;
-    /** Pinned by the authoritative DB Reading Session, not by the browser. */
-    sourceBirthRevisionId: string;
-    sourceVerifier?: SajuOfficialSourceVerificationPortV1;
-    mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
-    /** Required single-use DB attempt allocation before any Saju source call. */
-    attemptPrepare?: SajuOfficialAttemptPreparePortV1;
-    dbTransaction?: SajuOfficialIssuedDbTransactionPortV1;
+export interface SajuOfficialReadingExecutionInputV1<AdmittedResponse> {
+  readingText: string;
+  targetPersonRef?: string;
+  /** Immutable period reference resolved from the purchase, when applicable. */
+  periodReferenceDateTime?: string;
+  requireCompleteResponse?: true;
+  adapter: SajuProductionReadingHttpAdapterV1<AdmittedResponse>;
+  subjectId: string;
+  readingId: string;
+  readingSessionId: string;
+  executionAttemptId: string;
+  outboxEventId: string;
+  /** Pinned by the authoritative DB Reading Session, not by the browser. */
+  sourceBirthRevisionId: string;
+  sourceBirthInputHash?: string;
+  releaseRef?: string;
+  sourceVerifier?: SajuOfficialSourceVerificationPortV1;
+  mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
+  /** Required single-use DB attempt allocation before any Saju source call. */
+  attemptPrepare?: SajuOfficialAttemptPreparePortV1;
+  dbTransaction?: SajuOfficialIssuedDbTransactionPortV1;
+}
+
+export function executeAndPersistCurrentBirthSajuOfficialReadingV1<AdmittedResponse>(
+  input: Readonly<SajuOfficialReadingExecutionInputV1<AdmittedResponse> & { profile: BirthProfileReadResponseV1 }>,
+): Promise<SajuOfficialIssuanceResultV1> {
+  return executeAndPersistPinnedBirthSajuOfficialReadingV1({
+    ...input,
+    resolveBirth: () => bindCurrentBirthProfileRevisionForSajuV1(input.profile),
+  });
+}
+
+/** Internal execution shared by current-profile and paid pinned-revision callers. */
+export async function executeAndPersistPinnedBirthSajuOfficialReadingV1<AdmittedResponse>(
+  input: Readonly<SajuOfficialReadingExecutionInputV1<AdmittedResponse> & {
+    resolveBirth: () => SajuBirthRevisionBindingV1;
   }>,
 ): Promise<SajuOfficialIssuanceResultV1> {
   const unavailable = Object.freeze({
@@ -125,7 +149,8 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   // Never charge an upstream call without a wired Production issuer + DB scope.
   const { sourceVerifier, mappingVerifier, attemptPrepare, dbTransaction } = input;
   if (typeof sourceVerifier?.verifyProductionIssue !== 'function'
-    || typeof mappingVerifier?.verifyIssuedReadingMapping !== 'function'
+    || (dbTransaction?.mappingVerification !== 'transaction'
+      && typeof mappingVerifier?.verifyIssuedReadingMapping !== 'function')
     || typeof attemptPrepare?.prepareBeforeSourceCall !== 'function'
     || typeof dbTransaction?.run !== 'function'
     || typeof input.adapter?.requestReading !== 'function') {
@@ -146,7 +171,7 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     return unavailable;
   }
 
-  const birth = bindCurrentBirthProfileRevisionForSajuV1(input.profile);
+  const birth = input.resolveBirth();
   if (birth.birthRevisionRef !== input.sourceBirthRevisionId) {
     return Object.freeze({
       ...unavailable,
@@ -159,6 +184,9 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   const executedRequest = buildSajuProductionReadingRequestV1({
     birthRevision: birth,
     readingText: input.readingText,
+    ...(input.periodReferenceDateTime === undefined
+      ? {}
+      : { periodReferenceDateTime: input.periodReferenceDateTime }),
   });
   const exactAttempt = {
     subjectId: input.subjectId,
@@ -167,6 +195,15 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     executionAttemptId: input.executionAttemptId,
     sourceBirthRevisionId: input.sourceBirthRevisionId,
   };
+  const { sourceBirthInputHash, releaseRef } = input;
+  const preparedContext = typeof sourceBirthInputHash === 'string'
+    && SAJU_PRODUCTION_ISSUE_BIRTH_HASH_V1.test(sourceBirthInputHash)
+    && typeof releaseRef === 'string' && SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1.test(releaseRef)
+    ? { ...exactAttempt, sourceBirthInputHash, releaseRef }
+    : undefined;
+  if (input.adapter.requestPreparedReading !== undefined && preparedContext === undefined) {
+    return unavailable;
+  }
 
   // The DB allocator rejects exact replays and in-flight attempts. A read-only
   // preflight is never sufficient to claim single-use network execution.
@@ -180,8 +217,22 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   // The immutable finalize transaction independently rechecks the grant,
   // current Birth and issuer provenance before any report can be stored.
   let response: AdmittedResponse;
+  let authenticatedTransportSourceRef: string | undefined;
   try {
-    response = await input.adapter.requestReading(executedRequest);
+    const prepared = { executionAttemptId: input.executionAttemptId };
+    if (input.adapter.requestPreparedReading !== undefined && preparedContext !== undefined) {
+      const attested = await input.adapter.requestPreparedReading(executedRequest, preparedContext);
+      response = attested.response;
+      authenticatedTransportSourceRef = attested.externalRequestRef;
+    } else if (typeof input.adapter.requestReadingWithSourceRef === 'function') {
+      const attested = await input.adapter.requestReadingWithSourceRef(executedRequest, prepared);
+      response = attested.response;
+      authenticatedTransportSourceRef = attested.externalRequestRef;
+    } else {
+      // Existing non-HTTP test ports remain subject to the independent
+      // Production Source + DB mapping authorities; no header is fabricated.
+      response = await input.adapter.requestReading(executedRequest, prepared);
+    }
   } catch (error) {
     // A transport error cannot prove whether the Saju issuer already generated
     // a result. Do not finalize a failed attempt as retryable/final, reissue the
@@ -194,8 +245,10 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   }
   return dbTransaction.run({
     subjectId: input.subjectId,
-    commit: ({ currentAuthority, commitPort }) =>
-      persistIssuedSajuOfficialReadingV1({
+    ...(dbTransaction.mappingVerification === 'transaction' ? { executionAttemptId: input.executionAttemptId } : {}),
+    commit: ({ currentAuthority, commitPort, mappingVerifier: transactionMappingVerifier }) => {
+      const mapping = dbTransaction.mappingVerification === 'transaction' ? transactionMappingVerifier : mappingVerifier;
+      return persistIssuedSajuOfficialReadingV1({
         subjectId: input.subjectId,
         readingId: input.readingId,
         readingSessionId: input.readingSessionId,
@@ -204,10 +257,15 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
         sourceBirthRevisionId: input.sourceBirthRevisionId,
         sourceResponse: response,
         executedRequest,
+        ...(input.requireCompleteResponse === true ? { requireCompleteResponse: true } : {}),
+        ...(authenticatedTransportSourceRef === undefined
+          ? {}
+          : { authenticatedTransportSourceRef }),
         sourceVerifier,
-        mappingVerifier,
+        ...(mapping === undefined ? {} : { mappingVerifier: mapping }),
         currentAuthority,
         commitPort,
-      }),
+      });
+    },
   });
 }

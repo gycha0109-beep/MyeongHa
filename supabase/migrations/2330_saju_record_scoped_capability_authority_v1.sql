@@ -40,6 +40,7 @@ create table public.commerce_saju_purchase_origins_v1 (
   saju_record_id uuid not null,
   birth_revision_id uuid not null,
   purchase_kind text not null,
+  approved_admission_hash text,
   created_at timestamptz not null default clock_timestamp(),
   constraint commerce_saju_purchase_origins_intent_subject_fk
     foreign key (purchase_intent_id, subject_id)
@@ -51,11 +52,45 @@ create table public.commerce_saju_purchase_origins_v1 (
     foreign key (birth_revision_id, subject_id)
     references public.birth_profile_revisions (id, subject_id),
   constraint commerce_saju_purchase_origins_kind_check
-    check (purchase_kind in ('original', 'upgrade'))
+    check (purchase_kind in ('original', 'upgrade')),
+  constraint commerce_saju_purchase_origins_approved_admission_shape
+    check (approved_admission_hash is null or
+      (purchase_kind='original' and approved_admission_hash ~ '^sha256:v1:[a-f0-9]{64}$')),
+  constraint commerce_saju_purchase_origins_approved_admission_unique
+    unique (purchase_intent_id, approved_admission_hash)
 );
 create index commerce_saju_purchase_origins_record_idx
   on public.commerce_saju_purchase_origins_v1(subject_id, saju_record_id, birth_revision_id);
 
+-- The approved checkout candidate writes this private child in the same
+-- transaction as its Origin. Existing checkout paths have no writer access.
+create schema commerce_saju_private;
+revoke all on schema commerce_saju_private from public,anon,authenticated,service_role;
+create table commerce_saju_private.approved_purchase_scope_v1 (
+  purchase_intent_id uuid primary key,
+  admission_hash text not null,
+  admission jsonb not null check (jsonb_typeof(admission)='object'),
+  component_scope_keys jsonb not null check (
+    jsonb_typeof(component_scope_keys)='object' and component_scope_keys<>'{}'::jsonb
+  ),
+  foreign key (purchase_intent_id,admission_hash)
+    references public.commerce_saju_purchase_origins_v1(purchase_intent_id,approved_admission_hash)
+    on delete cascade
+);
+alter table commerce_saju_private.approved_purchase_scope_v1 enable row level security;
+revoke all on commerce_saju_private.approved_purchase_scope_v1 from public,anon,authenticated,service_role;
+create function commerce_saju_private.reject_scope_update_v1()
+returns trigger language plpgsql security invoker
+set search_path = pg_catalog
+as $scope_immutable$
+begin
+  raise exception using errcode='23514', message='Approved Saju purchase scope is immutable';
+end
+$scope_immutable$;
+revoke all on function commerce_saju_private.reject_scope_update_v1() from public,anon,authenticated,service_role;
+create trigger approved_purchase_scope_immutable_v1
+before update on commerce_saju_private.approved_purchase_scope_v1
+for each row execute function commerce_saju_private.reject_scope_update_v1();
 
 -- This short-lived collision inventory mirrors the already reviewed 13-product
 -- Saju quote policy. It is NOT Product Capability/Entitlement authority. Only
@@ -185,6 +220,21 @@ begin
     -- admission check even if it successfully acquired a Record row lock.
     if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
       raise exception 'SAJU_PENDING_ORIGIN_REQUIRES_READ_COMMITTED';
+    end if;
+    -- The approved-catalog writer checks overlap by the persisted component
+    -- scope under this same Record lock. Only its exact private context can
+    -- bypass the legacy product-wide collision check.
+    if exists (
+      select 1 from public.commerce_saju_purchase_admission_context_v1 context
+      join public.purchase_intents intent on intent.id=new.purchase_intent_id
+        and intent.product_offer_id=context.product_offer_id
+      where context.backend_pid=pg_catalog.pg_backend_pid()
+        and context.transaction_id=pg_catalog.txid_current()
+        and context.subject_id=new.subject_id and context.saju_record_id=new.saju_record_id
+        and context.birth_revision_id=new.birth_revision_id
+        and context.approved_purchase_intent_id=new.purchase_intent_id
+    ) then
+      return new;
     end if;
     if exists (
       select 1
@@ -586,6 +636,7 @@ declare
   v_scope_key text;
   v_scope_mode text;
   v_product_key text;
+  v_approved_saju_purchase boolean;
   v_scope_key_norm text;
   v_grant_key text;
   v_next_ordering_key text;
@@ -689,33 +740,31 @@ begin
            po.product_id, pcs.product_id, pcs.definition_version, pcs.definition_hash,
            pci.entitlement_key,
            pci.scope_mode,
-           product.product_key,
+           product.product_key, origin.approved_admission_hash is not null,
            case
              when pci.scope_mode='global' then null
              when pci.scope_mode='fixed' then pci.fixed_scope_key
-             when pci.scope_mode='saju_record' then (
-               select 'saju-record:'||record.entitlement_scope_id::text
-               from public.commerce_saju_purchase_origins_v1 origin
-               join public.commerce_saju_records_v1 record
-                 on record.id=origin.saju_record_id
-                and record.subject_id=origin.subject_id
-                and record.birth_revision_id=origin.birth_revision_id
-               where origin.purchase_intent_id=pi.id
-                 and origin.subject_id=pi.subject_id
-                 and product.product_key in (
+             when pci.scope_mode='saju_record' and record.id is not null then case
+               when origin.approved_admission_hash is not null then case
+                 when v_receipt.provider='portone_v2' and v_receipt.platform='web'
+                   and v_receipt.verified_amount_minor=pi.expected_amount_minor
+                   and v_receipt.verified_currency=pi.expected_currency
+                 then approved.component_scope_keys->>p_capability_item_key
+               end
+               when product.product_key in (
                    'standard.career','standard.wealth','standard.love_relationship',
                    'standard.business','standard.family','standard.spouse',
                    'standard.year','standard.month','standard.compatibility',
                    'standard.current_concern','bundle.career_economy',
                    'bundle.love_relationship','bundle.full_saju'
-                 )
-             )
+               ) then 'saju-record:'||record.entitlement_scope_id::text
+             end
              else null
            end
       into v_capability_set_id, v_capability_snapshot, v_capability_snapshot_hash,
            v_offer_product_id, v_capability_product_id,
            v_capability_definition_version, v_capability_definition_hash,
-           v_entitlement_key, v_scope_mode, v_product_key, v_scope_key
+           v_entitlement_key, v_scope_mode, v_product_key, v_approved_saju_purchase, v_scope_key
     from public.purchase_intents pi
     join public.product_offers po on po.id = pi.product_offer_id
     join public.products product on product.id=po.product_id
@@ -724,6 +773,13 @@ begin
     join public.product_capability_items pci
       on pci.capability_set_id = pi.capability_set_id
      and pci.item_key = p_capability_item_key
+    left join public.commerce_saju_purchase_origins_v1 origin
+      on origin.purchase_intent_id=pi.id and origin.subject_id=pi.subject_id
+    left join public.commerce_saju_records_v1 record
+      on record.id=origin.saju_record_id and record.subject_id=origin.subject_id
+      and record.birth_revision_id=origin.birth_revision_id
+    left join commerce_saju_private.approved_purchase_scope_v1 approved
+      on approved.purchase_intent_id=origin.purchase_intent_id and approved.admission_hash=origin.approved_admission_hash
     where pi.id = v_receipt.purchase_intent_id
       and pi.subject_id = v_receipt.subject_id
       and pi.product_offer_id = v_receipt.product_offer_id
@@ -743,6 +799,9 @@ begin
            and v_entitlement_key is distinct from
              public.internal_commerce_saju_entitlement_key_v1(p_capability_item_key))
        or (
+         v_approved_saju_purchase and v_scope_mode<>'saju_record'
+       )
+       or (
          v_product_key in (
            'standard.career','standard.wealth','standard.love_relationship',
            'standard.business','standard.family','standard.spouse',
@@ -758,7 +817,7 @@ begin
            'standard.year','standard.month','standard.compatibility',
            'standard.current_concern','bundle.career_economy',
            'bundle.love_relationship','bundle.full_saju'
-         ),true) and v_scope_mode='saju_record'
+         ),true) and not v_approved_saju_purchase and v_scope_mode='saju_record'
        ) then
       raise exception using errcode = 'P0001',
         constraint = 'internal_entitlement_effect_capability_authority_unavailable',
@@ -1614,6 +1673,7 @@ create table public.commerce_saju_purchase_admission_context_v1 (
   saju_record_id uuid not null,
   birth_revision_id uuid not null,
   product_offer_id uuid not null,
+  approved_purchase_intent_id uuid,
   created_at timestamptz not null default transaction_timestamp(),
   constraint commerce_saju_purchase_admission_context_v1_pk
     primary key(backend_pid,transaction_id)
@@ -1667,6 +1727,7 @@ declare
   v_existing_capability_set_id uuid;
   v_existing_capability_snapshot jsonb;
   v_existing_capability_snapshot_hash text;
+  v_existing_approved_context boolean;
 
   v_subject_kind text;
   v_subject_status text;
@@ -1682,6 +1743,7 @@ declare
   v_product_enabled boolean;
   v_product_retired_at timestamptz;
   v_offer_capability_set_id uuid;
+  v_approved_context boolean;
   v_expected_offer_snapshot jsonb;
 
   v_capability_product_id uuid;
@@ -1771,7 +1833,14 @@ begin
     and pi.idempotency_key = p_idempotency_key;
 
   if found then
-    if exists (
+    select exists (
+      select 1 from public.commerce_saju_purchase_admission_context_v1 context
+      where context.backend_pid=pg_catalog.pg_backend_pid()
+        and context.transaction_id=pg_catalog.txid_current()
+        and context.subject_id=p_subject_id and context.product_offer_id=v_existing_offer_id
+        and context.approved_purchase_intent_id=p_purchase_intent_id
+    ) into v_existing_approved_context;
+    if (exists (
       select 1
       from public.product_offers existing_offer
       join public.products existing_product on existing_product.id=existing_offer.product_id
@@ -1779,7 +1848,10 @@ begin
         and public.internal_commerce_saju_product_fields_v1(
           existing_product.product_key
         ) is not null
-    ) and not exists (
+    ) or exists (
+      select 1 from public.product_capability_items item
+      where item.capability_set_id=v_existing_capability_set_id and item.scope_mode='saju_record'
+    )) and not exists (
       select 1 from public.commerce_saju_purchase_admission_context_v1 context
       where context.backend_pid=pg_catalog.pg_backend_pid()
         and context.transaction_id=pg_catalog.txid_current()
@@ -1797,7 +1869,8 @@ begin
       where existing_offer.id=v_existing_offer_id
         and (
           (
-            public.internal_commerce_saju_product_fields_v1(existing_product.product_key) is not null
+            (v_existing_approved_context
+              or public.internal_commerce_saju_product_fields_v1(existing_product.product_key) is not null)
             and exists (
               select 1 from public.product_capability_items item
               where item.capability_set_id=v_existing_capability_set_id
@@ -1805,7 +1878,8 @@ begin
             )
           )
           or (
-            public.internal_commerce_saju_product_fields_v1(existing_product.product_key) is null
+            not v_existing_approved_context
+            and public.internal_commerce_saju_product_fields_v1(existing_product.product_key) is null
             and exists (
               select 1 from public.product_capability_items item
               where item.capability_set_id=v_existing_capability_set_id
@@ -1926,7 +2000,18 @@ begin
       message = 'selected product offer was not found';
   end if;
 
-  if public.internal_commerce_saju_product_fields_v1(v_product_key) is not null
+  select exists (
+    select 1 from public.commerce_saju_purchase_admission_context_v1 context
+    where context.backend_pid=pg_catalog.pg_backend_pid()
+      and context.transaction_id=pg_catalog.txid_current()
+      and context.subject_id=p_subject_id and context.product_offer_id=p_product_offer_id
+      and context.approved_purchase_intent_id=p_purchase_intent_id
+  ) into v_approved_context;
+  if (public.internal_commerce_saju_product_fields_v1(v_product_key) is not null
+      or exists (
+        select 1 from public.product_capability_items item
+        where item.capability_set_id=v_offer_capability_set_id and item.scope_mode='saju_record'
+      ))
      and not exists (
        select 1 from public.commerce_saju_purchase_admission_context_v1 context
        where context.backend_pid=pg_catalog.pg_backend_pid()
@@ -1996,14 +2081,14 @@ begin
   end if;
 
   if (
-    public.internal_commerce_saju_product_fields_v1(v_product_key) is not null
+    (v_approved_context or public.internal_commerce_saju_product_fields_v1(v_product_key) is not null)
     and exists (
       select 1 from public.product_capability_items item
       where item.capability_set_id=v_offer_capability_set_id
         and item.scope_mode<>'saju_record'
     )
   ) or (
-    public.internal_commerce_saju_product_fields_v1(v_product_key) is null
+    not v_approved_context and public.internal_commerce_saju_product_fields_v1(v_product_key) is null
     and exists (
       select 1 from public.product_capability_items item
       where item.capability_set_id=v_offer_capability_set_id

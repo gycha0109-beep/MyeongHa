@@ -5,6 +5,7 @@ import {
   type PaymentAttemptServerIdentityPortV1,
 } from './payment-attempt-create-command.js';
 import { handlePaymentAttemptCreateRequestV1 } from './payment-attempt-create-http.js';
+import { derivePortOneKcpV2SandboxPaymentIdV1 } from './portone-kcp-v2-sandbox-payment-id-v1.js';
 import type {
   PostgresSubjectConnectionV1,
   PostgresSubjectPoolV1,
@@ -71,14 +72,18 @@ function fakePool(input: {
           if (text.includes('begin_member_subject_context_v1')) {
             return { rows: [{ subjectId: SUBJECT_ID, subjectKind: 'member' } as Row] };
           }
-          if (text.includes('cmd_create_payment_attempt_v1')) {
+          if (text.includes('cmd_create_payment_attempt_v1') || text.includes('create_approved_saju_sandbox_attempt_v1')) {
+            const approved = text.includes('create_approved_saju_sandbox_attempt_v1');
+            const providerRequestId = approved ? derivePortOneKcpV2SandboxPaymentIdV1({
+              purchaseIntentId: PURCHASE_INTENT_ID, idempotencyKey: IDEMPOTENCY_KEY,
+            }) : PROVIDER_REQUEST_ID;
             expect(values).toEqual([
               SUBJECT_ID,
               PAYMENT_ATTEMPT_ID,
               PURCHASE_INTENT_ID,
               'sandbox',
               IDEMPOTENCY_KEY,
-              PROVIDER_REQUEST_ID,
+              providerRequestId,
             ]);
             if (input.commandConstraint !== undefined) {
               throw Object.assign(new Error('private database detail'), {
@@ -93,9 +98,9 @@ function fakePool(input: {
               purchaseIntentId: PURCHASE_INTENT_ID,
               productOfferId: OFFER_ID,
               attemptNo: 1,
-              provider: 'testpay',
+              provider: approved ? 'portone_v2' : 'testpay',
               environment: 'sandbox',
-              providerRequestId: PROVIDER_REQUEST_ID,
+              providerRequestId,
               providerTransactionId: null,
               status: 'created',
               replayed: input.replayed ?? false,
@@ -114,6 +119,7 @@ function invoke(input: {
   evidence?: VerifiedSubjectIdentityEvidenceV1 | null;
   pool?: PostgresSubjectPoolV1;
   serverIdentityPort?: PaymentAttemptServerIdentityPortV1;
+  approvedSajuSandbox?: true;
 } = {}) {
   return handlePaymentAttemptCreateRequestV1({
     request: input.request ?? post({
@@ -130,10 +136,29 @@ function invoke(input: {
     ),
     pool: input.pool ?? fakePool(),
     identityPort: input.serverIdentityPort ?? identityPort(),
+    ...(input.approvedSajuSandbox === true ? { approvedSajuSandbox: true } : {}),
   });
 }
 
 describe('Payment Attempt authenticated HTTP runtime foundation', () => {
+  it('uses the private approved checkout command only when configured by the server', async () => {
+    const queriedSql: string[] = [];
+    const response = await invoke({
+      approvedSajuSandbox: true,
+      pool: fakePool({ queriedSql }),
+      serverIdentityPort: {
+        nextPaymentAttemptId: () => PAYMENT_ATTEMPT_ID,
+        providerRequestIdFor: derivePortOneKcpV2SandboxPaymentIdV1,
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(queriedSql.some((sql) => sql.includes('create_approved_saju_sandbox_attempt_v1'))).toBe(true);
+    expect(queriedSql.some((sql) => sql.includes('cmd_create_payment_attempt_v1'))).toBe(false);
+    expect((await invoke({
+      approvedSajuSandbox: true,
+      request: post({ purchaseIntentId: PURCHASE_INTENT_ID, idempotencyKey: 'x' }),
+    })).status).toBe(400);
+  });
   it('requires verified identity before parsing body or connecting PostgreSQL', async () => {
     const connect = vi.fn(async () => { throw new Error('must not connect'); });
     const request = new Request('https://myeongha.internal/internal-not-publicly-mounted', {

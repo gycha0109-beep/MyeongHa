@@ -157,7 +157,9 @@ export async function prepareReaderLatestAnchorContinuityV1(input: Readonly<{
   preflight: CharacterStandardReadingChatTurnPreflightV2;
   grounded: CharacterStandardChatGroundingV2;
   anchorAuthorityPort: ValidatedStandardFollowupAnchorAuthorityPortV1;
-  recentMessageAuthorityPort: Pick<ReaderContextNonMemoryReadAuthorityPortV1,'readRecentMessages'>;
+  recentMessageAuthorityPort?: Pick<ReaderContextNonMemoryReadAuthorityPortV1,'readRecentMessages'>;
+  /** The protected SQL function checks the current grant and latest acknowledged marker. */
+  useApprovedSajuAnchorContinuity?: true;
 }>): Promise<ReaderLatestAnchorContinuityDecisionV1> {
   try {
     assertServerPreparedStandardChatPreflightV2(input.preflight);
@@ -189,11 +191,26 @@ export async function prepareReaderLatestAnchorContinuityV1(input: Readonly<{
 
   const read=async ():Promise<ReaderLatestAssistantObservationV1>=>{
     try {
-      const rows=await input.recentMessageAuthorityPort.readRecentMessages({
+      if (input.useApprovedSajuAnchorContinuity === true) {
+        const anchor = await input.anchorAuthorityPort.readLatestValidatedAnchor({
+          subjectId: scope.subjectId, threadId: scope.threadId,
+          readerCharacterId: scope.readerCharacterId, readingRef: scope.readingId,
+        });
+        if (anchor === null) return Object.freeze({
+          mode: 'hold' as const, reason: 'LATEST_ASSISTANT_UNAVAILABLE' as const,
+          permitsSourceAuthority: false as const,
+        });
+        return Object.freeze({
+          mode: 'latest_assistant_metadata' as const, assistantMessageId: anchor.assistantMessageId,
+          metadataDigest: 'sha256:v1:' + createHash('sha256').update(canonicalJson(anchor)).digest('hex'),
+          permitsSourceAuthority: false as const,
+        });
+      }
+      const rows=await input.recentMessageAuthorityPort?.readRecentMessages({
         subjectId:scope.subjectId,threadId:scope.threadId,limit:32,
       });
       return inspectReaderLatestAssistantObservationV1({
-        rows,expectedReaderCharacterId:scope.readerCharacterId,
+        rows: rows ?? [],expectedReaderCharacterId:scope.readerCharacterId,
       });
     }catch {
       return Object.freeze({

@@ -18,6 +18,12 @@ import {
   type CharacterSajuUtteranceV1,
 } from '../../../packages/domain/src/index.js';
 import { ApiCommandError } from './api-error.js';
+import { createPostgresApprovedSajuReadingAccessV1 } from './postgres-approved-saju-reading-access-v1.js';
+import type { PostgresSubjectExecutionScopeV1 } from './postgres-subject-execution.js';
+import {
+  runCharacterSajuConsultationShadowV1,
+  type CharacterSajuConsultationShadowPortV1,
+} from './character-saju-consultation-shadow-v1.js';
 import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
 import {
   prepareOfficialReadingReaderAdmissionV1,
@@ -123,6 +129,8 @@ export interface RunReaderInterpretationPreviewInputV1 {
   readonly accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1;
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  /** Server-side optional comparison only; no user-visible candidate. */
+  readonly consultationShadowPort?: CharacterSajuConsultationShadowPortV1;
 }
 
 export interface RunThreadBoundReaderInterpretationPreviewInputV1 {
@@ -140,6 +148,8 @@ export interface RunThreadBoundReaderInterpretationPreviewInputV1 {
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
   readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  /** Server-side optional comparison only; no user-visible candidate. */
+  readonly consultationShadowPort?: CharacterSajuConsultationShadowPortV1;
   /**
    * Product/Commerce server-only authority. Missing authority fails closed:
    * it cannot be substituted with a hard-coded standard Product or Reader role.
@@ -223,6 +233,7 @@ async function projectAndAdmitGrounding(input: {
   readonly source: CharacterStandardReadingKnowledgeSourceV1;
   readonly context: CharacterRuntimeContextV1;
   readonly projectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  readonly requireExactSourceHash?: true;
 }): Promise<{
   readonly grounding: CharacterSajuGroundingBundleViewV1;
   readonly runtimeContext: CharacterRuntimeContextWithGroundingV1;
@@ -241,6 +252,13 @@ async function projectAndAdmitGrounding(input: {
     throw new ReaderInterpretationPreviewRuntimeErrorV1(
       'SOURCE_MISMATCH',
       'Reader Interpretation base Saju context does not match the authorized Official Reading.',
+    );
+  }
+
+  if (input.requireExactSourceHash === true && input.source.productResponseState !== 'delivered') {
+    throw new ReaderInterpretationPreviewRuntimeErrorV1(
+      'SOURCE_MISMATCH',
+      'Purchased Saju consultation requires a complete official source.',
     );
   }
 
@@ -278,6 +296,11 @@ async function projectAndAdmitGrounding(input: {
       throw new TypeError(
         'Saju grounding projection did not return valid source and grounding hashes.',
       );
+    }
+
+    if (input.requireExactSourceHash === true &&
+        'sha256:v1:' + (candidate as { sourceResponseHash: string }).sourceResponseHash !== input.source.responseHash) {
+      throw new TypeError('Saju grounding does not match the exact purchased Reading response.');
     }
 
     const expectedRef = Object.freeze({
@@ -421,6 +444,9 @@ async function renderResolvedReaderInterpretationPreviewV1(input: {
   readonly context: CharacterRuntimeContextV1;
   readonly requestedDomain: SajuDomain;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  /** Server-side optional comparison only; no user-visible candidate. */
+  readonly consultationShadowPort?: CharacterSajuConsultationShadowPortV1;
+  readonly assertCurrentPaidSource?: (source: CharacterStandardReadingKnowledgeSourceV1) => Promise<void>;
 }): Promise<ReaderInterpretationPreviewEnvelopeV1> {
   // Character-neutral bounded selection is resolved before the Saju call.
   // Reader grants, pinned Character content and rollout admission remain
@@ -430,7 +456,9 @@ async function renderResolvedReaderInterpretationPreviewV1(input: {
     source: input.source,
     context: input.context,
     projectionPort: input.groundingProjectionPort,
+    ...(input.assertCurrentPaidSource === undefined ? {} : { requireExactSourceHash: true }),
   });
+  await input.assertCurrentPaidSource?.(input.source);
 
   assertRuntimeIdentity({
     source: input.source,
@@ -484,6 +512,25 @@ async function renderResolvedReaderInterpretationPreviewV1(input: {
     });
   }
 
+  // After official access, grounding admission, and semantic preservation:
+  // comparison candidates are NEVER included in any Reader preview envelope.
+  if (input.consultationShadowPort !== undefined) {
+    try {
+      await runCharacterSajuConsultationShadowV1({
+        rendered,
+        grounding,
+        publishedCharacterVoice: Object.freeze({
+          speech: input.context.speech,
+          persona: input.context.persona,
+        }),
+        port: input.consultationShadowPort,
+      });
+    } catch {
+      // Shadow errors cannot replace or weaken the exact-core Reading.
+    }
+    await input.assertCurrentPaidSource?.(input.source);
+  }
+
   return withHash({
     ...common,
     mode: 'reader_interpretation' as const,
@@ -527,6 +574,7 @@ export async function runReaderInterpretationPreviewV1(
     context: input.context,
     requestedDomain: input.requestedDomain,
     groundingProjectionPort: input.groundingProjectionPort,
+    ...(input.consultationShadowPort === undefined ? {} : { consultationShadowPort: input.consultationShadowPort }),
   });
 }
 
@@ -541,8 +589,49 @@ export async function runReaderInterpretationPreviewV1(
  * authority. No browser-provided Reader, bundle, Character profile, relationship,
  * Memory, perspective, grounding, or Official Reading prose is accepted here.
  */
-export async function runThreadBoundReaderInterpretationPreviewV1(
+export function runThreadBoundReaderInterpretationPreviewV1(
   input: RunThreadBoundReaderInterpretationPreviewInputV1,
+): Promise<ReaderInterpretationPreviewEnvelopeV1> {
+  return runThreadBoundReaderInterpretationV1(input);
+}
+
+/** Paid Reader validation uses the exact same authority and immutable snapshot as Records. */
+export function runApprovedSajuReaderInterpretationPreviewV1(
+  input: Omit<RunThreadBoundReaderInterpretationPreviewInputV1,
+    'resolvedSubjectId' | 'accessAuthorityPort' | 'artifactAuthorityPort' | 'currentVerifiedPurchaseAuthorityPort'> & {
+    readonly scope: PostgresSubjectExecutionScopeV1;
+  },
+): Promise<ReaderInterpretationPreviewEnvelopeV1> {
+  const { scope, ...request } = input;
+  if (scope.resolvedSubject.subjectKind !== 'member') {
+    return Promise.reject(new ReaderInterpretationPreviewRuntimeErrorV1(
+      'ACCESS_DENIED', 'A verified member is required for a purchased Saju Reading.',
+    ));
+  }
+  const officialReadingId = requiredString(request.officialReadingId, 'officialReadingId');
+  const { accessPort, artifactPort, purchasePort } = createPostgresApprovedSajuReadingAccessV1(scope.client, officialReadingId);
+  const assertCurrentPaidSource = async (source: CharacterStandardReadingKnowledgeSourceV1) => {
+    try {
+      await purchasePort.assertCurrentVerifiedPurchase(source);
+    } catch {
+      throw new ReaderInterpretationPreviewRuntimeErrorV1(
+        'ACCESS_DENIED', 'Purchased Saju Reader access changed during interpretation.',
+      );
+    }
+  };
+  return runThreadBoundReaderInterpretationV1({
+    ...request,
+    resolvedSubjectId: scope.resolvedSubject.subjectId,
+    officialReadingId,
+    accessAuthorityPort: accessPort,
+    artifactAuthorityPort: artifactPort,
+    currentVerifiedPurchaseAuthorityPort: purchasePort,
+  }, assertCurrentPaidSource);
+}
+
+async function runThreadBoundReaderInterpretationV1(
+  input: RunThreadBoundReaderInterpretationPreviewInputV1,
+  assertCurrentPaidSource?: (source: CharacterStandardReadingKnowledgeSourceV1) => Promise<void>,
 ): Promise<ReaderInterpretationPreviewEnvelopeV1> {
   const subjectId = requiredString(input.resolvedSubjectId, 'resolvedSubjectId');
   const officialReadingId = requiredString(input.officialReadingId, 'officialReadingId');
@@ -697,5 +786,7 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
     context: prepared.context,
     requestedDomain: prepared.source.sajuDomain,
     groundingProjectionPort: input.groundingProjectionPort,
+    ...(input.consultationShadowPort === undefined ? {} : { consultationShadowPort: input.consultationShadowPort }),
+    ...(assertCurrentPaidSource === undefined ? {} : { assertCurrentPaidSource }),
   });
 }

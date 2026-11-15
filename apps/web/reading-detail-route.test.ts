@@ -101,13 +101,8 @@ describe('Reading hub/detail fail-closed regression', () => {
       'reading-detail.html?topic=money',
       'reading-detail.html?topic=love',
       'reading-detail.html?topic=business',
-      'reading-detail.html?topic=family',
-      'reading-detail.html?topic=life-stage',
       'reading-detail.html?scope=year',
       'reading-detail.html?scope=month',
-      'reading-detail.html?topic=spouse',
-      'reading-detail.html?topic=compatibility',
-      'reading-detail.html?topic=question-specific',
     ]) {
       expect(hub).toContain(href);
     }

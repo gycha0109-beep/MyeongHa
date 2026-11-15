@@ -23,6 +23,7 @@ export interface CreateProductionPaymentAttemptHandoffContextRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
+  readonly approvedSajuSandbox?: true;
 }
 
 /**
@@ -51,6 +52,7 @@ export function createProductionPaymentAttemptHandoffContextRuntimeV1(
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
         pool: poolLease.pool,
+        ...(input.approvedSajuSandbox === true ? { approvedSajuSandbox: true } : {}),
       });
     },
     close() {

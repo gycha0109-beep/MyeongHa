@@ -1,6 +1,7 @@
 import { projectProductReadingResponseV2 } from '../../../packages/api-client/src/product-reading-display.js';
 import type { SajuProductionReadingRequestV1 } from './saju-production-reading-http-adapter.js';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
+import type { SajuCanonicalReaderSourceV1 } from './saju-canonical-reader-source-v1.js';
 
 /**
  * Saju Production source -> DB-owned immutable Official Reading handoff.
@@ -17,6 +18,7 @@ export const SAJU_OFFICIAL_DB_ISSUANCE_HANDOFF_VERSION_V1 =
 
 const HASH = /^[a-f0-9]{64}$/u;
 const VERSIONED_BIRTH_HASH = /^sha256:v1:[a-f0-9]{64}$/u;
+const EXACT_SOURCE_REF = /^saju_source_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu;
 const RESPONSE_VERSION = 'myeonghwa-product-reading-response-v2';
 const STATES = new Set(['delivered', 'delivered_with_fallback']);
@@ -32,14 +34,23 @@ function uuid(value: unknown): value is string {
 }
 
 /** Returned ONLY from a real Saju Production issuer signature/semantic verifier. */
+export interface SajuProductionIssueProofEnvelopeV1 {
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly signature: string;
+  readonly readerSource?: SajuCanonicalReaderSourceV1;
+}
+
 export interface VerifiedSajuProductionIssueV1 {
   readonly state: 'production_source_verified';
   readonly nativeReadingId: string;
+  /** Digest of the exact normalized request attested by the Production issuer. */
+  readonly sourceRequestHash: string;
   readonly sourceResponseHash: string;
   readonly sourceBirthRevisionId: string;
   readonly sourceBirthInputHash: string;
   readonly engineVersion: string;
   readonly externalRequestRef: string;
+  readonly issueProof?: SajuProductionIssueProofEnvelopeV1;
 }
 
 /** DB Owner must separately attest that the ONLY transformation is Reading ID. */
@@ -62,6 +73,7 @@ export interface SajuOfficialSourceVerificationPortV1 {
     readonly dbReadingId: string;
     readonly readingSessionId: string;
     readonly sourceBirthRevisionId: string;
+    readonly executionAttemptId: string;
   }>): Promise<VerifiedSajuProductionIssueV1 | null>;
 }
 
@@ -74,6 +86,18 @@ export interface SajuOfficialDbMappingVerificationPortV1 {
     readonly source: VerifiedSajuProductionIssueV1;
     readonly originalResponse: unknown;
   }>): Promise<ApprovedSajuReadingIdMappingV1 | null>;
+}
+
+/** The stored artifact preserves the native payload with the authorized DB ID. */
+export function projectSajuOfficialStoredSnapshotV1(
+  response: unknown,
+  readingId: string,
+): Readonly<Record<string, unknown>> | null {
+  if (!uuid(readingId) || !obj(response) || !obj(response.reading) || !id(response.reading.readingId)) return null;
+  return Object.freeze({
+    ...response,
+    reading: Object.freeze({ ...response.reading, readingId }),
+  });
 }
 
 /** Run this immediately before finalization in the SAME governed DB transaction. */
@@ -98,6 +122,8 @@ export interface SajuOfficialImmutableCommitPortV1 {
     readonly engineVersion: string;
     readonly externalRequestRef: string;
     readonly nativeReadingId: string;
+    readonly sourceRequestHash?: string;
+    readonly issueProof?: SajuProductionIssueProofEnvelopeV1;
     readonly sourceResponseHash: string;
     readonly sourceBirthInputHash: string;
     readonly readingContractVersion: typeof RESPONSE_VERSION;
@@ -158,6 +184,9 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
   readonly sourceResponse: unknown;
   /** Exact request sent to the authenticated Saju host, for issuer digest verification. */
   readonly executedRequest: SajuProductionReadingRequestV1;
+  readonly requireCompleteResponse?: true;
+  /** Authenticated transport header coordinate; must equal independently verified Source provenance. */
+  readonly authenticatedTransportSourceRef?: string;
   readonly sourceVerifier?: SajuOfficialSourceVerificationPortV1;
   readonly mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
   readonly currentAuthority?: SajuOfficialCurrentAuthorityPortV1;
@@ -168,8 +197,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     input.sourceBirthRevisionId].every(uuid)) {
     return held('production_source_unverified');
   }
-  // No Production issuer exists in the current Saju runtime. In particular,
-  // a Preview source proof, even when HMAC-verified, cannot enter this path.
+  // A Preview source proof cannot authorize an official Reading.
   if (!input.sourceVerifier || !input.mappingVerifier
     || !input.currentAuthority || !input.commitPort) {
     return held('production_source_unverified');
@@ -184,6 +212,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
   if (!obj(native) || !obj(native.reading)
     || native.responseVersion !== RESPONSE_VERSION
     || !STATES.has(String(native.state))
+    || (input.requireCompleteResponse === true && native.state !== 'delivered')
     || !id(native.responseId)
     || !id(native.reading.readingId)) {
     return held('production_source_unverified');
@@ -196,21 +225,27 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     return held('production_source_unverified');
   }
 
+  const executedRequestHash = hashSajuHeldSourceProofRequestV1(input.executedRequest);
+  const originalHash = hashSajuHeldSourceProofRequestV1(native);
   const source = await input.sourceVerifier.verifyProductionIssue({
     sourceResponse: native, executedRequest: input.executedRequest, subjectId: input.subjectId,
     dbReadingId: input.readingId, readingSessionId: input.readingSessionId,
     sourceBirthRevisionId: input.sourceBirthRevisionId,
+    executionAttemptId: input.executionAttemptId,
   });
-  const originalHash = hashSajuHeldSourceProofRequestV1(native);
   if (source?.state !== 'production_source_verified'
     || source.nativeReadingId !== native.reading.readingId
+    || source.sourceRequestHash !== executedRequestHash
     || source.sourceResponseHash !== originalHash
     || !HASH.test(source.sourceResponseHash)
     || source.sourceBirthRevisionId !== input.sourceBirthRevisionId
     || typeof source.sourceBirthInputHash !== 'string'
     || !VERSIONED_BIRTH_HASH.test(source.sourceBirthInputHash)
     || !id(source.engineVersion)
-    || !id(source.externalRequestRef)) {
+    || !id(source.externalRequestRef)
+    || (input.authenticatedTransportSourceRef !== undefined &&
+      (!EXACT_SOURCE_REF.test(input.authenticatedTransportSourceRef) ||
+        source.externalRequestRef !== input.authenticatedTransportSourceRef))) {
     return held('production_source_unverified');
   }
 
@@ -223,10 +258,10 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
 
   // Only the DB UUID is remapped, never interpreted/rewritten text, scope,
   // disclosures, ambiguity, birth data, or issuer response metadata.
-  const storedSnapshot = Object.freeze({
-    ...native,
-    reading: Object.freeze({ ...native.reading, readingId: input.readingId }),
-  });
+  const storedSnapshot = projectSajuOfficialStoredSnapshotV1(native, input.readingId);
+  if (storedSnapshot === null || hashSajuHeldSourceProofRequestV1(native) !== originalHash) {
+    return held('db_mapping_unverified');
+  }
   const storedHash = hashSajuHeldSourceProofRequestV1(storedSnapshot);
   if (mapped?.state !== 'approved_mapping'
     || mapped.subjectId !== input.subjectId
@@ -258,6 +293,8 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     engineVersion: source.engineVersion,
     externalRequestRef: source.externalRequestRef,
     nativeReadingId: source.nativeReadingId,
+    sourceRequestHash: source.sourceRequestHash,
+    ...(source.issueProof === undefined ? {} : { issueProof: source.issueProof }),
     sourceResponseHash: originalHash,
     sourceBirthInputHash: source.sourceBirthInputHash,
     readingContractVersion: RESPONSE_VERSION,

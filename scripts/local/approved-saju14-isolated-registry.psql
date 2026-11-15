@@ -1,0 +1,97 @@
+\set ON_ERROR_STOP on
+-- Synthetic, disposable PostgreSQL 17 ONLY. These are not Production offers,
+-- not settlement evidence, and not a release of the Saju signing authority.
+begin;
+do $isolated$
+declare
+  v_product_id uuid;
+  offer_id uuid;
+  capability_id uuid;
+  offer_key text;
+  amount bigint;
+  fields text[];
+  counterpart_order text;
+  item_count integer;
+begin
+  if current_database() <> 'myeongha_saju_sandbox_v1'
+    or current_setting('server_version_num')::integer < 170000
+    or current_setting('server_version_num')::integer >= 180000
+    or inet_server_addr() is not null then
+    raise exception 'HOLD_DISPOSABLE_SAJU14_REGISTRY_ONLY';
+  end if;
+  if to_regclass('commerce_saju_private.approved_fulfillment_release_v1') is null then
+    raise exception 'HOLD_SAJU14_APPROVED_SCHEMA_NOT_INSTALLED';
+  end if;
+  select id into v_product_id from public.products
+    where product_key = 'isolated.saju14.review';
+  if v_product_id is null then
+    v_product_id := gen_random_uuid();
+    insert into public.products(id,product_key,product_type,enabled,created_at)
+    values (v_product_id,'isolated.saju14.review','reading',true,now());
+    foreach offer_key in array array[
+      'career','business','wealth','relationship','year','month',
+      'first-counterpart','additional-counterpart','relationship-plus-first',
+      'career-economy','basic','basic-year','basic-month','basic-year-month'
+    ] loop
+      select approved.amount_minor,approved.fields,approved.counterpart_order
+        into strict amount,fields,counterpart_order
+      from commerce_saju_private.approved_offer_v1(offer_key) approved;
+      offer_id := gen_random_uuid();
+      capability_id := gen_random_uuid();
+      insert into public.product_capability_sets(
+        id,product_id,definition_version,definition_hash,created_at
+      ) values (
+        capability_id,v_product_id,offer_key,'isolated-saju14-' || offer_key,now()
+      );
+      insert into public.product_capability_items(
+        capability_set_id,item_key,entitlement_key,scope_mode,validity_mode
+      ) select capability_id,field,'saju.' || field,'saju_record','unbounded'
+        from unnest(fields) field;
+      insert into public.product_offers(
+        id,product_id,platform,provider,external_product_id,currency,
+        display_price_minor,enabled,created_at,capability_set_id
+      ) values (
+        offer_id,v_product_id,'web','portone_v2','isolated-saju14-' || offer_key,
+        'KRW',amount,true,now(),capability_id
+      );
+      insert into public.product_offer_charge_terms(
+        id,product_offer_id,terms_version,amount_minor,currency
+      ) values (
+        gen_random_uuid(),offer_id,'isolated-review',amount,'KRW'
+      );
+      insert into commerce_saju_private.approved_fulfillment_release_v1(
+        product_offer_id,approved_offer_id,capability_set_id,components
+      ) select offer_id,offer_key,capability_id,jsonb_agg(jsonb_build_object(
+        'component',field,'authority','official_fulfillment',
+        'releaseRef','isolated-' || field) order by field)
+        from unnest(fields) field;
+    end loop;
+  end if;
+
+  select count(*) into item_count from public.product_offers offer
+    join commerce_saju_private.approved_fulfillment_release_v1 release
+      on release.product_offer_id=offer.id and release.revoked_at is null
+    where offer.product_id=v_product_id and offer.enabled
+      and offer.provider='portone_v2' and offer.platform='web'
+      and offer.currency='KRW';
+  if item_count <> 14 then
+    raise exception 'HOLD_SAJU14_SYNTHETIC_REGISTRY_INCOMPLETE: %',item_count;
+  end if;
+  if exists (
+    select 1 from public.product_offers offer
+    join commerce_saju_private.approved_fulfillment_release_v1 release
+      on release.product_offer_id=offer.id
+    where offer.product_id=v_product_id
+      and (offer.display_price_minor is distinct from (
+          select amount_minor from commerce_saju_private.approved_offer_v1(release.approved_offer_id))
+        or release.components <> (
+          select jsonb_agg(jsonb_build_object(
+            'component',field,'authority','official_fulfillment',
+            'releaseRef','isolated-' || field) order by field)
+          from unnest((select approved.fields from commerce_saju_private.approved_offer_v1(release.approved_offer_id) approved)) field))
+  ) then
+    raise exception 'HOLD_SAJU14_SYNTHETIC_PRICE_OR_COMPONENT_DRIFT';
+  end if;
+end
+$isolated$;
+commit;

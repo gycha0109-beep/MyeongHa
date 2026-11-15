@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { APPROVED_SAJU_CATALOG_V1, getApprovedSajuOfferV1 } from
+  '../packages/contracts/src/approved-saju-catalog.js';
 
 const webRoot = resolve(process.cwd(), 'apps/web');
 
@@ -86,10 +88,18 @@ describe('Web Golden Master', () => {
       '사주 해석 상품',
       '보고서 구성 미리보기',
     ]);
-    expectInOrder(page.slice(page.indexOf('const sajuProductTopics')), [
-      '직업 · 커리어', '재물', '연애 · 관계',
-      '사업', '가족', '삶의 단계', '올해', '이번 달', '배우자', '궁합', '지금 고민으로 보기',
+    expect(APPROVED_SAJU_CATALOG_V1.map((offer) => offer.id)).toEqual([
+      'career', 'business', 'wealth', 'relationship',
+      'year', 'month', 'first-counterpart',
+      'additional-counterpart', 'relationship-plus-first',
+      'career-economy', 'basic', 'basic-year', 'basic-month', 'basic-year-month',
     ]);
+    expect(getApprovedSajuOfferV1('career')).toMatchObject({
+      title: '직업·커리어운', priceKrw: 9900, type: 'single',
+    });
+    expect(getApprovedSajuOfferV1('basic-year-month')).toMatchObject({
+      title: '전체 사주 + 올해 + 이번 달', priceKrw: 39700,
+    });
 
     const runtimeIds = [
       'saju-status', 'saju-empty', 'saju-birth-form',
@@ -105,8 +115,6 @@ describe('Web Golden Master', () => {
     ] as const;
     for (const id of runtimeIds) expect(saju).toContain(`id="${id}"`);
     expect(page).not.toContain('전체 사주');
-    const catalog = page.match(/const sajuProductTopics = \[([\s\S]*?)\] as const;/u)?.[1] ?? '';
-    expect(catalog.match(/symbol:/gu)).toHaveLength(11);
     expect(page).toContain("resumedVisibleTopic ?? '#saju-design-products-title'");
     expect(design).toContain('.saju-design-product-card:nth-last-child(3):nth-child(4n+1)');
     expect(design).toContain('.gm-saju-main:has(#saju-empty:not([hidden]))');

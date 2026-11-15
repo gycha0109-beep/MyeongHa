@@ -83,6 +83,7 @@ function verifier(overrides:Record<string,unknown>={}) {
 function fakePool(
   sql: string[], values: unknown[][],
   grantEffect: 'same_event'|'unattributed'='same_event',
+  approvedDisposition?: 'revoked' | 'unrelated_commerce',
 ) {
   return {
     async connect() {
@@ -90,6 +91,11 @@ function fakePool(
         async query(statement:string, bindings?:readonly unknown[]) {
           sql.push(statement);
           if (bindings!==undefined) values.push([...bindings]);
+          if (statement.includes('internal_apply_approved_saju_full_cancellation_v1')) {
+            return {rows:[{result: approvedDisposition==='unrelated_commerce'
+              ? {disposition:approvedDisposition}
+              : {disposition:approvedDisposition,receiptId:RECEIPT,providerEventId:EVENT,grantCount:5}}]};
+          }
           if (statement.includes('cmd_apply_verified_portone_reader_full_cancellation_v1')) {
             return {rows:[{result:{
               contractVersion:'portone-reader-full-cancellation-v1',
@@ -168,6 +174,27 @@ describe('PortOne authenticated full cancellation -> scoped Reader revoke',()=>{
     });
     expect(sql.at(-1)).toBe('COMMIT');
   });
+
+  it.each(['revoked','unrelated_commerce'] as const)(
+    'routes verified approved cancellation before legacy cancellation when disposition is %s',
+    async (disposition) => {
+      const sql: string[] = [];
+      const event = signedEvent('Transaction.Cancelled',fullCancelData);
+      const result = await executePortOneV2WebhookPaymentCompletionV1({
+        ...event,
+        config: { ...event.config, privateApprovedSajuFullCancellationEnabled:true },
+        pool: fakePool(sql,[],'same_event',disposition),
+        verificationAdapter: {verify:vi.fn(async()=>{throw Error('not paid')})},
+        fullCancellationVerifier: verifier().verifier,
+      });
+      expect(result).toMatchObject({kind:'cancelled',receiptId:RECEIPT,grantCount:disposition==='revoked'?5:1});
+      const statements = [expect.stringContaining('internal_apply_approved_saju_full_cancellation_v1')];
+      if (disposition==='unrelated_commerce') {
+        statements.push(expect.stringContaining('cmd_apply_verified_portone_reader_full_cancellation_v1'));
+      }
+      expect(sql).toEqual(['BEGIN','SET LOCAL ROLE myeongha_commerce_internal_executor',...statements,'COMMIT']);
+    },
+  );
 
   it('normalizes equivalent RFC3339 provider clocks without inventing a new event order',async()=>{
     const sql:string[]=[];

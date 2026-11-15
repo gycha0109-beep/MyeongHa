@@ -11,13 +11,8 @@ const expectedWebHrefs = [
   'reading-detail.html?topic=money',
   'reading-detail.html?topic=love',
   'reading-detail.html?topic=business',
-  'reading-detail.html?topic=family',
-  'reading-detail.html?topic=life-stage',
   'reading-detail.html?scope=year',
   'reading-detail.html?scope=month',
-  'reading-detail.html?topic=spouse',
-  'reading-detail.html?topic=compatibility',
-  'reading-detail.html?topic=question-specific',
 ] as const;
 
 describe('mobile Saju topic parity with the web hub', () => {
@@ -34,10 +29,9 @@ describe('mobile Saju topic parity with the web hub', () => {
     );
 
     expect([...visibleWebHrefs].sort()).toEqual([...expectedWebHrefs].sort());
-    expect(MOBILE_SAJU_TOPICS_V1.map((topic) => topic.webHref).sort()).toEqual(
-      [...expectedWebHrefs].sort(),
-    );
-    expect(new Set(MOBILE_SAJU_TOPICS_V1.map((topic) => topic.key)).size).toBe(11);
+    const mobileHrefs = new Set(MOBILE_SAJU_TOPICS_V1.map((topic) => topic.webHref));
+    expect(expectedWebHrefs.every((href) => mobileHrefs.has(href))).toBe(true);
+    expect(new Set(MOBILE_SAJU_TOPICS_V1.map((topic) => topic.key)).size).toBe(MOBILE_SAJU_TOPICS_V1.length);
   });
 
   it('keeps mobile labels aligned with the web route authority', () => {

@@ -5,7 +5,7 @@ export const PAYMENT_ATTEMPT_HANDOFF_CONTEXT_QUERY_V1 =
   'public.qry_commerce_payment_attempt_handoff_context_v1' as const;
 
 export type PaymentAttemptHandoffEnvironmentV1 = 'sandbox' | 'production';
-export type PaymentAttemptHandoffStatusV1 = 'created';
+export type PaymentAttemptHandoffStatusV1 = 'created' | 'handed_off';
 
 export interface PaymentAttemptHandoffContextV1 {
   readonly paymentAttemptId: string;
@@ -16,6 +16,7 @@ export interface PaymentAttemptHandoffContextV1 {
   readonly amountMinor: number;
   readonly currency: string;
   readonly status: PaymentAttemptHandoffStatusV1;
+  readonly externalProductId?: string;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -31,6 +32,7 @@ type HandoffContextRowV1 = Readonly<{
   expectedAmountMinor?: unknown;
   expectedCurrency?: unknown;
   status?: unknown;
+  externalProductId?: unknown;
 }>;
 
 const READ_CONTEXT_SQL = `
@@ -44,6 +46,12 @@ select
   status
 from public.qry_commerce_payment_attempt_handoff_context_v1($1::uuid, $2::uuid)
 `.trim();
+const READ_APPROVED_SAJU_CONTEXT_SQL = READ_CONTEXT_SQL.replace(
+  '  status\n', '  status,\n  external_product_id as "externalProductId"\n',
+).replace(
+  'public.qry_commerce_payment_attempt_handoff_context_v1($1::uuid, $2::uuid)',
+  'public.read_approved_saju_sandbox_handoff_v1($1::uuid, $2::uuid, $3::text)',
+);
 
 function requirePaymentAttemptId(value: unknown): string {
   if (typeof value !== 'string' || !UUID.test(value.trim())) {
@@ -86,11 +94,11 @@ function requireCurrency(value: unknown): string {
   return currency;
 }
 
-function requireStatus(value: unknown): PaymentAttemptHandoffStatusV1 {
-  if (value !== 'created') {
+function requireStatus(value: unknown, expected: PaymentAttemptHandoffStatusV1): PaymentAttemptHandoffStatusV1 {
+  if (value !== expected) {
     throw new Error('Payment Attempt handoff authority returned an ineligible status.');
   }
-  return value;
+  return expected;
 }
 
 function postgresConstraint(error: unknown): string | undefined {
@@ -103,6 +111,7 @@ function mapAuthorityError(error: unknown): never {
   switch (postgresConstraint(error)) {
     case 'qry_commerce_payment_attempt_handoff_context_unavailable':
     case 'qry_commerce_payment_attempt_handoff_context_state_ineligible':
+    case 'approved_saju_payment_unavailable':
       throw new ApiCommandError(
         'NOT_FOUND',
         'Payment Attempt handoff context is unavailable for the current subject.',
@@ -117,6 +126,7 @@ function mapAuthorityError(error: unknown): never {
 function projectContext(
   requestedPaymentAttemptId: string,
   rows: readonly HandoffContextRowV1[],
+  expectedStatus: PaymentAttemptHandoffStatusV1,
 ): PaymentAttemptHandoffContextV1 {
   const row = rows[0];
   if (rows.length !== 1 || row === undefined) {
@@ -128,6 +138,12 @@ function projectContext(
     throw new Error('Payment Attempt handoff authority returned a different payment-attempt identity.');
   }
 
+  const externalProductId = expectedStatus === 'handed_off'
+    ? requireStoredString('external product identity', row.externalProductId)
+    : undefined;
+  if (externalProductId !== undefined && externalProductId.length > 512) {
+    throw new Error('Payment Attempt handoff authority returned an invalid external product identity.');
+  }
   return Object.freeze({
     paymentAttemptId: requestedPaymentAttemptId,
     provider: requireStoredString('provider', row.provider),
@@ -135,26 +151,30 @@ function projectContext(
     providerRequestId: requireStoredString('provider request identity', row.providerRequestId),
     amountMinor: requireAmountMinor(row.expectedAmountMinor),
     currency: requireCurrency(row.expectedCurrency),
-    status: requireStatus(row.status),
+    status: requireStatus(row.status, expectedStatus),
+    ...(externalProductId === undefined ? {} : { externalProductId }),
   });
 }
 
 /**
  * Reads one owned pre-browser Payment Attempt handoff context under an already bound
- * transaction-local canonical Subject. It performs no PSP I/O and mutates no state.
+ * transaction-local canonical Subject. Approved Saju commits the sandbox handoff before returning.
  */
 export async function loadPaymentAttemptHandoffContextV1(input: {
   readonly scope: PostgresSubjectExecutionScopeV1;
   readonly paymentAttemptId: unknown;
+  readonly approvedOfferId?: string;
 }): Promise<PaymentAttemptHandoffContextV1> {
   const paymentAttemptId = requirePaymentAttemptId(input.paymentAttemptId);
 
   try {
     const result = await input.scope.client.query<HandoffContextRowV1>(
-      READ_CONTEXT_SQL,
-      [input.scope.resolvedSubject.subjectId, paymentAttemptId],
+      input.approvedOfferId === undefined ? READ_CONTEXT_SQL : READ_APPROVED_SAJU_CONTEXT_SQL,
+      input.approvedOfferId === undefined
+        ? [input.scope.resolvedSubject.subjectId, paymentAttemptId]
+        : [input.scope.resolvedSubject.subjectId, paymentAttemptId, input.approvedOfferId],
     );
-    return projectContext(paymentAttemptId, result.rows);
+    return projectContext(paymentAttemptId, result.rows, input.approvedOfferId === undefined ? 'created' : 'handed_off');
   } catch (error) {
     return mapAuthorityError(error);
   }

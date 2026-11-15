@@ -26,11 +26,9 @@ export function preparePortOneV2BrowserCheckoutV1(input: {
   readonly context: PaymentAttemptBrowserHandoffContextV1;
   readonly providerSelector: PortOneV2ProviderSelectorV1;
   readonly activation: PortOneV2DeferredActivationFieldsV1;
+  readonly requireCommittedHandoff?: true;
 }): PortOneV2BrowserPaymentRequestV1 {
-  const core = projectPortOneV2BrowserPaymentCoreV1({
-    context: input.context,
-    providerSelector: input.providerSelector,
-  });
+  const core = projectPortOneV2BrowserPaymentCoreV1(input);
 
   return composePortOneV2BrowserPaymentRequestV1({
     core,

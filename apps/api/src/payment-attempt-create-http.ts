@@ -9,6 +9,7 @@ import {
   type PaymentAttemptServerIdentityPortV1,
 } from './payment-attempt-create-command.js';
 import { createPostgresPaymentAttemptCreateAuthorityPortV1 } from './postgres-payment-attempt-create.js';
+import { isPortOneKcpV2SandboxPaymentIdInputV1 } from './portone-kcp-v2-sandbox-payment-id-v1.js';
 import {
   executePostgresSubjectTransactionV1,
   type PostgresSubjectPoolV1,
@@ -34,6 +35,7 @@ export interface HandlePaymentAttemptCreateRequestInputV1 {
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly identityPort: PaymentAttemptServerIdentityPortV1;
+  readonly approvedSajuSandbox?: true;
 }
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -166,7 +168,7 @@ export async function handlePaymentAttemptCreateRequestV1(
     });
   }
   const requestBody = parsePublicRequestBody(rawBody);
-  if (requestBody === null) {
+  if (requestBody === null || (input.approvedSajuSandbox === true && !isPortOneKcpV2SandboxPaymentIdInputV1(requestBody))) {
     return jsonError({
       status: 400,
       code: 'INVALID_REQUEST',
@@ -186,7 +188,7 @@ export async function handlePaymentAttemptCreateRequestV1(
           request: requestBody,
           environment,
           identityPort: input.identityPort,
-          authorityPort: createPostgresPaymentAttemptCreateAuthorityPortV1(client),
+          authorityPort: createPostgresPaymentAttemptCreateAuthorityPortV1(client, input.approvedSajuSandbox),
         }),
     });
     return successResponse(data, requestId, serverTime);

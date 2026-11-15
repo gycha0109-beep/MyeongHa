@@ -1,4 +1,5 @@
 import { SAJU_DOMAINS } from '../../../packages/contracts/src/index.js';
+import type { SajuReadingComponentV1 } from '../../../packages/contracts/src/approved-saju-catalog.js';
 import { projectProductReadingResponseV2 } from '../../../packages/api-client/src/product-reading-display.js';
 import { ApiCommandError } from './api-error.js';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
@@ -14,6 +15,7 @@ const ARCHIVE_OPENABLE_PRODUCT_RESPONSE_STATES_V1 = new Set([
 ]);
 
 export interface OfficialReadingRecordAuthorityRowV1 {
+  readonly approvedComponent?: SajuReadingComponentV1;
   readonly readingId: string;
   readonly readingSessionId: string;
   readonly sajuDomain: string;
@@ -50,6 +52,7 @@ export interface OfficialReadingRecordReadAuthorityPortV1 {
 }
 
 export interface OfficialReadingRecordV1 {
+  readonly approvedComponent?: SajuReadingComponentV1;
   readonly readingId: string;
   readonly readingSessionId: string;
   readonly sajuDomain: string;
@@ -266,6 +269,7 @@ export async function getOfficialReadingRecord(input: {
 
     return Object.freeze({
       readingId,
+      ...(row.approvedComponent === undefined ? {} : { approvedComponent: row.approvedComponent }),
       readingSessionId: requireStoredUuid('Stored Reading Session identity', row.readingSessionId),
       sajuDomain: requireSajuDomain(row.sajuDomain),
       readingContractVersion,

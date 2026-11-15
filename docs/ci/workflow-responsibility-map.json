@@ -296,6 +296,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "saju-t10-pair-production-cross-service-e2e.yml": {
+      "responsibility": "saju-official-t10-pair-cross-service-verification",
+      "prMode": "narrow",
+      "mainMode": "narrow",
+      "workTrackAttribution": "pr-metadata"
+    },
     "reader-grounding-cross-service-e2e.yml": {
       "responsibility": "saju-character-cross-service-verification",
       "prMode": "narrow",

@@ -7,6 +7,7 @@ import {
   guardCharacterSajuSemanticPreservationV2,
   renderCharacterSajuBoundedExactCoreV2,
   resolveCharacterSajuCommonPerspectiveV1,
+  type CharacterReadingPerspectiveRefV1,
   type CharacterSajuUtteranceV1,
 } from '../../../packages/domain/src/index.js';
 import {
@@ -53,7 +54,7 @@ export type CharacterStandardReaderBoundedCandidateV1 =
         'selection_mismatch' | 'renderer_unavailable' | 'semantic_guard_failed';
     }>;
 
-const mintedSemanticCandidates = new WeakSet<object>();
+const mintedSemanticCandidates = new WeakMap<object, CharacterReadingPerspectiveRefV1>();
 
 export function assertServerGuardedStandardReaderBoundedCandidateV1(
   value: unknown,
@@ -64,6 +65,14 @@ export function assertServerGuardedStandardReaderBoundedCandidateV1(
       !mintedSemanticCandidates.has(value)) {
     throw new Error('Official Reader bounded semantic candidate is unavailable.');
   }
+}
+
+export function getGuardedStandardReaderCandidateProfileV1(
+  candidate: CharacterStandardReaderBoundedCandidateV1,
+): CharacterReadingPerspectiveRefV1 {
+  const profile = mintedSemanticCandidates.get(candidate);
+  if (profile === undefined) throw new Error('Official Reader bounded semantic candidate is unavailable.');
+  return profile;
 }
 
 function hold(
@@ -176,7 +185,7 @@ export function prepareCharacterStandardReaderBoundedCandidateV1(input: Readonly
     requiredDisclosureRefs: closure.requiredDisclosureRefs,
     utterance: guard.utterance,
   });
-  mintedSemanticCandidates.add(result);
+  mintedSemanticCandidates.set(result, rendered.planDecision.plan.perspectiveProfileRef);
   return result;
 }
 
@@ -439,6 +448,29 @@ export async function recheckCharacterStandardReaderFinalHoldV1(input: Readonly<
     return denyFresh('SOURCE_MISMATCH');
   }
 
+  const recheckedAt = await recheckCurrentReaderQuestionAdmissionV1(input);
+  return Object.freeze({
+    mode: 'fresh_revalidated_hold' as const,
+    publicDisclosureAuthorized: false as const,
+    atomicCommitAuthorized: false as const,
+    reason: 'DB_ATOMIC_PROVENANCE_AND_DISCLOSURE_PENDING' as const,
+    sourceIdentityHash: hold.sourceIdentityHash,
+    utteranceHash: hold.utteranceHash,
+    recheckedAt,
+  });
+}
+
+/** Fresh current purchase and Reader scope check shared by guarded first and later questions. */
+export async function recheckCurrentReaderQuestionAdmissionV1(input: Readonly<{
+  preflight: CharacterStandardReadingChatTurnPreflightV2;
+  threadBindingAuthorityPort: PrepareOfficialReadingReaderAdmissionInputV1['threadBindingAuthorityPort'];
+  accessAuthorityPort: PrepareOfficialReadingReaderAdmissionInputV1['accessAuthorityPort'];
+  artifactAuthorityPort: PrepareOfficialReadingReaderAdmissionInputV1['artifactAuthorityPort'];
+  productReaderEligibilityAuthorityPort: PrepareOfficialReadingReaderAdmissionInputV1['productReaderEligibilityAuthorityPort'];
+  currentVerifiedPurchaseAuthorityPort?: PrepareOfficialReadingReaderAdmissionInputV1['currentVerifiedPurchaseAuthorityPort'];
+}>): Promise<string> {
+  assertServerPreparedStandardChatPreflightV2(input.preflight);
+  const pinned = input.preflight.scope;
   const recheckedAt = new Date().toISOString();
   const priorAt = Date.parse(pinned.effectiveAt);
   if (!Number.isFinite(priorAt) || priorAt >= Date.parse(recheckedAt)) {
@@ -477,13 +509,5 @@ export async function recheckCharacterStandardReaderFinalHoldV1(input: Readonly<
     return denyFresh('SOURCE_MISMATCH');
   }
 
-  return Object.freeze({
-    mode: 'fresh_revalidated_hold' as const,
-    publicDisclosureAuthorized: false as const,
-    atomicCommitAuthorized: false as const,
-    reason: 'DB_ATOMIC_PROVENANCE_AND_DISCLOSURE_PENDING' as const,
-    sourceIdentityHash: hold.sourceIdentityHash,
-    utteranceHash: hold.utteranceHash,
-    recheckedAt,
-  });
+  return recheckedAt;
 }

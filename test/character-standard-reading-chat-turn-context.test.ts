@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
+import { prepareApprovedSajuReaderThreadRuntimeV1 } from '../apps/api/src/character-standard-reading-chat-turn-context.js';
+import { runApprovedSajuReaderInterpretationPreviewV1 } from '../apps/api/src/reader-interpretation-preview-runtime-v1.js';
+import { createPostgresApprovedSajuReadingAccessV1 } from '../apps/api/src/postgres-approved-saju-reading-access-v1.js';
+import { getOfficialReadingRecord } from '../apps/api/src/official-reading-record-read.js';
+import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
 import { prepareCharacterStandardReadingChatTurnPreflightV2 } from '../apps/api/src/character-standard-reading-chat-turn-preflight-v2.js';
 import {
   prepareCharacterStandardChatGroundingV2,
+  prepareApprovedSajuReaderFollowupSourceV1,
   assertServerPreparedStandardChatGroundingV2,
 } from '../apps/api/src/character-standard-reading-chat-grounding-v2.js';
 import { selectCharacterStandardFollowupEvidenceV1 } from '../apps/api/src/character-standard-reading-chat-followup-evidence-v1.js';
@@ -21,8 +27,15 @@ import {
   classifyCharacterStandardFollowupQuestionScopeV1,
   assertServerPreparedStandardFollowupQuestionScopeV1,
 } from '../apps/api/src/character-standard-reading-chat-question-scope-v1.js';
-import { prepareReaderConversationResponseCandidateV1 } from '../apps/api/src/reader-conversation-source-routing-v1.js';
-import { runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
+import {
+  prepareReaderConversationResponseCandidateV1,
+  reviewPreparedReaderConversationFollowupV1,
+  reviewPreparedPurchasedReaderQuestionV1,
+  consumeReviewedPrivateReaderFollowupBodyV1,
+} from '../apps/api/src/reader-conversation-source-routing-v1.js';
+import type { CharacterSajuConsultationShadowPortV1 } from '../apps/api/src/character-saju-consultation-shadow-v1.js';
+import { CHARACTER_SAJU_SP2_EVALUATOR_VERDICT_SCHEMA_VERSION_V1 } from '../packages/domain/src/character-saju-sp2-evaluation.js';
+import { renderGroundedStandardReaderSceneV2, runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import { assertServerGuardedReaderInterpretationSceneV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import {
   prepareCharacterStandardReaderSceneSourceHandoffV1,
@@ -453,7 +466,7 @@ function existingThreadReceivePlan(
   });
 }
 
-function previewGrounding(): CharacterSajuGroundingBundleViewV1 {
+function previewGrounding(sourceResponseHash = 'a'.repeat(64)): CharacterSajuGroundingBundleViewV1 {
   const withoutHash = {
     schemaVersion: SAJU_CHARACTER_GROUNDING_SCHEMA_VERSION_V1,
     groundingProjectionVersion: SAJU_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
@@ -462,7 +475,7 @@ function previewGrounding(): CharacterSajuGroundingBundleViewV1 {
     productResponseVersion: 'myeonghwa-product-reading-response-v2',
     engineVersion: 'saju-engine-v1',
     readingDomain: 'career' as const,
-    sourceResponseHash: 'a'.repeat(64),
+    sourceResponseHash,
     units: [
       {
         unitId: `grounding_unit_${'1'.repeat(24)}`,
@@ -511,6 +524,153 @@ function previewGrounding(): CharacterSajuGroundingBundleViewV1 {
 }
 
 describe('thread-bound Official Reading Reader runtime', () => {
+  it.each(['same_source', 'wrong_source', 'insufficient_source', 'refund_during_consultation'] as const)(
+    'checks paid Reader source and active grant for %s', async (scenario) => {
+      const authority = authorities();
+      const effectiveAt = '2026-09-21T00:01:00.000Z';
+      const [access] = await authority.accessAuthorityPort.readAccessibleReadings({
+        subjectId: SUBJECT_ID, readerCharacterId: 'baekheon', effectiveAt,
+      });
+      const [artifact] = await authority.artifactAuthorityPort.readArtifactSource({
+        subjectId: SUBJECT_ID, readerCharacterId: 'baekheon', readingId: READING_ID, effectiveAt,
+      });
+      const productResponseState = scenario === 'insufficient_source' ? 'delivered_with_fallback' : 'delivered';
+      const snapshot = {
+        ...(artifact?.responseSnapshotJsonb as Record<string, unknown>),
+        state: productResponseState,
+        messageCode: scenario === 'insufficient_source' ? 'READING_DELIVERED_WITH_GROUNDED_FALLBACK' : 'READING_DELIVERED',
+      };
+      const responseHash = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(snapshot);
+      const { readApprovedRule } = authority.productReaderEligibilityAuthorityPort;
+      readApprovedRule.mockResolvedValue({
+        status: 'approved',
+        rule: { ...((await readApprovedRule()).rule), productSpecVersion: 'approved-saju-2026-11-06' },
+      });
+      let grantCurrent = true;
+      const client: PostgresTransactionQueryV1 = {
+        async query<Row>(sql: string, params?: readonly unknown[]) {
+          expect(sql).toContain('qry_approved_saju_component_record_v1');
+          expect(params?.slice(0, 3)).toEqual([SUBJECT_ID, READING_ID, 'baekheon']);
+          return { rows: grantCurrent ? [{
+            ...access, ...artifact, component: 'career', responseHash, productResponseState,
+            responseSnapshotJsonb: params?.[3] === true ? snapshot : null,
+          } as Row] : [] };
+        },
+      };
+      const generate = vi.fn(async () => {
+        if (scenario === 'refund_during_consultation') grantCurrent = false;
+        return { segments: [] }; // The malformed comparison can never replace the exact-core Reading.
+      });
+      const projectGrounding = vi.fn(async () => previewGrounding(
+        scenario === 'wrong_source' ? 'a'.repeat(64) : responseHash.slice('sha256:v1:'.length),
+      ));
+      const running = runApprovedSajuReaderInterpretationPreviewV1({
+        ...authority, scope: { client, resolvedSubject: { subjectId: SUBJECT_ID, subjectKind: 'member' } },
+        threadId: THREAD_ID, officialReadingId: READING_ID, effectiveAt,
+        contentReleaseRuntime: compatibleReceiveRuntime(), contextInput: serverContextInput(),
+        groundingProjectionPort: { projectGrounding },
+        consultationShadowPort: {
+          generate, evaluate: async () => { throw new Error('Malformed candidate cannot reach review'); },
+          multiUnitPilot: true, evaluateBatch: async () => ({ verdicts: [] }), evaluatorVersion: 'fixture-evaluator',
+        },
+      });
+      if (scenario === 'same_source') {
+        await expect(running).resolves.toMatchObject({
+          mode: 'reader_interpretation', officialArtifactResponseHash: responseHash,
+          sourceResponseHash: responseHash.slice('sha256:v1:'.length),
+        });
+      } else {
+        await expect(running).rejects.toMatchObject({
+          code: scenario === 'refund_during_consultation' ? 'ACCESS_DENIED' : 'SOURCE_MISMATCH',
+        });
+      }
+      expect(projectGrounding).toHaveBeenCalledTimes(scenario === 'insufficient_source' ? 0 : 1);
+      expect(generate).toHaveBeenCalledTimes(scenario === 'wrong_source' || scenario === 'insufficient_source' ? 0 : 1);
+
+      grantCurrent = true;
+      const followupProjection = vi.fn(async () => {
+        if (scenario === 'refund_during_consultation') grantCurrent = false;
+        return previewGrounding(scenario === 'wrong_source' ? 'a'.repeat(64) : responseHash.slice('sha256:v1:'.length));
+      });
+      const followup = prepareApprovedSajuReaderFollowupSourceV1({
+        ...authority, scope: { client, resolvedSubject: { subjectId: SUBJECT_ID, subjectKind: 'member' } },
+        readingId: READING_ID, effectiveAt, receivePlan: existingThreadReceivePlan(),
+        contextInput: serverContextInput(), groundingProjectionPort: { projectGrounding: followupProjection },
+      });
+      if (scenario === 'same_source') {
+        await expect(followup).resolves.toMatchObject({
+          preflight: { scope: { officialArtifactResponseHash: responseHash } },
+          grounded: {
+            scope: { officialArtifactResponseHash: responseHash, readingId: READING_ID },
+            grounding: { sourceResponseHash: responseHash.slice('sha256:v1:'.length) },
+          },
+        });
+        const initialScene = await runReaderInterpretationPreviewHttpV1({
+          ...authority, resolvedSubjectId: SUBJECT_ID, effectiveAt,
+          approvedSajuScope: { client, resolvedSubject: { subjectId: SUBJECT_ID, subjectKind: 'member' } },
+          body: { threadId: THREAD_ID, officialReadingId: READING_ID },
+          contentReleaseRuntime: compatibleReceiveRuntime(),
+          contextAuthorityPort: { resolveContext: () => serverContextInput() },
+          groundingProjectionPort: { projectGrounding: followupProjection },
+        });
+        expect(initialScene).toMatchObject({
+          mode: 'reader_interpretation', readerCharacterId: 'baekheon', officialReadingId: READING_ID,
+        });
+        expect(initialScene).not.toHaveProperty('sourceResponseHash');
+        const { grounded } = await followup;
+        expect(initialScene.interpretationHash).toBe(renderGroundedStandardReaderSceneV2(grounded).interpretationHash);
+      } else {
+        await expect(followup).rejects.toMatchObject({
+          code: scenario === 'insufficient_source' ? 'GROUNDING_UNAVAILABLE' : 'SOURCE_MISMATCH',
+        });
+      }
+      expect(followupProjection).toHaveBeenCalledTimes(scenario === 'insufficient_source' ? 0 : scenario === 'same_source' ? 2 : 1);
+    },
+  );
+
+  it('rechecks the purchased component for Reader body access and preserves the Records source hash', async () => {
+    const authority = authorities();
+    const [access] = await authority.accessAuthorityPort.readAccessibleReadings({
+      subjectId: SUBJECT_ID, readerCharacterId: 'baekheon', effectiveAt: '2026-09-21T00:01:00.000Z',
+    });
+    const [artifact] = await authority.artifactAuthorityPort.readArtifactSource({
+      subjectId: SUBJECT_ID, readerCharacterId: 'baekheon', readingId: READING_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z',
+    });
+    const reads: unknown[] = [];
+    let archiveGrantCurrent = true;
+    const client: PostgresTransactionQueryV1 = {
+      async query<Row>(text: string, values?: readonly unknown[]) {
+        expect(text).toContain('qry_approved_saju_component_record_v1');
+        reads.push(values);
+        if (values?.[3] === true && !archiveGrantCurrent) return { rows: [] };
+        return { rows: [{
+          ...access, ...artifact, component: 'career', issuedRevisionNo: 1, currentRevisionNo: 1,
+          responseSnapshotJsonb: values?.[3] === true ? artifact?.responseSnapshotJsonb : null,
+        } as Row] };
+      },
+    };
+    const { recordPort } = createPostgresApprovedSajuReadingAccessV1(client, READING_ID);
+    const record = await getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID, readingId: READING_ID, authorityPort: recordPort,
+    });
+    const request = {
+      resolvedSubjectId: SUBJECT_ID, threadId: THREAD_ID, readingId: READING_ID, client,
+      effectiveAt: '2026-09-21T00:01:00.000Z',
+      threadBindingAuthorityPort: authority.threadBindingAuthorityPort,
+      contextInput: contextInput(),
+    };
+    const result = await prepareApprovedSajuReaderThreadRuntimeV1(request);
+    expect(result.source.responseSnapshotJsonb).toEqual(record.reading);
+    expect(result.source.responseHash).toBe('sha256:v1:' + hashSajuHeldSourceProofRequestV1(record.reading));
+    expect(reads).toEqual([
+      [SUBJECT_ID, READING_ID, null, true],
+      [SUBJECT_ID, READING_ID, 'baekheon', false],
+      [SUBJECT_ID, READING_ID, 'baekheon', true],
+    ]);
+    archiveGrantCurrent = false;
+    await expect(prepareApprovedSajuReaderThreadRuntimeV1(request)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
   it('derives Reader identity from the owned thread and assembles the exact Official Reading context', async () => {
     const authority = authorities();
     const previousNodeEnv = process.env.NODE_ENV;
@@ -1248,7 +1408,7 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
     expect(projectGrounding).not.toHaveBeenCalled();
   });
 
-  async function prepareSceneHandoffFixture() {
+  async function prepareSceneHandoffFixture(bundle = previewGrounding()) {
     const authority = authorities();
     const base = nonspecialistReleaseRuntime();
     const entry = base.resolvePinned(RELEASE_ID);
@@ -1282,7 +1442,6 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
         },
       })),
     } as unknown as ContentReleaseRuntime;
-    const bundle = previewGrounding();
     const guardedScene = await runThreadBoundReaderInterpretationPreviewV2({
       resolvedSubjectId: SUBJECT_ID, threadId: THREAD_ID,
       officialReadingId: READING_ID,
@@ -1340,6 +1499,91 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
     expect(() => assertServerPreparedStandardReaderSceneSourceHandoffV1({ ...result }))
       .toThrow(/unavailable/u);
   });
+
+  it.each(['accepted', 'qualified', 'acknowledged', 'prior_moved', 'stale_scene', 'refund_during', 'new_answer', 'changed_judgment'] as const)(
+    'answers the first question from one purchased Scene focus (%s)', async scenario => {
+      const { groundingHash: _, ...base } = previewGrounding();
+      const qualifier = '같은 직업 환경에서 흐름이 반복될 때 적용됩니다.';
+      const disclosure = { disclosureRef: 'grounding_disclosure_' + '1'.repeat(24),
+        type: 'scope_limitation' as const, sourceDisclosureIndex: 0, text: '이 풀이는 직업을 살피는 데 적용됩니다.' };
+      const material = scenario !== 'qualified' ? base : {
+        ...base, disclosures: [disclosure], units: [{
+          ...base.units[0]!, qualifiers: [qualifier], requiredDisclosureRefs: [disclosure.disclosureRef],
+          canonicalMeaning: base.units[0]!.canonicalMeaning + '\n' + qualifier,
+        }, ...base.units.slice(1)],
+      };
+      const f = await prepareSceneHandoffFixture({
+        ...material, groundingHash: hashCharacterSajuGroundingBundleMaterialV1(material),
+      });
+      const guardedScene = scenario === 'qualified' ? renderGroundedStandardReaderSceneV2(f.grounded) : f.guardedScene;
+      if (guardedScene.mode !== 'reader_interpretation') throw Error('Fixture needs a guarded Scene.');
+      const firstQuestion = {
+        ...f.input, guardedScene, expectedSceneInterpretationHash: guardedScene.interpretationHash,
+        selectedSceneSegmentIndex: guardedScene.utterance.segments.findIndex(segment => segment.kind === 'semantic_realization'),
+      };
+      const admitted = await prepareCharacterStandardReaderSceneSourceHandoffV1(firstQuestion);
+      if (admitted.mode === 'hold') throw Error('Fixture needs an admitted Scene focus.');
+      const previousSafeMessageId = '12345678-1234-4234-8234-123456789012';
+      const prior = scenario === 'acknowledged' || scenario === 'prior_moved';
+      if (prior) f.readLatestValidatedAnchor.mockResolvedValue({
+        status: 'committed_semantic_guard_pass', subjectId: SUBJECT_ID, threadId: THREAD_ID,
+        readerCharacterId: 'baekheon', readingRef: READING_ID,
+        officialArtifactResponseHash: f.grounded.scope.officialArtifactResponseHash,
+        groundingHash: f.grounded.grounding.groundingHash,
+        assistantMessageId: previousSafeMessageId, sourceUnitRefs: [admitted.rootUnitId],
+        focusedUnitRef: admitted.rootUnitId,
+      });
+      const evaluatorVersion = 'first-scene-test-v1';
+      const leading = '직업에서는 긴 흐름에서 반복되는 선택을 살펴보시는 편입니다.';
+      const text = scenario === 'qualified' ? leading + ' ' + qualifier : leading;
+      const generate = vi.fn<CharacterSajuConsultationShadowPortV1['generate']>(async ({ input }) => {
+        const prompt = input as { question: string; officialUnits: readonly { unitId: string }[] };
+        expect(prompt.question).toBe('방금 본 직업 해석을 조금 더 설명해 주세요.');
+        expect(prompt.officialUnits.map(unit => unit.unitId)).toEqual([admitted.rootUnitId]);
+        if (scenario === 'qualified') expect(prompt.officialUnits[0]).toMatchObject({ qualifiers: [qualifier] });
+        return { segments: [{ unitId: admitted.rootUnitId, text }] };
+      });
+      const evaluateBatch = vi.fn<NonNullable<CharacterSajuConsultationShadowPortV1['evaluateBatch']>>(
+        async ({ candidateHashes, groundingUnits }) => {
+          if (scenario === 'new_answer' || scenario === 'prior_moved') {
+            f.readLatestValidatedAnchor.mockRejectedValue(new Error('An answer was committed.'));
+          }
+          return { verdicts: [{
+            schemaVersion: CHARACTER_SAJU_SP2_EVALUATOR_VERDICT_SCHEMA_VERSION_V1,
+            evaluatorVersion, candidateHash: candidateHashes[0]!, unitId: groundingUnits[0]!.unitId,
+            semanticPreserved: scenario !== 'changed_judgment', characterFidelityPreserved: true,
+            failureClasses: scenario === 'changed_judgment' ? ['ADDED_CLAIM'] : [],
+          }] };
+        },
+      );
+      let checks = 0;
+      const result = await reviewPreparedPurchasedReaderQuestionV1({
+        ...firstQuestion,
+        ...(prior ? {} : { firstSceneQuestion: {
+          interpretationHash: scenario === 'stale_scene' ? 'sha256:v1:' + '0'.repeat(64) : guardedScene.interpretationHash,
+          segmentIndex: firstQuestion.selectedSceneSegmentIndex,
+        } }),
+        port: { generate, evaluateBatch, evaluatorVersion, evaluate: async () => { throw Error('Batch only'); } },
+        recheckCurrent: async () => {
+          if (++checks === 2 && scenario === 'refund_during') throw Error('Purchase revoked.');
+        },
+      });
+      expect(generate).toHaveBeenCalledTimes(scenario === 'stale_scene' ? 0 : 1);
+      if (scenario !== 'accepted' && scenario !== 'qualified' && scenario !== 'acknowledged') {
+        expect(result).toBeNull();
+        return;
+      }
+      expect(result?.sourceUnitRefs).toEqual([admitted.rootUnitId]);
+      expect(result?.focusedUnitRef).toBe(admitted.rootUnitId);
+      expect(result?.previousSafeMessageId).toBe(prior ? previousSafeMessageId : null);
+      expect(checks).toBe(2);
+      expect(JSON.stringify(result)).not.toContain(text);
+      expect(consumeReviewedPrivateReaderFollowupBodyV1(result!.reviewed)).toBe(
+        scenario === 'qualified' ? [text, disclosure.text].join('\n\n') : text,
+      );
+      expect(consumeReviewedPrivateReaderFollowupBodyV1(result!.reviewed)).toBeNull();
+    },
+  );
 
   it('RR-01 does not trust a browser Scene clone, stale hash, or forged A3 Grounding', async () => {
     const f = await prepareSceneHandoffFixture();
@@ -1825,7 +2069,8 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     };
   }
 
-  it('RR-08 connects latest real Reader Assistant and Guarded Official anchor into existing RR-06 Output HOLD', async () => {
+  it.each(['reviewed', 'approved_paid', 'approved_moved', 'wrong_source', 'changed_anchor', 'refund_before', 'refund_during', 'semantic_rejected'] as const)(
+    'RR-08 privately reviews one generated follow-up and keeps its exact authority (%s)', async scenario => {
     const base = previewGrounding();
     const {groundingHash: _old, ...material} = base;
     const bounded = {...material, units: [material.units[0]!]};
@@ -1853,13 +2098,17 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       },
     ];
     const readRecentMessages = vi.fn(async () => rows);
+    const approved = scenario === 'approved_paid' || scenario === 'approved_moved';
+    const continuity = approved
+      ? { useApprovedSajuAnchorContinuity: true as const }
+      : { recentMessageAuthorityPort: { readRecentMessages } };
     const result = await prepareReaderConversationResponseCandidateV1({
       userText: question, admittedDomain: 'career',
       official: {
         preflight: f.input.preflight,
         grounded: f.input.grounded,
         anchorAuthorityPort: f.input.anchorAuthorityPort,
-        recentMessageAuthorityPort: { readRecentMessages },
+        ...continuity,
         rendererDraft: cosmetics(),
       },
     });
@@ -1880,12 +2129,82 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     expect(result.selectedSourceUnitRefs).toEqual([f.ids[0]]);
     expect(result.publicDisclosureAuthorized).toBe(false);
     expect(result.addedModelCalls).toBe(0);
-    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(1);
-    expect(readRecentMessages).toHaveBeenCalledTimes(2);
-    expect(readRecentMessages).toHaveBeenCalledWith({
+    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(approved ? 3 : 1);
+    expect(readRecentMessages).toHaveBeenCalledTimes(approved ? 0 : 2);
+    if (!approved) expect(readRecentMessages).toHaveBeenCalledWith({
       subjectId: SUBJECT_ID, threadId: THREAD_ID, limit: 32,
     });
     expect(JSON.stringify(result)).not.toContain('PRIVATE_GUARDED_OFFICIAL_TEXT');
+
+    const generated = '직업에서는 방향을 급히 정하기보다 흐름을 길게 살펴보시는 쪽입니다.';
+    const evaluatorVersion = 'followup-test-evaluator-v1';
+    const generate = vi.fn<CharacterSajuConsultationShadowPortV1['generate']>(async ({ input }) => {
+      const prompt = input as { question: string; officialUnits: readonly { unitId: string }[] };
+      expect(prompt.question).toBe(question);
+      expect(prompt.officialUnits.map(unit => unit.unitId)).toEqual([f.ids[0]]);
+      return { segments: [{ unitId: scenario === 'wrong_source' ? 'unrelated' : f.ids[0], text: generated }] };
+    });
+    const evaluateBatch = vi.fn<NonNullable<CharacterSajuConsultationShadowPortV1['evaluateBatch']>>(
+      async ({ candidateHashes, groundingUnits, question: reviewedQuestion }) => {
+        expect(reviewedQuestion).toBe(question);
+        if (scenario === 'approved_moved') {
+          f.readLatestValidatedAnchor.mockRejectedValue(new Error('Previous paid answer changed'));
+        }
+        if (scenario === 'changed_anchor') {
+          rows.unshift({
+            messageId: 'different-newer-assistant', sequenceNo: 19, senderType: 'character',
+            characterId: 'baekheon', text: 'newer reply', createdAt: '2026-10-22T05:00:01.000Z',
+          });
+        }
+        return { verdicts: [{
+          schemaVersion: CHARACTER_SAJU_SP2_EVALUATOR_VERDICT_SCHEMA_VERSION_V1,
+          evaluatorVersion, candidateHash: candidateHashes[0]!, unitId: groundingUnits[0]!.unitId,
+          semanticPreserved: scenario !== 'semantic_rejected', characterFidelityPreserved: true,
+          failureClasses: scenario === 'semantic_rejected' ? ['ADDED_CLAIM'] : [],
+        }] };
+      },
+    );
+    const port = { generate, evaluateBatch, evaluatorVersion, evaluate: async () => { throw new Error('batch only'); } };
+    let checks = 0;
+    const review = (outputHold = result.outputHold) => reviewPreparedReaderConversationFollowupV1({
+      outputHold, port,
+      withCurrentAuthority: check => {
+        checks += 1;
+        return check({
+          ...f.authority,
+          ...(scenario === 'refund_before' || (scenario === 'refund_during' && checks > 1)
+            ? { currentVerifiedPurchaseAuthorityPort: { assertCurrentVerifiedPurchase: async () => { throw new Error('refunded'); } } }
+            : {}),
+          anchorAuthorityPort: f.input.anchorAuthorityPort,
+          ...continuity,
+        });
+      },
+    });
+    await expect(review({ ...result.outputHold })).resolves.toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+    const candidate = await review();
+    if (scenario === 'reviewed' || scenario === 'approved_paid') {
+      expect(candidate).toMatchObject({
+        state: 'reviewed_private', evaluatorVersion,
+        officialArtifactResponseHash: result.outputHold.officialArtifactResponseHash,
+        sourceIdentityHash: result.outputHold.sourceIdentityHash,
+        candidateHashes: [expect.stringMatching(/^[a-f0-9]{64}$/u)],
+        privateBodyHash: expect.stringMatching(/^sha256:v1:[a-f0-9]{64}$/u),
+      });
+      expect(candidate).not.toBeNull();
+      expect(JSON.stringify(candidate)).not.toContain(generated);
+      expect(consumeReviewedPrivateReaderFollowupBodyV1({ ...candidate! })).toBeNull();
+      expect(consumeReviewedPrivateReaderFollowupBodyV1(candidate!)).toBe(generated);
+      expect(consumeReviewedPrivateReaderFollowupBodyV1(candidate!)).toBeNull();
+      expect(checks).toBe(2);
+    } else {
+      expect(candidate).toBeNull();
+    }
+    const expectedCalls = scenario === 'refund_before' ? 0 : 1;
+    expect(generate).toHaveBeenCalledTimes(expectedCalls);
+    expect(evaluateBatch).toHaveBeenCalledTimes(scenario === 'wrong_source' ? 0 : expectedCalls);
+    await expect(review()).resolves.toBeNull();
+    expect(generate).toHaveBeenCalledTimes(expectedCalls);
   });
 
   it('RR-08 refuses to bypass missing actual Reader transcript authority despite valid server-minted sources', async () => {

@@ -1,6 +1,7 @@
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 import type { SajuOfficialImmutableCommitPortV1 } from './saju-official-reading-issuer-db-persistence-v1.js';
+import type { ApprovedSajuIssueAttemptBindingV1 } from './postgres-approved-saju-issue-scope-v1.js';
 
 /**
  * Existing DB Owner atomic finalize command; NOT a new writer, grant or
@@ -24,6 +25,10 @@ from public.cmd_finalize_reading_transport_success_v1(
   $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb, $16::text
 )
 `.trim();
+const FINALIZE_APPROVED_SQL = FINALIZE_SQL.replace(
+  /public\.cmd_finalize_reading_transport_success_v1\([\s\S]+\)$/u,
+  'public.cmd_finalize_approved_saju_reading_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::jsonb,$13::text)',
+);
 
 // Read back the exact immutable source lineage after finalization in the SAME
 // transaction, including replays. The legacy command only compares responseHash
@@ -44,6 +49,10 @@ from public.qry_saju_official_stored_lineage_v3(
   $1::uuid, $2::uuid, $3::uuid
 )
 `.trim();
+
+const VERIFY_APPROVED_STORED_LINEAGE_SQL = VERIFY_STORED_LINEAGE_SQL.replace(
+  'public.qry_saju_official_stored_lineage_v3', 'public.qry_approved_saju_stored_lineage_v1',
+);
 
 type StoredLineageRow = Readonly<{
   nativeReadingId: unknown;
@@ -77,13 +86,24 @@ function strictString(value: unknown, label: string): string {
 
 export function createPostgresSajuOfficialImmutableCommitPortV1(
   client: PostgresTransactionQueryV1,
+  approvedPurchase?: ApprovedSajuIssueAttemptBindingV1,
 ): SajuOfficialImmutableCommitPortV1 {
   return Object.freeze({
     async finalizeSuccess(input: Parameters<SajuOfficialImmutableCommitPortV1['finalizeSuccess']>[0]) {
+      if (approvedPurchase !== undefined && input.sourceRequestHash !== approvedPurchase.sourceRequestHash) {
+        throw new Error('Approved Saju issuer did not verify the purchased source request.');
+      }
+      if (input.issueProof !== undefined && (
+        input.issueProof.payload.executionAttemptId !== input.executionAttemptId ||
+        input.issueProof.payload.responseBodyHash !== input.sourceResponseHash
+      )) {
+        throw new Error('Saju issue proof does not match the verified Reading response.');
+      }
       // Caller has already verified issuer provenance, exact ID mapping,
       // immutable birth revision and current Commerce/Privacy authority.
       // Do not run an open-ended UPDATE or forge a DB success state.
-      const result = await client.query<Row>(FINALIZE_SQL, [
+      const result = await client.query<Row>(approvedPurchase === undefined ? FINALIZE_SQL : FINALIZE_APPROVED_SQL,
+        approvedPurchase === undefined ? [
         input.subjectId,
         input.readingId,
         input.executionAttemptId,
@@ -100,6 +120,11 @@ export function createPostgresSajuOfficialImmutableCommitPortV1(
         null,
         JSON.stringify(input.storedSnapshot),
         input.storedResponseHash,
+      ] : [
+        input.subjectId, approvedPurchase.purchaseIntentId, approvedPurchase.component, input.readingId,
+        input.executionAttemptId, input.outboxEventId, approvedPurchase.sourceRequestHash, input.externalRequestRef,
+        input.engineVersion, input.nativeReadingId, input.sourceBirthInputHash,
+        JSON.stringify(input.storedSnapshot), input.storedResponseHash,
       ]);
       if (result.rows.length !== 1 || !result.rows[0]) {
         throw new Error('Saju official immutable DB commit did not return exactly one receipt.');
@@ -109,9 +134,11 @@ export function createPostgresSajuOfficialImmutableCommitPortV1(
         throw new Error('Saju official immutable DB commit returned an invalid replay state.');
       }
 
-      const verified = await client.query<StoredLineageRow>(VERIFY_STORED_LINEAGE_SQL, [
-        input.subjectId, input.readingId, input.executionAttemptId,
-      ]);
+      const verified = await client.query<StoredLineageRow>(
+        approvedPurchase === undefined ? VERIFY_STORED_LINEAGE_SQL : VERIFY_APPROVED_STORED_LINEAGE_SQL, [
+          input.subjectId, input.readingId, input.executionAttemptId,
+        ],
+      );
       const lineage = verified.rows[0];
       if (verified.rows.length !== 1 || !lineage
         || lineage.nativeReadingId !== input.nativeReadingId
@@ -139,6 +166,16 @@ export function createPostgresSajuOfficialImmutableCommitPortV1(
       if (hashSajuHeldSourceProofRequestV1(originalNativeSnapshot)
         !== input.sourceResponseHash) {
         throw new Error('Saju native source hash differs from the stored immutable mapped response.');
+      }
+      if (approvedPurchase !== undefined && input.issueProof !== undefined) {
+        const proof = await client.query<{ bound: boolean }>(
+          'select public.cmd_bind_approved_saju_source_issue_proof_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::jsonb) as bound',
+          [input.subjectId, approvedPurchase.purchaseIntentId, approvedPurchase.component, input.readingId,
+            input.executionAttemptId, JSON.stringify(input.issueProof)],
+        );
+        if (proof.rows.length !== 1 || proof.rows[0]?.bound !== true) {
+          throw new Error('Approved Saju Reading proof did not bind to the stored issuance.');
+        }
       }
       return Object.freeze({
         readingId: strictString(row.readingId, 'Reading ID'),
