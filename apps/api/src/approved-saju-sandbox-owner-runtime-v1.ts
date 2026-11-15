@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import type { CommercePaymentVerificationAdapterV1 } from './commerce-payment-verification-execution.js';
 import { createApprovedSajuSandboxHttpRuntimeV1 } from './approved-saju-sandbox-http-runtime-v1.js';
+import { createApprovedSajuOwnerTestRefundReconcileV1 } from './approved-saju-owner-test-refund-reconcile-v1.js';
 import { createApprovedSajuSandboxLoopbackHostV1 } from './approved-saju-sandbox-loopback-host-v1.js';
 import { createApprovedSajuT10PairReaderHttpV1 } from './approved-saju-t10-pair-reader-http-v1.js';
 import type { SajuT10ProductionPairTrustV1 } from './saju-t10-production-pair-issue-source-v1.js';
@@ -40,6 +41,8 @@ export function createApprovedSajuSandboxOwnerRuntimeV1(input: Readonly<{
   /** Independent read-only role; never use the issuer or checkout DB connection. */
   pairReader?: Readonly<{ pool: PostgresSubjectPoolV1; trust: SajuT10ProductionPairTrustV1 }>;
   verificationAdapter: CommercePaymentVerificationAdapterV1;
+  /** Private PortOne TEST credentials, never exposed to the browser. */
+  testRefund?: Readonly<{ apiSecret: string; evidenceHmacSecret: string }>;
   memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   sdkFetch?: typeof fetch;
 }>) {
@@ -78,6 +81,13 @@ export function createApprovedSajuSandboxOwnerRuntimeV1(input: Readonly<{
     origin: input.origin,
     staticRoot: input.staticRoot,
     runtime: checkout,
+    ...(input.testRefund === undefined ? {} : {
+      refundReconciler: createApprovedSajuOwnerTestRefundReconcileV1({
+        commercePool: input.commercePool,
+        apiSecret: input.testRefund.apiSecret,
+        evidenceHmacSecret: input.testRefund.evidenceHmacSecret,
+      }),
+    }),
     ...(input.sdkFetch === undefined ? {} : { sdkFetch: input.sdkFetch }),
     ...(input.pairReader === undefined ? {} : {
       signedPairReader: createApprovedSajuT10PairReaderHttpV1({

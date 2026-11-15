@@ -57,5 +57,55 @@ begin
   end loop;
 end
 $owner_test_overlay$;
+
+-- Narrow server-only commands, granted ONLY inside this disposable DB.
+-- The normal production functions deliberately remain ungranted.
+grant execute on function public.internal_fulfill_verified_approved_saju_receipt_v1(uuid)
+  to myeongha_commerce_internal_executor;
+grant execute on function public.internal_apply_approved_saju_full_cancellation_v1(
+  text,text,text,timestamptz,bigint,text,text,text,text
+) to myeongha_commerce_internal_executor;
+
+create function public.qry_approved_saju_owner_test_cancel_candidate_v1(p_purchase uuid)
+returns jsonb language sql stable security definer set search_path=pg_catalog
+as $candidate$
+  select jsonb_build_object(
+    'paymentId',attempt.provider_request_id,
+    'transactionId',receipt.external_transaction_id,
+    'verifiedAmountMinor',receipt.verified_amount_minor,
+    'verifiedCurrency',receipt.verified_currency,
+    'receiptStatus',receipt.verification_status
+  )
+  from public.commerce_receipts receipt
+  join public.commerce_saju_purchase_origins_v1 origin
+    on origin.purchase_intent_id=receipt.purchase_intent_id
+      and origin.subject_id=receipt.subject_id
+      and origin.approved_admission_hash is not null
+  join public.commerce_payment_attempts attempt
+    on attempt.purchase_intent_id=receipt.purchase_intent_id
+      and attempt.subject_id=receipt.subject_id
+      and attempt.product_offer_id=receipt.product_offer_id
+      and attempt.provider_transaction_id=receipt.external_transaction_id
+      and attempt.environment='sandbox'
+      and attempt.provider='portone_v2'
+  join public.subjects member on member.id=receipt.subject_id
+    and member.kind='member' and member.status='active'
+  join public.myeongha_owner_administrators_v1 owner
+    on owner.auth_user_id=member.auth_user_id
+      and owner.role='superadmin' and owner.sandbox_checkout_allowed
+  where receipt.purchase_intent_id=p_purchase
+    and receipt.environment='sandbox'
+    and receipt.provider='portone_v2'
+    and receipt.platform='web'
+    and receipt.verification_status in ('verified','revoked')
+    and receipt.verified_at is not null
+    and receipt.verified_amount_minor>0
+    and receipt.verified_currency='KRW'
+  limit 1
+$candidate$;
+revoke all on function public.qry_approved_saju_owner_test_cancel_candidate_v1(uuid)
+  from public,anon,authenticated,service_role,myeongha_api_executor;
+grant execute on function public.qry_approved_saju_owner_test_cancel_candidate_v1(uuid)
+  to myeongha_commerce_internal_executor;
 commit;
 select 'SAJU14_VERIFIED_SANDBOX_ONLY_ISSUANCE_READY' as state;

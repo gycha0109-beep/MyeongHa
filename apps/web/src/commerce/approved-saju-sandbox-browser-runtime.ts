@@ -82,6 +82,26 @@ export async function loadApprovedSajuSandboxCheckoutPortsV1(
         await memberToken();
         return readings;
       },
+      async reconcileRefund(purchaseIntentId) {
+        const token = await memberToken();
+        const response = await fetch('/api/me/saju/checkout-test/reconcile-cancellation', {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ purchaseIntentId }), credentials: 'same-origin',
+          cache: 'no-store', redirect: 'error',
+        });
+        if (!response.ok) throw Error('Refund reconciliation is unavailable.');
+        const envelope: unknown = await response.json();
+        if (!envelope || typeof envelope !== 'object' || !('ok' in envelope) || envelope.ok !== true
+          || !('data' in envelope) || !envelope.data || typeof envelope.data !== 'object'
+          || !('state' in envelope.data) ||
+          (envelope.data.state !== 'not_fully_cancelled' && envelope.data.state !== 'refund_reconciled')) {
+          throw Error('Invalid refund reconciliation response.');
+        }
+        await memberToken();
+        return envelope.data as Awaited<ReturnType<NonNullable<ApprovedSajuCheckoutPanelPorts['reconcileRefund']>>>;
+      },
       async readSignedPair(selection) {
         const token = await memberToken();
         const response = await fetch('/api/approved-saju/pair/reader', {

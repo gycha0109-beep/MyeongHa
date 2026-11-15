@@ -1259,3 +1259,9 @@ Watchtower-Track: commerce
 - `production` 전용 승인 SQL 원본은 그대로 두고, **폐기형 로컬 PostgreSQL 17의 소유자 한 계정·구매 시작 전 DB에만** `sandbox` 영수증을 인식하는 격리 DB 함수 오버레이를 설치한다. 설치 대상 DB·함수 목록·사용자 권한이 어긋나면 결제 시작 자체를 거부한다.
 - 별도 격리 PG17에 위 SQL을 실제 설치하고 `SAJU14_VERIFIED_SANDBOX_ONLY_ISSUANCE_READY` 확인, 임시 DB 삭제. 운영 DB와 실제 상품 판매 플래그는 변경하지 않았다.
 - 외부 PortOne TEST 자격증명과 Saju 공식 서명 Source가 현재 미설정이라 실제 결제→공식 서명→환불 종단 완료를 뜻하지 않는다.
+
+### 2026-11-15 — Owner 전용 PortOne TEST 전체 취소 확인과 발급 권한 회수
+- `POST /api/me/saju/checkout-test/reconcile-cancellation`: 구매 ID만 받아 서버가 실제 격리 영수증·결제 시도를 조회한 뒤 PortOne V2 REST `GET`으로 **이미 완료된 전체 취소**를 재검증한다. 취소 요청 API를 호출하지 않으며 미취소·부분 취소는 권한을 회수하지 않는다.
+- 영수증의 결제 ID·거래 ID·금액·통화와 PortOne의 정확히 한 건 성공한 전체 취소를 일치시킨 후에만 기존 승인 취소 SQL로 Grant·구매 영수증을 원자적으로 회수한다. UI에서는 회수 후 기존 풀이 링크를 지운다.
+- 14상품 격리 DB의 Commerce 전용 역할에 누락됐던 승인 사주 영수증 발급 및 취소 처리 실행 권한을 **폐기형 DB에서만** 부여하며, 일반 회원·다른 출처는 차단한다.
+- 실제 폐기형 PostgreSQL 17에 SQL 설치와 역할을 확인해 OWNER_TEST_REFUND_SQL_READY. 실제 PortOne TEST 결제·취소 증거는 자격증명이 없어 아직 실행하지 않았다. 상용 DB·판매/환불 기능은 변경하지 않는다.
