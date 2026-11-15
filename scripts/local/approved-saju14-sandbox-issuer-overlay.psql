@@ -1,0 +1,61 @@
+\set ON_ERROR_STOP on
+-- LOCAL TEST AUTHORITY ONLY: replaces production-receipt requirements with
+-- real provider-verified PortOne SANDBOX receipts on a disposable PG17.
+-- The reviewed Production SQL files and hosted database remain untouched.
+begin;
+do $owner_test_overlay$
+declare
+  fn record;
+  def text;
+  changed text;
+  expected text[] := array[
+    'public.internal_apply_verified_receipt_capability_effects_v1',
+    'public.internal_apply_entitlement_effect_v1',
+    'commerce_saju_private.current_approved_saju_comparison_order_v1',
+    'commerce_saju_private.create_approved_purchase_intent_v1',
+    'public.internal_fulfill_verified_approved_saju_receipt_v1',
+    'commerce_saju_private.approved_component_entitlement_v1',
+    'public.cmd_claim_approved_saju_issue_job_v1',
+    'public.internal_apply_approved_saju_full_cancellation_v1'
+  ];
+  name text;
+  matched integer;
+begin
+  if current_database() <> 'myeongha_saju_sandbox_v1'
+    or current_setting('server_version_num')::integer < 170000
+    or current_setting('server_version_num')::integer >= 180000
+    or inet_server_addr() is not null
+    or to_regclass('public.myeongha_owner_administrators_v1') is null
+    or to_regclass('commerce_saju_private.approved_purchase_scope_v1') is null
+    or (select count(*) from public.myeongha_owner_administrators_v1
+        where sandbox_checkout_allowed and role='superadmin') <> 1 then
+    raise exception 'HOLD_ONLY_DISPOSABLE_SAJU14_OWNER_SANDBOX_OVERLAY';
+  end if;
+  if exists (select 1 from public.purchase_intents)
+    or exists (select 1 from public.commerce_receipts) then
+    raise exception 'HOLD_SANDBOX_AUTHORITY_MUST_PRECEDE_ALL_PURCHASES';
+  end if;
+
+  foreach name in array expected loop
+    select count(*) into matched
+    from pg_catalog.pg_proc proc
+    join pg_catalog.pg_namespace namespace on namespace.oid=proc.pronamespace
+    where namespace.nspname||'.'||proc.proname=name;
+    if matched <> 1 then
+      raise exception 'HOLD_REVIEWED_SANDBOX_FUNCTION_NOT_UNIQUE: %',name;
+    end if;
+    select pg_catalog.pg_get_functiondef(proc.oid) into strict def
+    from pg_catalog.pg_proc proc
+    join pg_catalog.pg_namespace namespace on namespace.oid=proc.pronamespace
+    where namespace.nspname||'.'||proc.proname=name;
+    if strpos(def,'''production''')=0 then
+      raise exception 'HOLD_REVIEWED_PRODUCTION_GATE_NOT_FOUND: %',name;
+    end if;
+    changed := replace(def,'''production''','''sandbox''');
+    if changed=def then raise exception 'HOLD_SANDBOX_PATCH_INEFFECTIVE: %',name; end if;
+    execute changed;
+  end loop;
+end
+$owner_test_overlay$;
+commit;
+select 'SAJU14_VERIFIED_SANDBOX_ONLY_ISSUANCE_READY' as state;

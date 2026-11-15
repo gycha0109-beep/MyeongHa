@@ -190,6 +190,7 @@ if (mode !== '--check' && mode !== '--serve') {
       const required = ['MYEONGHA_SAJU_TEST_STORE_ID', 'MYEONGHA_SAJU_TEST_CHANNEL_KEY',
         'MYEONGHA_SAJU_TEST_PORTONE_API_SECRET',
         'MYEONGHA_SAJU_TEST_EVIDENCE_HMAC_SECRET', 'MYEONGHA_SUPABASE_API_KEY',
+        'MYEONGHA_SAJU_TEST_OWNER_AUTH_USER_ID',
         ...issuerRequired];
       const missing = required.filter(key => !process.env[key]?.trim());
       if (missing.length) throw Error('PortOne TEST / Auth settings are missing: ' + missing.join(', '));
@@ -254,6 +255,31 @@ if (mode !== '--check' && mode !== '--serve') {
       name, 'bash', '/app/scripts/local/provision-approved-saju14-local-roles.sh']);
     if (!rolesOutput.includes('SAJU14_LOCAL_ROLE_SEPARATION_READY')) {
       throw Error('Local DB role isolation was not established.');
+    }
+    if (mode === '--serve' || process.env.MYEONGHA_SAJU_TEST_OWNER_AUTH_USER_ID) {
+      const ownerId = process.env.MYEONGHA_SAJU_TEST_OWNER_AUTH_USER_ID;
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(ownerId)) {
+        throw Error('An existing verified Supabase Owner account UUID is required.');
+      }
+      const seeded = docker(['exec', '-e', 'MYEONGHA_DISPOSABLE_SAJU14=explicit-local-only',
+        '-e', 'PGHOST=/var/run/postgresql',
+        '-e', 'MYEONGHA_SAJU_TEST_OWNER_AUTH_USER_ID=' + ownerId,
+        name, 'bash', '/app/scripts/local/provision-approved-saju14-local-owner.sh']);
+      if (!seeded.includes('SAJU14_LOCAL_OWNER_AUTHORITY_READY')) {
+        throw Error('Verified Owner membership was not bound to the local database.');
+      }
+    }
+    if (mode === '--serve') {
+      // This overlays only the disposable local PG17's reviewed functions.
+      // Production and hosted SQL remain unchanged. PortOne TEST receipts
+      // must still be independently verified and tied to an Owner purchase.
+      const sandbox = docker(['exec', '-e', 'PGHOST=/var/run/postgresql',
+        name, 'psql', '-X', '-U', 'postgres', '-d', database,
+        '-v', 'ON_ERROR_STOP=1', '-At',
+        '-f', '/app/scripts/local/approved-saju14-sandbox-issuer-overlay.psql']);
+      if (!sandbox.includes('SAJU14_VERIFIED_SANDBOX_ONLY_ISSUANCE_READY')) {
+        throw Error('Isolated verified TEST issuance was not enabled.');
+      }
     }
     const portOutput = docker(['port', name, '5432/tcp']);
     const match = /^127\.0\.0\.1:(\d{2,5})$/u.exec(portOutput);

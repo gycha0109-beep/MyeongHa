@@ -62,6 +62,18 @@ echo 'Installing reviewed 14-offer checkout, signed issuer, Reader and refund au
 psql -X -U postgres -d "$db" -v ON_ERROR_STOP=1 \
   -f scripts/local/approved-saju14-isolated-stage.psql >/dev/null
 fi
+# The owner-only web host REQUIRES this specific approved Auth ACL. It was
+# excluded from the credit migrations and must not be silently absent here.
+owner_acl_installed="$(psql -X -U postgres -d "$db" -Atqc "
+  select to_regclass('public.myeongha_owner_administrators_v1') is not null
+    and to_regprocedure('public.qry_myeongha_owner_admin_access_v1(uuid)') is not null
+")"
+if [[ "$owner_acl_installed" != 't' ]]; then
+  psql -X -U postgres -d "$db" -v ON_ERROR_STOP=1 \
+    -c 'alter table auth.users add column if not exists email_confirmed_at timestamptz' >/dev/null
+  psql -X -U postgres -d "$db" -v ON_ERROR_STOP=1 \
+    -f supabase/migrations/20261026110300_owner_admin_credit_testing_v1.sql >/dev/null
+fi
 echo 'Provisioning exactly 14 isolated catalog offers and pinned sandbox releases...'
 psql -X -U postgres -d "$db" -v ON_ERROR_STOP=1 \
   -f scripts/local/approved-saju14-isolated-registry.psql >/dev/null
