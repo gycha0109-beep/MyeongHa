@@ -103,18 +103,27 @@ export function collectChatOpenRpcBoundary({metadata,grants,sources}){
     'transaction role');
   has(tx,/assert_myeongha_subject_context_v1\(\$1::uuid\)/u,
     'subject assertion statement');
+  has(tx,/return executeSubjectTransaction\(input, ENTER_EXECUTION_ROLE_SQL\);/u,
+    'default member execution role');
   ordered(tx,[
+    'async function executeRoleTransaction<T>(',
     'await connection.query(BEGIN_SQL);',
-    'await connection.query(ENTER_EXECUTION_ROLE_SQL);',
-    'const resolvedSubject = await resolveSubjectIdentity({',
-    'verifiedEvidence: input.verifiedEvidence,',
-    'await connection.query(ASSERT_SUBJECT_CONTEXT_SQL, [resolvedSubject.subjectId]);',
-    'const result = await input.execute(',
+    'await connection.query(executionRoleSql);',
+    'const result = await execute(connection);',
     'await connection.query(COMMIT_SQL);',
     'await connection.query(ROLLBACK_SQL);',
     'connection.release(discardConnectionError);',
-  ],'transaction-local subject and rollback');
-  has(tx,/resolvedSubject,\s*client: connection,/u,'subject-scoped client');
+  ],'transaction-local role and rollback');
+  ordered(tx,[
+    'async function executeSubjectTransaction<T>(',
+    'return executeRoleTransaction(input.pool, executionRoleSql, async (client) => {',
+    'const resolvedSubject = await resolveSubjectIdentity({',
+    'verifiedEvidence: input.verifiedEvidence,',
+    'await client.query(ASSERT_SUBJECT_CONTEXT_SQL, [resolvedSubject.subjectId]);',
+    'return input.execute(Object.freeze({ resolvedSubject, client }));',
+  ],'transaction-local subject and scoped client');
+  has(tx,/input\.execute\(Object\.freeze\(\{\s*resolvedSubject,\s*client\s*\}\)\)/u,
+    'subject-scoped client');
   const sourceSha256=Object.fromEntries(CHAT_OPEN_SOURCE_FILES.map(p=>[p,sha(sources[p])]));
   return Object.freeze({
     schemaVersion:CHAT_OPEN_SOURCE_BOUNDARY_VERSION,
