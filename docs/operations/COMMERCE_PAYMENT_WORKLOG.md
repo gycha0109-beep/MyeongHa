@@ -1196,3 +1196,8 @@ Watchtower-Track: commerce
 - Implemented npm run start:saju-owner-test with separate loopback PostgreSQL TEST principals, existing verified member login, 14-offer checkout, purchased-reading archive, counterpart reads, and pinned PortOne TEST SDK. PR #3322, development branch only; production sale remains OFF.
 - Read-only linked Supabase production check: commerce_saju_private.approved_purchase_scope_v1, approved_component_reading_v1, source issue proof and issuer role are absent. No production DDL or payment was executed.
 - TEST PG roles / provider credentials are not configured in the accessible local environment. Real 14-offer payment-to-issuance-to-refund is blocked, not claimed complete.
+
+### 2026-11-15 — 결제 확인 후 개인·궁합 공식 발급 실행 연결
+- 구매 영수증 검증으로 발생한 기존 승인 사주 발급 큐를 개인 사주/궁합 발급 작업자가 함께 처리하는 독립 실행기를 추가. `npm run start:saju-issuer`.
+- 구매 권한·기간·상대 동의·고정 Release·서명 Source·발급 완료 DB 검증을 유지하며, 확인되지 않은 결제 요청은 발급하지 않는다.
+- 실제 운영 DB·판매는 수정하지 않았다. 발급 전용 로컬 DB와 독립 궁합 보관함 역할·서명 검증 키가 없으면 실행하지 않는다. 실제 구매 발급은 아직 차단 상태다.
