@@ -1,0 +1,94 @@
+\set ON_ERROR_STOP on
+-- Disposable PostgreSQL 17 only, no Supabase Production migrations.
+\getenv member_password SAJU14_LOCAL_MEMBER_PASSWORD
+\getenv commerce_password SAJU14_LOCAL_COMMERCE_PASSWORD
+\getenv issuer_password SAJU14_LOCAL_ISSUER_PASSWORD
+\getenv pair_password SAJU14_LOCAL_PAIR_READER_PASSWORD
+begin;
+do $guard$
+declare r text;
+begin
+  if current_database() <> 'myeongha_saju_sandbox_v1'
+    or current_setting('server_version_num')::integer < 170000
+    or current_setting('server_version_num')::integer >= 180000
+    or inet_server_addr() is not null then
+    raise exception 'HOLD_NOT_DISPOSABLE_POSTGRES17';
+  end if;
+  if to_regclass('commerce_saju_private.approved_fulfillment_release_v1') is null
+    or to_regprocedure('public.cmd_claim_approved_saju_issue_job_v1(uuid,jsonb)') is null then
+    raise exception 'HOLD_APPROVED_SAJU14_SCHEMA_NOT_INSTALLED';
+  end if;
+  foreach r in array array[
+    'myeongha_api_executor','myeongha_commerce_internal_executor',
+    'myeongha_approved_saju_issuer_executor',
+    'myeongha_approved_saju_pair_reader_executor'
+  ] loop
+    if to_regrole(r) is null then raise exception 'HOLD_REQUIRED_ROLE_MISSING: %',r; end if;
+  end loop;
+end
+$guard$;
+do $roles$
+declare r text;
+begin
+  foreach r in array array[
+    'saju14_local_member_login',
+    'saju14_local_commerce_login',
+    'saju14_local_issuer_login',
+    'saju14_local_pair_reader_login'
+  ] loop
+    if not exists(select 1 from pg_roles where rolname=r) then
+      execute format('create role %I nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls connection limit 4',r);
+    end if;
+    execute format('alter role %I nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls connection limit 4',r);
+  end loop;
+end
+$roles$;
+grant myeongha_api_executor to saju14_local_member_login
+  with inherit false, set true, admin false;
+grant myeongha_commerce_internal_executor to saju14_local_commerce_login
+  with inherit false, set true, admin false;
+grant myeongha_approved_saju_issuer_executor to saju14_local_issuer_login
+  with inherit false, set true, admin false;
+grant myeongha_approved_saju_pair_reader_executor to saju14_local_pair_reader_login
+  with inherit false, set true, admin false;
+
+select format('alter role saju14_local_member_login login password %L', :'member_password') \gexec
+select format('alter role saju14_local_commerce_login login password %L', :'commerce_password') \gexec
+select format('alter role saju14_local_issuer_login login password %L', :'issuer_password') \gexec
+select format('alter role saju14_local_pair_reader_login login password %L', :'pair_password') \gexec
+
+do $check$
+begin
+  if (select count(*) from pg_roles where rolname in (
+    'saju14_local_member_login','saju14_local_commerce_login',
+    'saju14_local_issuer_login','saju14_local_pair_reader_login'
+  ) and rolcanlogin and not rolcreaterole and not rolcreatedb and not rolsuper
+    and not rolbypassrls and not rolinherit) <> 4 then
+    raise exception 'HOLD_SAJU14_LOCAL_ROLE_ATTR_MISMATCH';
+  end if;
+  if exists (
+    select 1 from pg_auth_members membership
+    where membership.member in (
+      'saju14_local_member_login'::regrole,
+      'saju14_local_commerce_login'::regrole,
+      'saju14_local_issuer_login'::regrole,
+      'saju14_local_pair_reader_login'::regrole
+    ) and (membership.admin_option or membership.inherit_option
+       or not membership.set_option)
+  ) then
+    raise exception 'HOLD_SAJU14_LOCAL_ROLE_MEMBERSHIP_DRIFT';
+  end if;
+  if (
+    select count(*) from pg_auth_members membership where
+      (membership.member, membership.roleid) in (
+        ('saju14_local_member_login'::regrole,'myeongha_api_executor'::regrole),
+        ('saju14_local_commerce_login'::regrole,'myeongha_commerce_internal_executor'::regrole),
+        ('saju14_local_issuer_login'::regrole,'myeongha_approved_saju_issuer_executor'::regrole),
+        ('saju14_local_pair_reader_login'::regrole,'myeongha_approved_saju_pair_reader_executor'::regrole)
+      )
+  ) <> 4 then
+    raise exception 'HOLD_SAJU14_LOCAL_ROLE_MEMBERSHIP_MISSING';
+  end if;
+end
+$check$;
+commit;
