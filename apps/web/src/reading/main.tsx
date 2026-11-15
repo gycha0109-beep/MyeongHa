@@ -18,7 +18,7 @@ let generation = 0;
 let approvedCheckout: ApprovedSajuCheckoutPanelPorts | undefined;
 
 async function refreshCheckoutForMember() {
-  const memberId = readMemberSession()?.user.id ?? null;
+  const memberId = readMemberSession()?.user?.id ?? null;
   if (currentMember === memberId) return;
   const activeGeneration = ++generation;
   currentMember = memberId;
@@ -28,12 +28,12 @@ async function refreshCheckoutForMember() {
 
   const ports = await loadApprovedSajuSandboxCheckoutPortsV1(async () => {
     const bearer = await getActiveBearer();
-    if (bearer?.kind !== 'member' || readMemberSession()?.user.id !== memberId) {
+    if (bearer?.kind !== 'member' || readMemberSession()?.user?.id !== memberId) {
       throw new Error('Owner checkout identity changed.');
     }
     return bearer.token;
   });
-  if (generation !== activeGeneration || readMemberSession()?.user.id !== memberId) return;
+  if (generation !== activeGeneration || readMemberSession()?.user?.id !== memberId) return;
   if (ports === null) return;
   approvedCheckout = ports;
   root.render(<ReadingPage approvedCheckout={approvedCheckout} />);
