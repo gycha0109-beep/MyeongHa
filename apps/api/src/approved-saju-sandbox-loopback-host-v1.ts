@@ -4,6 +4,7 @@ import { extname, isAbsolute, resolve, sep } from 'node:path';
 import { APPROVED_SAJU_SANDBOX_ROUTES_V1 } from '../../../packages/contracts/src/approved-saju-sandbox-routes.js';
 import type { createApprovedSajuSandboxHttpRuntimeV1 } from './approved-saju-sandbox-http-runtime-v1.js';
 import { OWNER_PORTONE_SDK_PATH, serveOwnerPortOneSdkV1 } from '../../../cloudflare/owner-portone-sdk-proxy.mjs';
+import { APPROVED_SAJU_PAIR_READER_PATH_V1 } from './approved-saju-t10-pair-reader-http-v1.js';
 
 const ROUTES = new Set(Object.values(APPROVED_SAJU_SANDBOX_ROUTES_V1));
 const AUTH_ROUTES = Object.freeze({
@@ -64,6 +65,8 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
   memberAuth?: LocalAuthHandler;
   /** Existing RLS/entitlement-verifying GET runtimes. No write routes. */
   ownerReads?: Readonly<{ targets: OwnerReadHandler; readings: OwnerReadHandler }>;
+  /** Dedicated read-only, signed T10 archive. Never an issue/write authority. */
+  signedPairReader?: Readonly<{ handleRequest: (request: Request) => Promise<Response | null> }>;
 }>) {
   const url = new URL(input.origin);
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1'
@@ -165,6 +168,56 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
           ...(cookie === null ? {} : { 'Set-Cookie': cookie }),
         });
         res.end(body);
+      } catch { reply(503); }
+      return;
+    }
+
+    if (requestUrl.pathname === APPROVED_SAJU_PAIR_READER_PATH_V1) {
+      if (input.signedPairReader === undefined) { req.resume(); reply(404); return; }
+      if (req.method !== 'POST') { req.resume(); reply(405); return; }
+      if (requestUrl.search !== '' || req.headers.origin !== input.origin ||
+        req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
+        req.resume(); reply(403); return;
+      }
+      const authorization = req.headers.authorization;
+      if (typeof authorization !== 'string') { req.resume(); reply(404); return; }
+      try {
+        const owner = await input.runtime.handleRequest(new Request(
+          input.origin + APPROVED_SAJU_SANDBOX_ROUTES_V1.access,
+          { headers: { Authorization: authorization } },
+        ));
+        if (owner?.status !== 200) { req.resume(); reply(404); return; }
+        const declaredLength = Number(req.headers['content-length'] ?? 0);
+        if (!Number.isSafeInteger(declaredLength) || declaredLength > MAX_REQUEST_BYTES) {
+          req.resume(); reply(413); return;
+        }
+        const chunks: Buffer[] = [];
+        let length = 0;
+        for await (const chunk of req) {
+          const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+          length += bytes.byteLength;
+          if (length > MAX_REQUEST_BYTES) { reply(413); return; }
+          chunks.push(bytes);
+        }
+        const result = await input.signedPairReader.handleRequest(new Request(requestUrl.href, {
+          method: 'POST',
+          headers: {
+            Authorization: authorization,
+            Origin: input.origin,
+            'Content-Type': 'application/json',
+          },
+          body: Buffer.concat(chunks),
+        }));
+        if (!(result instanceof Response) || result.status >= 300 && result.status < 400 ||
+          result.headers.has('set-cookie') || result.headers.has('location')) {
+          reply(503); return;
+        }
+        const body = new Uint8Array(await result.arrayBuffer());
+        if (body.byteLength > MAX_RESPONSE_BYTES ||
+          !result.headers.get('content-type')?.startsWith('application/json')) {
+          reply(503); return;
+        }
+        reply(result.status, body, result.headers.get('content-type') ?? 'application/json');
       } catch { reply(503); }
       return;
     }

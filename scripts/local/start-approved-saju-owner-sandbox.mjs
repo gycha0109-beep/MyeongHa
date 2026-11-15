@@ -12,6 +12,7 @@
  * MYEONGHA_SUPABASE_API_KEY
  */
 import { access } from 'node:fs/promises';
+import { createPublicKey } from 'node:crypto';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
@@ -72,11 +73,26 @@ async function assertRole(pool, expectedLogin, requiredRole, requireCommerceSche
 let runtime;
 let memberPool;
 let commercePool;
+let pairReaderPool;
 try {
   requireSettings();
   const member = parseTestDb('MYEONGHA_SAJU_TEST_MEMBER_DB_URL');
   const merchant = parseTestDb('MYEONGHA_SAJU_TEST_COMMERCE_DB_URL');
+  const pairReader = parseTestDb('MYEONGHA_SAJU_TEST_PAIR_READER_DB_URL');
   requireDistinctRoles(member, merchant);
+  if (pairReader.username === member.username || pairReader.username === merchant.username
+    || pairReader.database !== member.database || pairReader.url.port !== member.url.port
+    || pairReader.url.port !== merchant.url.port) {
+    throw Error('T10 pair archive requires an independent local read-only role.');
+  }
+  const pairPem = Buffer.from(process.env.MYEONGHA_SAJU_PAIR_VERIFY_PEM_B64, 'base64').toString('utf8');
+  if (!pairPem.startsWith('-----BEGIN PUBLIC KEY-----') || !pairPem.trimEnd().endsWith('-----END PUBLIC KEY-----')) {
+    throw Error('T10 Reader requires pinned Ed25519 PUBLIC proof key.');
+  }
+  const pairKey = createPublicKey(pairPem);
+  if (pairKey.type !== 'public' || pairKey.asymmetricKeyType !== 'ed25519') {
+    throw Error('T10 Reader trust must be an Ed25519 public key.');
+  }
   await access(resolve(webRoot, 'reading.html'));
   await access(resolve(root, 'dist/apps/api/src/approved-saju-sandbox-owner-runtime-v1.js'));
   const [runtimeModule, paymentModule] = await Promise.all([
@@ -90,9 +106,12 @@ try {
     connectionTimeoutMillis: 5000, idleTimeoutMillis: 5000, ssl: false });
   commercePool = new Pool({ connectionString: merchant.url.href, max: 2,
     connectionTimeoutMillis: 5000, idleTimeoutMillis: 5000, ssl: false });
+  pairReaderPool = new Pool({ connectionString: pairReader.url.href, max: 2,
+    connectionTimeoutMillis: 5000, idleTimeoutMillis: 5000, ssl: false });
   await Promise.all([
     assertRole(memberPool, member.username, 'myeongha_api_executor', true),
     assertRole(commercePool, merchant.username, 'myeongha_commerce_internal_executor', true),
+    assertRole(pairReaderPool, pairReader.username, 'myeongha_approved_saju_pair_reader_executor', true),
   ]);
   const verificationAdapter = paymentModule.createPortOneV2PaymentVerificationAdapterV1({
     apiSecret: process.env.MYEONGHA_SAJU_TEST_PORTONE_API_SECRET,
@@ -104,6 +123,13 @@ try {
     supabaseOrigin: expectedAuthOrigin,
     supabaseApiKey: process.env.MYEONGHA_SUPABASE_API_KEY,
     memberPool, commercePool, verificationAdapter,
+    pairReader: { pool: pairReaderPool, trust: {
+      issuer: process.env.MYEONGHA_SAJU_PAIR_PROOF_ISSUER,
+      audience: process.env.MYEONGHA_SAJU_PAIR_PROOF_AUDIENCE,
+      keyId: process.env.MYEONGHA_SAJU_PAIR_PROOF_KEY_ID,
+      engineVersion: process.env.MYEONGHA_SAJU_ENGINE_VERSION,
+      verificationKey: pairKey,
+    } },
     channel: {
       environment: 'sandbox',
       storeId: process.env.MYEONGHA_SAJU_TEST_STORE_ID,
@@ -118,14 +144,14 @@ try {
     if (exiting) return;
     exiting = true;
     try { await runtime.close(); } finally {
-      await Promise.allSettled([memberPool.end(), commercePool.end()]);
+      await Promise.allSettled([memberPool.end(), commercePool.end(), pairReaderPool.end()]);
     }
   };
   process.once('SIGINT', () => { void shutdown(); });
   process.once('SIGTERM', () => { void shutdown(); });
 } catch (error) {
   await Promise.allSettled([
-    runtime?.close(), memberPool?.end(), commercePool?.end(),
+    runtime?.close(), memberPool?.end(), commercePool?.end(), pairReaderPool?.end(),
   ].filter(Boolean));
   const message = error instanceof Error ? error.message : 'TEST runtime refused to start.';
   console.error('Owner-only Saju TEST startup blocked: ' + message);

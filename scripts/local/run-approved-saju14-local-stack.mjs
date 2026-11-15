@@ -226,6 +226,8 @@ if (mode !== '--check' && mode !== '--serve') {
       env.MYEONGHA_SAJU_TEST_COMMERCE_DB_URL =
         'postgresql://' + commerce[1] + ':' + pw[commerce[0]] + '@127.0.0.1:' + port + '/' + database;
       const issuer = roles[2], pairReader = roles[3];
+      env.MYEONGHA_SAJU_TEST_PAIR_READER_DB_URL =
+        'postgresql://' + pairReader[1] + ':' + pw[pairReader[0]] + '@127.0.0.1:' + port + '/' + database;
       const issuerEnv = {
         ...env,
         MYEONGHA_SAJU_ISSUER_STAGE: 'local-only',

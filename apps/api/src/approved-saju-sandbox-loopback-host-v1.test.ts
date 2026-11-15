@@ -253,3 +253,48 @@ describe('purchased Reading / comparison target reads on isolated test host', ()
     expect((await fetch(otherOrigin + '/api/hidden.json')).status).toBe(404);
   });
 });
+
+describe('T10 signed pair archive via the actual isolated HTTP server', () => {
+  const port = 48676;
+  const origin = 'http://127.0.0.1:' + port;
+  const path = '/api/approved-saju/pair/reader';
+  const id = '11111111-1111-4111-8111-111111111111';
+  const trusted = vi.fn(async (request: Request) => Response.json({
+    ok: true,
+    data: {
+      state: 'signed_pair_archive_reopened',
+      readingId: id, readerCharacterId: 'seyeon',
+      display: { kind: 'delivered', steps: [{ title: '근거 확인', primary: '저장된 궁합 풀이',
+        supporting: [], structure: [] }], notices: [] },
+    },
+  }));
+  const host = createApprovedSajuSandboxLoopbackHostV1({
+    origin, staticRoot: join(tmpdir(), 'saju-owner-archive-route'),
+    runtime: {
+      handleRequest: async (request: Request) =>
+        request.headers.get('authorization') === 'Bearer owner'
+          ? Response.json({ ok: true }) : Response.json({ ok: false }, { status: 404 }),
+    },
+    signedPairReader: { handleRequest: trusted },
+  });
+  beforeAll(async () => host.start());
+  afterAll(async () => host.close());
+  it('admits only the authorized Owner; blocks anonymous, other member and cross-origin', async () => {
+    trusted.mockClear();
+    const json = JSON.stringify({ purchaseIntentId: id, readingId: id, readerCharacterId: 'seyeon' });
+    const send = (originHeader: string, bearer?: string) => fetch(origin + path, {
+      method: 'POST', body: json,
+      headers: { Origin: originHeader, 'Content-Type': 'application/json',
+        ...(bearer ? { Authorization: 'Bearer ' + bearer } : {}) },
+    });
+    expect((await send(origin)).status).toBe(404);
+    expect((await send(origin, 'other-member')).status).toBe(404);
+    expect((await send('https://attacker.example', 'owner')).status).toBe(403);
+    expect(trusted).not.toHaveBeenCalled();
+    const admitted = await send(origin, 'owner');
+    expect(admitted.status).toBe(200);
+    expect((await admitted.json()).data.state).toBe('signed_pair_archive_reopened');
+    expect(trusted).toHaveBeenCalledOnce();
+    expect((await fetch(origin + path, { method: 'GET' })).status).toBe(405);
+  });
+});
