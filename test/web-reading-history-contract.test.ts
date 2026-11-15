@@ -49,6 +49,18 @@ describe('Reading History browser contract', () => {
     });
   });
 
+  it('retains the distinct year and month components within the general domain', () => {
+    const base = { ...payload().readings[0], sajuDomain: 'general' };
+    const { readings } = parseReadingHistoryPayloadV1({ readings: [
+      { ...base, approvedComponent: 'year' },
+      { ...base, readingId: SESSION_ID, approvedComponent: 'month' },
+    ] });
+    expect(readings.map(reading => reading.approvedComponent)).toEqual(['year', 'month']);
+    expect(() => parseReadingHistoryPayloadV1({
+      readings: [{ ...base, approvedComponent: 'compatibility' }],
+    })).toThrow(ReadingHistoryContractErrorV1);
+  });
+
   it.each([
     { ...payload(), readings: 'not-an-array' },
     { readings: [{ ...payload().readings[0], readingId: 'reading-1' }] },

@@ -973,8 +973,8 @@ Semantic fields are immutable.
 capability_set_id
 item_key
 entitlement_key
-scope_mode        # global | fixed
-fixed_scope_key   # fixed only
+scope_mode        # global | fixed | saju_record (approved Saju-only mode)
+fixed_scope_key   # fixed only; NULL for global and saju_record
 validity_mode     # unbounded | fixed_duration | provider_expiry
 duration_seconds  # fixed_duration only
 ```
@@ -1380,3 +1380,24 @@ external decisions required before provider implementation = P0-CM-01 + launch P
 결제·권한 설계 CLOSED
 implementation HOLD
 ```
+
+
+## Approved Saju Record-scoped Capability exception (2026-11-07)
+
+The general `global | fixed` contract remains unchanged for every non-Saju Product. The only
+approved user-owned resource scope is the narrow Saju-specific `saju_record` mode:
+
+- It is valid only for the reviewed 13 Saju Product keys.
+- `fixed_scope_key` must be NULL; the client never submits a Record scope or entitlement key.
+- The server resolves `Receipt → Purchase Intent → immutable Saju Purchase Origin → Saju Record`
+  and derives `saju-record:<opaque entitlement_scope_id>`.
+- The opaque scope identity is unique per Record and is deleted with the personal Record mapping.
+- Generic Purchase Intent v3 rejects Saju Product creation/replay unless invoked inside the
+  transaction-local private context established by the Record-locking Saju admission command.
+- The first admission implementation accepts original purchases only. Upgrade checkout remains
+  HOLD until the static Offer Charge Terms model is extended with an immutable quote-specific
+  amount authority; no client-provided delta can override pinned price.
+- This is not a generic dynamic-resource resolver and does not relax the general client-scope
+  prohibition.
+
+Implementation: migration `2330_saju_record_scoped_capability_authority_v1.sql`, pending CI.

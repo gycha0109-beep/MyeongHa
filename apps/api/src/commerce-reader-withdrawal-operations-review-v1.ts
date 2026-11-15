@@ -14,9 +14,20 @@ export const READER_WITHDRAWAL_PRIVATE_REVIEW_V1=Object.freeze({
   maxCandidateReceipts:25,
 } as const);
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+// A privileged RLS-bypass attribute alone is not an operator identity.
+// Match the non-public recorded-Claim reviewer; reject service/runtime roles.
+const UNSAFE_OWNER_OPERATIONS_ROLES=new Set([
+  'anon','authenticated','service_role','myeongha_api_executor',
+  'myeongha_worker_runtime','myeongha_commerce_internal_executor',
+]);
+const ownerRoleAllowed=(value:unknown):value is string=>
+  typeof value==='string'&&value.length>0&&value.trim()===value&&
+  !UNSAFE_OWNER_OPERATIONS_ROLES.has(value);
+
 const ROLE=[
   "select (rolsuper or rolbypassrls) as \"fullVisibility\",",
-  "current_setting('transaction_read_only')='on' as \"readOnly\"",
+  "current_setting('transaction_read_only')='on' as \"readOnly\",",
+  'current_user as "currentUser"',
   'from pg_catalog.pg_roles where rolname=current_user',
 ].join('\n');
 const CLAIM=[
@@ -97,9 +108,12 @@ export async function readPrivilegedReaderWithdrawalCaseV1(input:Readonly<{
   try{
     await connection.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     active=true;
-    const roles=await connection.query<{fullVisibility:unknown;readOnly:unknown}>(ROLE);
+    const roles=await connection.query<{
+      fullVisibility:unknown;readOnly:unknown;currentUser:unknown;
+    }>(ROLE);
     if(roles.rows.length!==1||roles.rows[0]?.fullVisibility!==true
-      ||roles.rows[0]?.readOnly!==true)
+      ||roles.rows[0]?.readOnly!==true
+      ||!ownerRoleAllowed(roles.rows[0]?.currentUser))
       throw Error('PRIVATE_REVIEW_FULL_VISIBILITY_REQUIRED');
     const records=await connection.query<ClaimRow>(CLAIM,[input.claimId]);
     if(records.rows.length===0){

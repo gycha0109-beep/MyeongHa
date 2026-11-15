@@ -24,6 +24,8 @@ export interface CreateProductionPurchaseIntentCreateRuntimeInputV3 {
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
+  /** Caller opt-in for the unmounted approved-catalog handler. */
+  readonly privateApprovedSajuCheckoutEnabled?: true;
 }
 
 /**
@@ -54,6 +56,7 @@ export function createProductionPurchaseIntentCreateRuntimeV3(
         identityEvidenceVerifier,
         pool: poolLease.pool,
         idPort,
+        ...(input.privateApprovedSajuCheckoutEnabled === true ? { privateApprovedSajuCheckoutEnabled: true } : {}),
       });
     },
     close() {

@@ -61,8 +61,11 @@ function fixture(options:FixtureOptions={}){
       ...(overrides.method==='GET'?{}:{body:JSON.stringify(overrides.body??body)}),
     });
   }
-  const run=(req=request(),enabled=true)=>handle({request:req,
-    identityEvidenceVerifier:verifier,pool:pool as unknown as PostgresSubjectPoolV1,enabled,idempotencySecret:secret});
+  // null explicitly omits the optional key from the server options object.
+  // An omitted third argument retains the fixture's valid signing secret.
+  const run=(req=request(),enabled=true,signingKey:string|null=secret)=>handle({request:req,
+    identityEvidenceVerifier:verifier,pool:pool as unknown as PostgresSubjectPoolV1,
+    enabled,...(signingKey===null?{}:{idempotencySecret:signingKey})});
   return {pool:pool as unknown as PostgresSubjectPoolV1,verifier,queries,request,run};
 }
 describe('buyer exact paid Reader withdrawal intake',()=>{
@@ -197,6 +200,34 @@ describe('buyer exact paid Reader withdrawal intake',()=>{
       claimId:claim,receivedAt:'2026-11-01T13:00:00.000Z',
       status:'received',
     });
+  });
+  it('allows scoped customer status GET without an unrelated POST signing secret',async()=>{
+    const f=fixture({status:'refund_processing'});
+    const r=await f.run(f.request({
+      method:'GET',url:endpoint+'&claimId='+claim,
+    }),true,null);
+    expect(r.status).toBe(200);
+    expect((await r.json()).data).toMatchObject({
+      claimId:claim,status:'refund_processing',
+    });
+    expect(f.queries.some(q=>q.sql.includes(
+      'qry_received_digital_reading_withdrawal_claim_v1'))).toBe(true);
+    expect(f.queries.some(q=>q.sql.includes(
+      'cmd_receive_digital_reading_withdrawal_claim_v1'))).toBe(false);
+  });
+  it('keeps customer intake POST disabled without its HMAC signing secret',async()=>{
+    const f=fixture();
+    const r=await f.run(f.request(),true,null);
+    expect(r.status).toBe(503);
+    expect(f.queries).toHaveLength(0);
+    expect(f.verifier.verifyRequestIdentity).not.toHaveBeenCalled();
+  });
+  it('rejects a malformed short POST signing secret, even when the route is on',async()=>{
+    const f=fixture();
+    const r=await f.run(f.request(),true,'short');
+    expect(r.status).toBe(503);
+    expect(f.queries).toHaveLength(0);
+    expect(f.verifier.verifyRequestIdentity).not.toHaveBeenCalled();
   });
   it.each(['refund_decision_recorded','refund_processing','refund_confirmed'] as const)(
     'shows exact owned customer claim lifecycle state %s without exposing raw refund evidence',async status=>{

@@ -76,9 +76,16 @@ if [[ "$reader_subject_present" != 0 ]]; then
     actual="$(printf '%s\n' "$actual" | grep -Fxv "${table}|subject_id")"
   done
 fi
+# The new Saju Record is personal data deleted by the account finalizer.
+# It is outside the historical P0-PR-01 30-edge snapshot, never P5Y evidence.
+if ! printf '%s\n' "$actual" | grep -Fxq 'commerce_saju_records_v1|subject_id'; then
+  echo "Expected exact Saju Record Subject FK was not found." >&2
+  exit 1
+fi
+actual="$(printf '%s\n' "$actual" | sed '/^commerce_saju_records_v1|subject_id$/d; /^chat_credit_lots_v1|subject_id$/d')"
+
 # Shared My Page memory is an independently approved, manually managed owner lane.
 # Admit exactly this new Subject FK without mutating frozen P0-PR-01 inventory.
-# Its deletion action is separately checked against the PostgreSQL catalog.
 shared_memory_edge='subject_shared_memory_items_v1|subject_id'
 if ! printf '%s\n' "$actual" | grep -Fxq "$shared_memory_edge"; then
   echo 'Expected Subject-owned shared memory FK is absent.' >&2
@@ -103,7 +110,6 @@ if [[ "$shared_memory_cascade" != '1' ]]; then
   exit 1
 fi
 actual="$(printf '%s\n' "$actual" | grep -Fxv "$shared_memory_edge")"
-actual="$(printf '%s\n' "$actual" | sed '/^chat_credit_lots_v1|subject_id$/d')"
 if [[ "$actual" != "$expected" ]]; then
   echo "Subject-owned data graph inventory drifted." >&2
   echo "--- inventory" >&2

@@ -125,12 +125,16 @@ select pg_temp.assert_true(
   )
 );
 
+insert into auth.users(id)
+values ('11206000-0000-0000-0000-000000000001')
+on conflict do nothing;
+
 insert into public.subjects(
   id, kind, auth_user_id, status, merged_into_subject_id, created_at, updated_at
 ) values (
   '11204000-0000-0000-0000-000000000001',
-  'guest',
-  null,
+  'member',
+  '11206000-0000-0000-0000-000000000001',
   'active',
   null,
   now(),

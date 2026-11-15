@@ -70,6 +70,7 @@ export interface SajuProductionReadingRequestV1 {
   readonly reading: Readonly<{
     text: string;
     targetPersonRef?: string;
+    periodReferenceDateTime?: string;
   }>;
 }
 
@@ -78,12 +79,26 @@ export interface SajuProductionReadingHttpAdapterV1<AdmittedResponse = unknown> 
     request: SajuProductionReadingRequestV1,
     preparedAttempt?: SajuA4PreparedAttemptTransportV1,
   ): Promise<AdmittedResponse>;
+  requestPreparedReading?(
+    request: SajuProductionReadingRequestV1,
+    context: SajuPreparedProductionReadingContextV1,
+  ): Promise<Readonly<{ response: AdmittedResponse; externalRequestRef: string }>>;
   /** Private server transport: ref is untrusted until independently signed by Source. */
   requestReadingWithSourceRef?(
     request: SajuProductionReadingRequestV1,
     preparedAttempt: SajuA4PreparedAttemptTransportV1,
   ): Promise<Readonly<{ response: AdmittedResponse; externalRequestRef: string }>>;
 }
+
+export interface SajuPreparedProductionReadingContextV1 {
+  readonly executionAttemptId: string;
+  readonly sourceBirthRevisionId: string;
+  readonly sourceBirthInputHash: string;
+  readonly releaseRef: string;
+}
+
+export const SAJU_PRODUCTION_ISSUE_BIRTH_HASH_V1 = /^sha256:v1:[a-f0-9]{64}$/u;
+export const SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1 = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,199}$/u;
 
 interface SajuProductionReadingHttpDeadlineLeaseV1 {
   readonly response: SajuProductionCalculationHttpResponseV1;
@@ -184,6 +199,7 @@ export function buildSajuProductionReadingRequestV1(input: {
   readonly birthRevision: SajuBirthRevisionBindingV1;
   readonly readingText: string;
   readonly targetPersonRef?: string;
+  readonly periodReferenceDateTime?: string;
 }): SajuProductionReadingRequestV1 {
   const calculationRequest = buildSajuProductionCalculationRequestV1(input.birthRevision);
   const text = requireNonBlank('readingText', input.readingText, 200);
@@ -191,12 +207,24 @@ export function buildSajuProductionReadingRequestV1(input: {
     input.targetPersonRef === undefined
       ? undefined
       : requireNonBlank('targetPersonRef', input.targetPersonRef, 200);
+  const { periodReferenceDateTime } = input;
+  if (periodReferenceDateTime !== undefined
+    && (typeof periodReferenceDateTime !== 'string'
+      || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(periodReferenceDateTime)
+      || !Number.isFinite(Date.parse(periodReferenceDateTime))
+      || new Date(periodReferenceDateTime).toISOString() !== periodReferenceDateTime)) {
+    throw new SajuProductionReadingHttpAdapterErrorV1(
+      'INVALID_READING_REQUEST',
+      'periodReferenceDateTime must be a canonical UTC timestamp.',
+    );
+  }
 
   return Object.freeze({
     birth: calculationRequest.birth,
     reading: Object.freeze({
       text,
       ...(targetPersonRef === undefined ? {} : { targetPersonRef }),
+      ...(periodReferenceDateTime === undefined ? {} : { periodReferenceDateTime }),
     }),
   });
 }
@@ -360,9 +388,13 @@ function assertLifecycleAttestation(
   response: SajuProductionCalculationHttpResponseV1,
   expectedLifecycle: string | undefined,
 ): void {
-  if (expectedLifecycle === undefined) return;
   const lifecycle = response.headers.get(SAJU_READING_LIFECYCLE_HEADER_V1);
-  if (lifecycle !== expectedLifecycle) {
+  // The bounded older Production host omits this header. A response labeled
+  // Preview (or any unknown lifecycle) cannot enter the Production adapter.
+  const matches = expectedLifecycle === undefined
+    ? lifecycle === null || lifecycle === 'production'
+    : lifecycle === expectedLifecycle;
+  if (!matches) {
     cancelUnusedResponseBody(response);
     throw new SajuProductionReadingHttpAdapterErrorV1(
       'RESPONSE_LIFECYCLE_ATTESTATION_REJECTED',

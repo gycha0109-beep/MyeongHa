@@ -125,16 +125,17 @@ function requireCurrency(value: unknown): string {
   return currency;
 }
 
-function requireStatus(value: unknown): 'created' {
-  if (value !== 'created') {
+function requireStatus(value: unknown, expected: PaymentAttemptBrowserHandoffContextV1['status']) {
+  if (value !== expected) {
     return invalidResponse('Payment Attempt browser handoff response status is invalid.');
   }
-  return value;
+  return expected;
 }
 
 function parseSuccessEnvelope(
   value: unknown,
   expectedPaymentAttemptId: string,
+  expectedStatus: PaymentAttemptBrowserHandoffContextV1['status'],
 ): PaymentAttemptBrowserHandoffContextV1 {
   if (!isRecord(value) || !hasExactKeys(value, ['ok', 'data', 'meta']) || value.ok !== true) {
     return invalidResponse('Payment Attempt browser handoff success envelope is invalid.');
@@ -147,6 +148,7 @@ function parseSuccessEnvelope(
     'amountMinor',
     'currency',
     'status',
+    ...(expectedStatus === 'handed_off' ? ['externalProductId'] : []),
   ])) {
     return invalidResponse('Payment Attempt browser handoff success data is invalid.');
   }
@@ -172,6 +174,12 @@ function parseSuccessEnvelope(
     return invalidResponse('Payment Attempt browser handoff response serverTime is invalid.');
   }
 
+  const externalProductId = expectedStatus === 'handed_off'
+    ? requireCanonicalString('externalProductId', value.data.externalProductId)
+    : undefined;
+  if (externalProductId !== undefined && externalProductId.length > 512) {
+    return invalidResponse('Payment Attempt browser handoff response externalProductId is invalid.');
+  }
   return Object.freeze({
     paymentAttemptId: expectedPaymentAttemptId,
     provider: requireCanonicalString('provider', value.data.provider),
@@ -179,7 +187,8 @@ function parseSuccessEnvelope(
     providerRequestId: requireCanonicalString('providerRequestId', value.data.providerRequestId),
     amountMinor: requireAmountMinor(value.data.amountMinor),
     currency: requireCurrency(value.data.currency),
-    status: requireStatus(value.data.status),
+    status: requireStatus(value.data.status, expectedStatus),
+    ...(externalProductId === undefined ? {} : { externalProductId }),
   });
 }
 
@@ -229,12 +238,16 @@ function normalizeHttpFailure(status: number): never {
 export async function fetchPaymentAttemptBrowserHandoffContextV1(input: {
   readonly paymentAttemptId: unknown;
   readonly fetchPort: PaymentAttemptHandoffFetchPortV1;
+  readonly approvedOfferId?: string;
 }): Promise<PaymentAttemptBrowserHandoffContextV1> {
   const paymentAttemptId = requirePaymentAttemptId(input.paymentAttemptId);
   const request: PaymentAttemptHandoffFetchRequestV1 = Object.freeze({
     method: 'POST',
     headers: Object.freeze({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ paymentAttemptId }),
+    body: JSON.stringify({
+      paymentAttemptId,
+      ...(input.approvedOfferId === undefined ? {} : { approvedOfferId: input.approvedOfferId }),
+    }),
   });
 
   let response: PaymentAttemptHandoffFetchResponseV1;
@@ -284,7 +297,7 @@ export async function fetchPaymentAttemptBrowserHandoffContextV1(input: {
     return invalidResponse('Payment Attempt browser handoff response JSON is malformed.');
   }
 
-  return parseSuccessEnvelope(decoded, paymentAttemptId);
+  return parseSuccessEnvelope(decoded, paymentAttemptId, input.approvedOfferId === undefined ? 'created' : 'handed_off');
 }
 
 /**

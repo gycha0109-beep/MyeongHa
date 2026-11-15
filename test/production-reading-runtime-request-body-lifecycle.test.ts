@@ -68,6 +68,20 @@ async function expectAuthRequired(response: Response): Promise<void> {
 }
 
 describe('Production Reading runtime request-body lifecycle', () => {
+  it('routes a paginated collection request to the history authentication boundary', async () => {
+    const runtime = createRuntime();
+    try {
+      const response = await runtime.handleRequest({
+        request: new Request('https://myeongha.example/api/readings?pageSize=2'),
+        requestId: 'req-reading-history-pagination',
+        serverTime: '2026-11-11T00:00:00.000Z',
+      });
+      await expectAuthRequired(response);
+    } finally {
+      await runtime.close();
+    }
+  });
+
   it('returns the governed 405 without waiting for unused-body cancellation to settle', async () => {
     const runtime = createRuntime();
     const source = requestWithCancellation('PUT', () => new Promise<void>(() => undefined));

@@ -16,6 +16,7 @@ export const COMMERCE_CURRENT_CANCEL_SET_READER_LOCKED_CAS_V1=Object.freeze({
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const REV=/^(0|[1-9][0-9]*)$/u;
+const MAC=/^hmac-sha256:k1:[0-9a-f]{64}$/u;
 const KEY=/^[^\u0000-\u001f\u007f]{1,512}$/u;
 const validKey=v=>v===null||
  (typeof v==='string'&&KEY.test(v)&&v.trim()===v);
@@ -23,6 +24,7 @@ const validKey=v=>v===null||
 const hold=(kind,extra={})=>Object.freeze({
  schemaVersion:COMMERCE_CURRENT_CANCEL_SET_READER_LOCKED_CAS_V1.schemaVersion,
  kind,exactProviderEventInStoredSet:false,
+ exactSignedCancellationBoundToEvent:false,
  authenticatedProviderSetMatched:false,postGetDbSnapshotStable:false,
  exactReaderGrantLockedAndCasChecked:false,
  readerS1LockAndScopeRecheckObserved:false,
@@ -50,6 +52,7 @@ const hold=(kind,extra={})=>Object.freeze({
 export async function inspectCurrentCancelSetExactReaderLockedCasReviewV1({
  dbClient,receiptId,providerEventId,entitlementGrantId,
  expectedGrantRevision,expectedLastProviderOrderingKey,
+ expectedProviderWebhookId,expectedCancellationIdHmac,
  sourceHmacSecret,apiSecret,fetchImpl,
  providerInspector,storedSetInspector,lockedCasInspector,
 }){
@@ -57,11 +60,24 @@ export async function inspectCurrentCancelSetExactReaderLockedCasReviewV1({
     ![receiptId,providerEventId,entitlementGrantId].every(
      x=>typeof x==='string'&&UUID.test(x),
     )||typeof expectedGrantRevision!=='string'||!REV.test(expectedGrantRevision)||
-    !validKey(expectedLastProviderOrderingKey))
+    !validKey(expectedLastProviderOrderingKey)||
+    // An externally signed cancellation is a pair, never a free-standing
+    // HMAC selected from another item of the same Receipt.
+    (expectedProviderWebhookId===undefined)!==
+      (expectedCancellationIdHmac===undefined)||
+    (expectedProviderWebhookId!==undefined&&
+     (typeof expectedProviderWebhookId!=='string'||
+      !KEY.test(expectedProviderWebhookId)||
+      expectedProviderWebhookId.trim()!==expectedProviderWebhookId||
+      typeof expectedCancellationIdHmac!=='string'||
+      !MAC.test(expectedCancellationIdHmac))))
   throw Error('INVALID_CURRENT_CANCEL_SET_READER_LOCK_REVIEW_INPUT');
+ const signedBoundRequested=expectedProviderWebhookId!==undefined;
  const setCheck=await (storedSetInspector??
   reconcileStoredPortOneCancellationSetWithGetPrivateV1)({
   dbClient,receiptId,expectedProviderEventId:providerEventId,
+  ...(signedBoundRequested?{expectedProviderWebhookId,
+    expectedCancellationIdHmac}:{}),
   sourceHmacSecret,apiSecret,fetchImpl,providerInspector,
  });
  if(setCheck.kind!=='authenticated_current_cancel_set_matches_recorded'||
@@ -70,6 +86,9 @@ export async function inspectCurrentCancelSetExactReaderLockedCasReviewV1({
     setCheck.observedProviderSetMatched!==true||
     setCheck.postGetDbSnapshotStable!==true||
     setCheck.exactProviderEventIncluded!==true||
+    (signedBoundRequested&&
+     (setCheck.exactSignedWebhookIncluded!==true||
+      setCheck.exactSignedCancellationIncluded!==true))||
     typeof setCheck.singleExactFullCancellationObservedAtGet!=='boolean'||
     setCheck.providerOrderingProven!==false||
     setCheck.currentProviderStateVerified!==false||
@@ -80,6 +99,7 @@ export async function inspectCurrentCancelSetExactReaderLockedCasReviewV1({
 
  const observed={
   exactProviderEventInStoredSet:true,
+  exactSignedCancellationBoundToEvent:signedBoundRequested,
   authenticatedProviderSetMatched:true,
   postGetDbSnapshotStable:true,
  };

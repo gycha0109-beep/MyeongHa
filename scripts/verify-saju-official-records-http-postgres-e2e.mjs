@@ -29,8 +29,8 @@ const expectedHash =
 const purchaseB2 = '12192300-0000-0000-0000-000000000002';
 const purchaseA = '11392300-0000-0000-0000-000000000001';
 const verifiedEvidence = Object.freeze({
-  kind: 'guest',
-  verifiedGuestTokenHash: 'synthetic-official-http-e2e-guest-hash',
+  kind: 'member',
+  verifiedAuthUserId: '11380000-0000-0000-0000-000000000001',
 });
 const request = new Request(
   'https://myeongha.internal/api/readings?readingId=' + readingId,

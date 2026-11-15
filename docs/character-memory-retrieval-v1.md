@@ -21,7 +21,7 @@ Provide one server-side, provider-neutral retrieval entrypoint for a canonical S
 
 ## Provenance
 
-Migration `2350_reader_context_memory_retrieval_provenance_v1.sql` adds two server-only `SECURITY INVOKER` projections:
+Migration `2450_reader_context_memory_retrieval_provenance_v1.sql` adds two server-only `SECURITY INVOKER` projections:
 
 - `qry_reader_context_granted_life_facts_v2`: source kind, source message/merge references, grant reason/time, valid-from/to, confirmation and creation timestamps.
 - `qry_reader_context_granted_memory_items_v2`: source kind, source turn/message/merge references and grant reason/time.

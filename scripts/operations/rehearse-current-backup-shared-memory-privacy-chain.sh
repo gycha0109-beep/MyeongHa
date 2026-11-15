@@ -35,9 +35,9 @@ jq -e '.restore_target == "github-actions-loopback-supabase-postgres"
     || '|' || (to_regprocedure('public.internal_replay_shared_memory_note_deletion_v1(uuid,uuid,timestamptz)') is null)::int")" == "1|1|1" ]] || fail
 
 # Git objects are pinned to the reviewed migration contents.
-f1=supabase/migrations/2360_subject_shared_memory_owner_managed_v1.sql
-f2=supabase/migrations/2370_subject_shared_memory_account_finalization_erasure_v1.sql
-f3=supabase/migrations/2380_subject_shared_memory_note_deletion_recovery_v1.sql
+f1=supabase/migrations/2460_subject_shared_memory_owner_managed_v1.sql
+f2=supabase/migrations/2470_subject_shared_memory_account_finalization_erasure_v1.sql
+f3=supabase/migrations/2480_subject_shared_memory_note_deletion_recovery_v1.sql
 [[ "$(git hash-object -- "$f1")" == ddf51632a08735042adb0cff1bdbbf1b64e7c65a &&
    "$(git hash-object -- "$f2")" == 90848c31cd5dfc0de1ffb0b30cb46c95ef5c0710 &&
    "$(git hash-object -- "$f3")" == 3cafb2d702bb17b6677ae550bd8b540d3e884158 ]] || fail

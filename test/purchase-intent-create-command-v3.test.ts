@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ApiCommandError } from '../apps/api/src/api-error.js';
 import {
+  APPROVED_SAJU_PURCHASE_POLICY_V1,
+  type ApprovedSajuPurchaseAdmissionV1,
+  type ApprovedSajuPurchaseAuthorityPortV1,
+} from '../apps/api/src/commerce-approved-saju-purchase-admission-v1.js';
+import { getApprovedSajuOfferV1 } from '../packages/contracts/src/approved-saju-catalog.js';
+import {
   PURCHASE_INTENT_CREATE_AUTHORITY_BINDING_V3,
   PurchaseIntentCreateAuthorityPortErrorV3,
   createPurchaseIntentV3,
@@ -8,6 +14,7 @@ import {
   type PurchaseIntentCapabilitySnapshotV3,
   type PurchaseIntentCreateAuthorityPortV3,
   type PurchaseIntentCreateAuthorityRowV3,
+  type SajuPurchaseOriginInputV1,
 } from '../apps/api/src/purchase-intent-create-command-v3.js';
 import type {
   PurchaseIntentIdPortV1,
@@ -37,6 +44,9 @@ const CAPABILITY_SNAPSHOT: PurchaseIntentCapabilitySnapshotV3 = Object.freeze({
 });
 
 type AuthorityCall = Parameters<PurchaseIntentCreateAuthorityPortV3['createPurchaseIntent']>[0];
+type SajuAuthorityCall = Parameters<NonNullable<
+  PurchaseIntentCreateAuthorityPortV3['createSajuPurchaseIntent']
+>>[0];
 
 class FakeOfferPort implements PurchaseIntentOfferSnapshotPortV1 {
   readonly calls: Array<{ productOfferId: string }> = [];
@@ -74,7 +84,29 @@ class FakeIdPort implements PurchaseIntentIdPortV1 {
 
 class FakeAuthorityPort implements PurchaseIntentCreateAuthorityPortV3 {
   readonly calls: AuthorityCall[] = [];
+  readonly sajuCalls:SajuAuthorityCall[]=[];
   result: readonly PurchaseIntentCreateAuthorityRowV3[] | Error | undefined;
+
+  createSajuPurchaseIntent(input:SajuAuthorityCall):readonly PurchaseIntentCreateAuthorityRowV3[] {
+    this.sajuCalls.push(input);
+    if(this.result instanceof Error)throw this.result;
+    if(this.result!==undefined)return this.result;
+    return [{
+      purchaseIntentId:input.purchaseIntentId,
+      productOfferId:input.productOfferId,
+      providerAccountLinkId:null,
+      status:'created',
+      offerSnapshotJsonb:input.offerSnapshotJsonb,
+      offerSnapshotHash:input.offerSnapshotHash,
+      expectedAmountMinor:12900,
+      expectedCurrency:'KRW',
+      chargeTermsVersion:'charge-v3',
+      capabilitySetId:input.capabilitySnapshotJsonb.capabilitySetId,
+      capabilitySnapshotJsonb:input.capabilitySnapshotJsonb,
+      capabilitySnapshotHash:input.capabilitySnapshotHash,
+      replayed:false,
+    }];
+  }
 
   createPurchaseIntent(input: AuthorityCall): readonly PurchaseIntentCreateAuthorityRowV3[] {
     this.calls.push(input);
@@ -107,6 +139,76 @@ function createPorts() {
   };
 }
 
+const LAUNCH_ORIGIN: SajuPurchaseOriginInputV1 = {
+  sajuRecordId: 'c1070000-0000-0000-0000-000000000011',
+  birthRevisionId: 'c1070000-0000-0000-0000-000000000012',
+  purchaseKind: 'original',
+  sourceReceiptIds: [],
+};
+const TARGET_ID = 'c1070000-0000-0000-0000-000000000013';
+const TARGET_REVISION = 'c1070000-0000-0000-0000-000000000014';
+
+function launchPorts(offerId: string) {
+  const offer = getApprovedSajuOfferV1(offerId);
+  if (offer === undefined) throw new Error('Unknown fixture offer.');
+  const ports = createPorts();
+  ports.offerSnapshotPort.result = { ...OFFER_SNAPSHOT, provider: 'portone_v2' };
+  const target = offer.counterpartOrder === undefined ? undefined : {
+    targetPersonId: TARGET_ID, targetBirthRevisionId: TARGET_REVISION,
+    order: offer.counterpartOrder, useApprovalRef: 'reviewed-use-synthetic',
+  };
+  const fixture: ApprovedSajuPurchaseAdmissionV1 = {
+    policy: APPROVED_SAJU_PURCHASE_POLICY_V1,
+    approvedOfferId: offerId,
+    subjectId: SUBJECT_ID,
+    sajuRecordId: LAUNCH_ORIGIN.sajuRecordId,
+    birthRevisionId: LAUNCH_ORIGIN.birthRevisionId,
+    productOfferId: OFFER_ID,
+    capabilitySetId: CAPABILITY_SET_ID,
+    currency: 'KRW',
+    amountMinor: offer.priceKrw,
+    components: offer.components.map(component => ({
+      component, authority: 'official_fulfillment', releaseRef: `fixture-release-${component}`,
+    })),
+    ...(offer.components.includes('year') || offer.components.includes('month')
+      ? { periodReferenceDateTime: '2026-11-30T14:59:59.999Z' }
+      : {}),
+    ...(target === undefined ? {} : { counterpart: target }),
+  };
+  const calls: Parameters<ApprovedSajuPurchaseAuthorityPortV1['createPurchaseIntent']>[0][] = [];
+  const state = { admission: fixture as ApprovedSajuPurchaseAdmissionV1 | null, incorrectCharge: false };
+  const authority: ApprovedSajuPurchaseAuthorityPortV1 = {
+    resolveAdmission: () => state.admission,
+    createPurchaseIntent(input) {
+      calls.push(input);
+      return [{
+        purchaseIntentId: input.purchaseIntentId,
+        productOfferId: input.productOfferId,
+        providerAccountLinkId: null,
+        status: 'created',
+        offerSnapshotJsonb: input.offerSnapshotJsonb,
+        offerSnapshotHash: input.offerSnapshotHash,
+        expectedAmountMinor: input.approvedSajuAdmission.amountMinor + (state.incorrectCharge ? 1 : 0),
+        expectedCurrency: 'KRW',
+        chargeTermsVersion: 'synthetic-approved-terms',
+        capabilitySetId: input.capabilitySnapshotJsonb.capabilitySetId,
+        capabilitySnapshotJsonb: input.capabilitySnapshotJsonb,
+        capabilitySnapshotHash: input.capabilitySnapshotHash,
+        approvedSajuAdmissionHash: input.approvedSajuAdmissionHash,
+        replayed: false,
+      }];
+    },
+  };
+  const command = {
+    ...ports,
+    resolvedSubjectId: SUBJECT_ID,
+    sajuOrigin: LAUNCH_ORIGIN,
+    request: { productOfferId: OFFER_ID, idempotencyKey: 'approved-catalog-v1' },
+    approvedSaju: { offerId, authority, ...(target === undefined ? {} : { targetPersonId: TARGET_ID }) },
+  };
+  return { command, calls, fixture, state, ports };
+}
+
 async function expectApiCode(promise: Promise<unknown>, code: string): Promise<ApiCommandError> {
   try {
     await promise;
@@ -119,6 +221,72 @@ async function expectApiCode(promise: Promise<unknown>, code: string): Promise<A
 }
 
 describe('Purchase Intent v3 capability authority boundary', () => {
+  it.each([
+    ['career', 9900], ['business', 9900], ['wealth', 9900], ['relationship', 9900],
+    ['year', 7900], ['month', 4900], ['first-counterpart', 12900],
+    ['additional-counterpart', 9900], ['relationship-plus-first', 19900],
+    ['career-economy', 24900], ['basic', 29900], ['basic-year', 35800],
+    ['basic-month', 33800], ['basic-year-month', 39700],
+  ] as const)('checks the approved %s offer before invoking its scoped writer', async (offerId, price) => {
+    const { command, calls, ports } = launchPorts(offerId);
+    await expect(createPurchaseIntentV3(command)).resolves.toEqual({ purchaseIntentId: INTENT_ID, status: 'created' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.approvedSajuAdmission.amountMinor).toBe(price);
+    expect(calls[0]?.approvedSajuAdmissionHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/u);
+    expect(ports.authorityPort.sajuCalls).toHaveLength(0);
+    expect(ports.authorityPort.calls).toHaveLength(0);
+  });
+
+  it('fails closed before allocating an intent for a stale price, missing reading or wrong scope', async () => {
+    const { command, calls, fixture, state, ports } = launchPorts('basic-year-month');
+    const { periodReferenceDateTime: _period, ...withoutPeriod } = fixture;
+    for (const mismatch of [
+      null,
+      { ...fixture, amountMinor: 34900 },
+      { ...fixture, subjectId: TARGET_ID },
+      { ...fixture, birthRevisionId: TARGET_REVISION },
+      withoutPeriod,
+      { ...fixture, components: fixture.components.slice(1) },
+      { ...fixture, components: fixture.components.map(entry => ({ ...entry, releaseRef: '' })) },
+    ]) {
+      state.admission = mismatch;
+      await expectApiCode(createPurchaseIntentV3(command), 'NOT_FOUND');
+    }
+    expect(ports.idPort.calls).toBe(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('requires the selected counterpart, verified order and use approval', async () => {
+    const { command, calls, fixture, state } = launchPorts('additional-counterpart');
+    const counterpart = fixture.counterpart!;
+    for (const mismatch of [
+      { ...counterpart, targetPersonId: SUBJECT_ID },
+      { ...counterpart, order: 'first' as const },
+      { ...counterpart, targetBirthRevisionId: LAUNCH_ORIGIN.birthRevisionId },
+      { ...counterpart, useApprovalRef: '' },
+    ]) {
+      state.admission = { ...fixture, counterpart: mismatch };
+      await expectApiCode(createPurchaseIntentV3(command), 'NOT_FOUND');
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it('keeps the approved period and target in the intent identity and rejects a different returned price', async () => {
+    const year = launchPorts('year');
+    await createPurchaseIntentV3(year.command);
+    year.state.admission = { ...year.fixture, periodReferenceDateTime: '2027-01-01T00:00:00.000Z' };
+    await createPurchaseIntentV3(year.command);
+    expect(year.calls[0]?.requestHash).not.toBe(year.calls[1]?.requestHash);
+
+    const comparison = launchPorts('first-counterpart');
+    await createPurchaseIntentV3(comparison.command);
+    comparison.state.admission = {
+      ...comparison.fixture, counterpart: { ...comparison.fixture.counterpart!, targetBirthRevisionId: PRODUCT_ID },
+    };
+    comparison.state.incorrectCharge = true;
+    await expect(createPurchaseIntentV3(comparison.command)).rejects.toThrow('did not bind the approved Saju admission');
+    expect(comparison.calls[0]?.requestHash).not.toBe(comparison.calls[1]?.requestHash);
+  });
   it('binds only to the additive capability-aware DB command', () => {
     expect(PURCHASE_INTENT_CREATE_AUTHORITY_BINDING_V3).toBe(
       'public.cmd_create_purchase_intent_v3',
@@ -162,6 +330,73 @@ describe('Purchase Intent v3 capability authority boundary', () => {
     expect(Object.isFrozen(response)).toBe(true);
   });
 
+  it('uses the Record-scoped admission port only for trusted server-side Saju origin context', async () => {
+    const ports=createPorts();
+    const sajuOrigin:SajuPurchaseOriginInputV1={
+      sajuRecordId:'c1070000-0000-0000-0000-000000000011',
+      birthRevisionId:'c1070000-0000-0000-0000-000000000012',
+      purchaseKind:'original',
+      sourceReceiptIds:[],
+    };
+    const response=await createPurchaseIntentV3({
+      resolvedSubjectId:SUBJECT_ID,
+      request:{productOfferId:OFFER_ID,idempotencyKey:'saju-record-v1'},
+      sajuOrigin,
+      ...ports,
+    });
+    expect(ports.authorityPort.calls).toHaveLength(0);
+    expect(ports.authorityPort.sajuCalls).toHaveLength(1);
+    expect(ports.authorityPort.sajuCalls[0]?.sajuOrigin).toEqual(sajuOrigin);
+    expect(ports.authorityPort.sajuCalls[0]?.requestHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/);
+    expect(response).toEqual({purchaseIntentId:INTENT_ID,status:'created'});
+    expect(response).not.toHaveProperty('sajuRecordId');
+    expect(response).not.toHaveProperty('scopeKey');
+  });
+
+  it('binds the idempotency hash to the exact Saju Record and Birth revision', async () => {
+    const first=createPorts();
+    const second=createPorts();
+    const common={
+      resolvedSubjectId:SUBJECT_ID,
+      request:{productOfferId:OFFER_ID,idempotencyKey:'saju-record-hash'},
+    };
+    await createPurchaseIntentV3({
+      ...common,...first,
+      sajuOrigin:{
+        sajuRecordId:'c1070000-0000-0000-0000-000000000011',
+        birthRevisionId:'c1070000-0000-0000-0000-000000000012',
+        purchaseKind:'original',sourceReceiptIds:[],
+      },
+    });
+    await createPurchaseIntentV3({
+      ...common,...second,
+      sajuOrigin:{
+        sajuRecordId:'c1070000-0000-0000-0000-000000000013',
+        birthRevisionId:'c1070000-0000-0000-0000-000000000014',
+        purchaseKind:'original',sourceReceiptIds:[],
+      },
+    });
+    expect(first.authorityPort.sajuCalls[0]?.requestHash)
+      .not.toBe(second.authorityPort.sajuCalls[0]?.requestHash);
+  });
+
+  it('rejects malformed Saju Record context before allocating a Purchase Intent id', async () => {
+    const ports=createPorts();
+    await expectApiCode(createPurchaseIntentV3({
+      resolvedSubjectId:SUBJECT_ID,
+      request:{productOfferId:OFFER_ID,idempotencyKey:'saju-invalid-origin'},
+      sajuOrigin:{
+        sajuRecordId:'client-scope-key',
+        birthRevisionId:'c1070000-0000-0000-0000-000000000012',
+        purchaseKind:'original',sourceReceiptIds:[],
+      },
+      ...ports,
+    }),'INVALID_REQUEST');
+    expect(ports.idPort.calls).toBe(0);
+    expect(ports.authorityPort.calls).toHaveLength(0);
+    expect(ports.authorityPort.sajuCalls).toHaveLength(0);
+  });
+
   it('rejects client attempts to inject capability, entitlement, monetary, owner, or status authority', async () => {
     for (const extra of [
       { capabilitySetId: CAPABILITY_SET_ID },
@@ -170,6 +405,10 @@ describe('Purchase Intent v3 capability authority boundary', () => {
       { capabilitySnapshotHash: 'client-snapshot-hash' },
       { entitlementKey: 'reading.full' },
       { scopeMode: 'global' },
+      { scopeKey: 'saju-record:client-controlled' },
+      { sajuRecordId: 'c1070000-0000-0000-0000-000000000011' },
+      { birthRevisionId: 'c1070000-0000-0000-0000-000000000012' },
+      { entitlementKey: 'saju.relationship' },
       { itemKey: 'reading-access' },
       { subjectId: SUBJECT_ID },
       { expectedAmountMinor: 1 },

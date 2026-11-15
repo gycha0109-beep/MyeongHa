@@ -12,6 +12,8 @@ export const RECORDED_READER_S7_CLAIM_EVIDENCE_V1=Object.freeze({
  * The original verified Receipt, paid purchase Grant and S5 body must be
  * joined again by the DB. No client-supplied body or Grant is trusted.
  * Retained S7 journal data is independently transport-only evidence.
+ * A revoked receipt contributes only when its exact original full cancellation
+ * remains the current source of revocation for the purchase grant.
  */
 export const RECORDED_READER_S7_EXACT_PURCHASE_SQL_V1=`
 select
@@ -73,6 +75,83 @@ left join public.official_reader_paid_delivery_attempts_v1 d
 where pi.id=$1::uuid and pi.subject_id=$2::uuid
  and presentation.unit_id=$3::uuid
  and pi.status='verified' and pi.expected_amount_minor>0
+ and (
+   receipt.verification_status='verified'
+   or (
+     receipt.verification_status='revoked'
+     and grant_row.status='revoked'
+       and exists (
+         select 1
+         from public.entitlement_events revoked
+         join public.commerce_provider_events cancelled
+           on cancelled.id=revoked.source_provider_event_id
+          and cancelled.resolved_subject_id=revoked.subject_id
+          and cancelled.resolved_receipt_id=receipt.id
+          and cancelled.provider=receipt.provider
+          and cancelled.environment=receipt.environment
+         where revoked.grant_id=grant_row.id
+           and revoked.subject_id=b.subject_id
+           and revoked.event_type='revoked'
+           and revoked.source_type='provider_event'
+           and cancelled.provider='portone_v2'
+           and cancelled.environment='production'
+           and cancelled.status in ('verified','processed')
+           and cancelled.resolution_source_type='receipt'
+           and cancelled.event_type='Transaction.Cancelled'
+           and cancelled.provider_occurred_at is not null
+           and cancelled.provider_occurred_at<=pg_catalog.clock_timestamp()
+           and grant_row.last_effective_at=revoked.effective_at
+           and grant_row.last_provider_ordering_key is not distinct from
+               revoked.provider_ordering_key
+           and revoked.effective_at=cancelled.provider_occurred_at
+           and revoked.provider_ordering_key is not distinct from
+               cancelled.provider_ordering_key
+           and cancelled.provider_ordering_key=(
+             'portone-v2-fullcancel:'||pg_catalog.to_char(
+               cancelled.provider_occurred_at at time zone 'UTC',
+               'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+             )
+           )
+           and receipt.provider='portone_v2'
+           and receipt.verified_amount_minor>0
+           and receipt.verified_currency ~ '^[A-Z]{3}$'
+           and cancelled.external_transaction_id=
+               receipt.external_transaction_id
+           and cancelled.external_event_id=(
+             'myeongha:portone-v2:full-cancel:v1:'||
+             (cancelled.verified_payload_jsonb->>'cancellationId')
+           )
+           and cancelled.payload_fingerprint ~
+               '^hmac-sha256:k1:[0-9a-f]{64}$'
+           and cancelled.verified_payload_jsonb->>'schemaVersion'=
+               'portone-full-cancel-verified-v1'
+           and cancelled.verified_payload_jsonb->>'transactionId'=
+               receipt.external_transaction_id
+           and cancelled.verified_payload_jsonb->>'environment'='production'
+           and cancelled.verified_payload_jsonb->>'verifiedAmountMinor'=
+               receipt.verified_amount_minor::text
+           and cancelled.verified_payload_jsonb->>'verifiedCurrency'=
+               receipt.verified_currency
+           and cancelled.verified_payload_jsonb->>'evidenceFingerprint'=
+               cancelled.payload_fingerprint
+           and cancelled.verified_payload_jsonb->>'verifierRevision'=
+               cancelled.verifier_revision
+           and (
+             select count(*)
+             from public.commerce_payment_attempts attempt
+             where attempt.purchase_intent_id=receipt.purchase_intent_id
+               and attempt.subject_id=receipt.subject_id
+               and attempt.product_offer_id=receipt.product_offer_id
+               and attempt.provider=receipt.provider
+               and attempt.environment=receipt.environment
+               and attempt.provider_transaction_id=
+                   receipt.external_transaction_id
+               and attempt.provider_request_id=
+                   cancelled.verified_payload_jsonb->>'paymentId'
+           )=1
+       )
+   )
+ )
 group by b.id,b.committed_at
 limit 2
 `.trim();

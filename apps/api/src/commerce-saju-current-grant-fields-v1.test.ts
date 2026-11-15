@@ -34,7 +34,7 @@ function evidence(field='career',grant=id(9007)) {
     capabilityBound:true,effectiveCurrent:true,
     receiptGrantedEventCount:'1',validReceiptGrantedEventCount:'1',
     providerRevocationEventCount:'0',
-    productKey:'standard.career',field,refundedMinor:'0',
+    productKey:'standard.career',field,entitlementKey:'saju.'+field,refundedMinor:'0',
     unsettledCancellationCount:'0',
   };
 }
@@ -60,7 +60,7 @@ async function quote(x:ReturnType<typeof setup>) {
     targetProductKey:'bundle.career_economy',
   });
 }
-describe('Saju current field Grant evidence — staged private-only read',()=>{
+describe('Saju current field Grant evidence — private Record-scoped read',()=>{
   it('joins one actual active pinned Receipt Grant and the net ledger in one snapshot',async()=>{
     const x=setup([evidence()]);
     const result=await quote(x);
@@ -110,6 +110,7 @@ describe('Saju current field Grant evidence — staged private-only read',()=>{
       {...evidence(),natalVersion:id(9993)},
       {...evidence(),productKey:'standard.business'},
       {...evidence(),field:'custom_unapproved_field'},
+      {...evidence(),entitlementKey:'saju.other'},
       {...evidence(),grantId:'not-a-uuid'},
       {...evidence(),receiptId:'not-a-uuid'},
     ];
@@ -177,9 +178,13 @@ describe('Saju current field Grant evidence — staged private-only read',()=>{
       'intent.capability_snapshot_jsonb=pg_catalog.jsonb_build_object',
       "receipt.product_offer_id=offer.id",
       "grant_row.source_receipt_id=receipt.id",
+      "item.scope_mode='saju_record'",
+      "grant_row.scope_key =",
+      "'saju-record:'||record.entitlement_scope_id::text",
       "grant_row.status='active'",
       'left join public.product_capability_sets capability',
       'left join public.product_capability_items item',
+      'item.entitlement_key as "entitlementKey"',
       'left join public.entitlements effective',
       "effective.status='active'",
       'active_grant_count>0',

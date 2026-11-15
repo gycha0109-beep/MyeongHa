@@ -45,7 +45,7 @@ P0 Decision Register의 최신 결정
 | Canonical provider key | `portone_v2` | DECIDED |
 | Completion authority | 서버의 PortOne V2 payment lookup | DECIDED |
 | Browser redirect/callback | transport hint only | DECIDED |
-| Guest purchase ownership | Guest + Member, canonical `subjects.id` | `P0-CM-04 DECIDED` |
+| Paid purchase eligibility | active authenticated Member only; Guest is free-only | `P0-CM-05 DECIDED` |
 | Launch paid Product/Capability | 미결정 | `P0-CM-03 OPEN-P0` |
 | Saleable SKU | 없음 | HOLD |
 | Live checkout | 비활성 | HOLD |
@@ -133,7 +133,7 @@ Commerce owner는 client가 선택하지 않는다.
 canonical owner = server-resolved subjects.id
 ```
 
-active Guest와 active Member 모두 Web one-off purchase owner가 될 수 있다.
+유료 Web one-off purchase owner는 **활성 인증 Member만** 가능하다. Guest는 무료 오늘의 운세와 추후 명시적으로 지정할 무료 사주 상품 1종만 이용할 수 있으며, 유료 구매에는 `LOGIN_REQUIRED`를 반환한다.
 
 ---
 
@@ -148,7 +148,8 @@ active Guest와 active Member 모두 Web one-off purchase owner가 될 수 있�
         │
         ▼
 [Server identity boundary]
-  active Guest / Member 검증
+  active authenticated Member 검증
+  Guest paid checkout → LOGIN_REQUIRED
   canonical subjects.id 결정
         │
         ▼
@@ -221,7 +222,7 @@ authenticated webhook
 
 ### 4.1 Purchase Intent
 
-현재 구현에는 기존 Purchase Intent와 Guest/Member ownership을 반영한 v2 command가 존재한다.
+현재 Purchase Intent v2/v3는 유료 구매 명령이며, P0-CM-05에 따라 활성 인증 Member만 사용할 수 있다.
 
 ```text
 apps/api/src/purchase-intent-create-command.ts
@@ -236,25 +237,39 @@ Purchase Intent authority에서 중요한 것은 다음이다.
 - Product identity는 provider lookup 시 exact round-trip 검증에 사용된다.
 - immutable snapshot과 provider verification 결과가 다르면 fail closed한다.
 
-### 4.2 Guest purchase
+### 4.2 Guest 무료 이용 / 유료 구매 로그인 경계
 
-`P0-CM-04`에 따라 active Guest purchase는 허용된다.
+Guest의 무료 이용 범위는 다음으로 제한한다.
 
-```text
-Guest purchase owner
-= exact Guest subjects.id
-```
+- 무료 오늘의 운세
+- 추후 별도 지정할 무료 사주 상품 1종
 
-Guest가 새 Member로 promotion되는 경우 기존 subject가 유지되므로 Commerce owner rewrite가 필요하지 않다.
+Guest에게 다른 사주 상품의 무료 이용 권한을 임의로 확대하지 않는다. 무료 경험은 별도 무료 접근 흐름이며 paid Purchase Intent/Payment Attempt를 만들지 않는다.
 
-기존 Member와 merge되는 경로에서는 현재 접근 권한을 canonical Member와 direct merged-Guest lineage로 조합할 수 있지만, historical Commerce provenance를 새 owner로 다시 쓰지 않는다.
+**유료 상품은 로그인 후에만 구매할 수 있다.**
 
 ```text
-historical Receipt/Event/Grant owner subject_id
-→ promotion/merge를 이유로 rewrite 금지
+Guest selects paid Product
+→ LOGIN_REQUIRED
+→ login / registration
+→ active authenticated Member
+→ Purchase Intent
+→ Payment Attempt
+→ provider checkout
 ```
 
-Guest bearer/session 만료도 이미 검증된 paid right의 자동 revoke 사유가 아니다.
+Purchase Intent v2/v3와 Payment Attempt의 DB command wrapper는 멱등 재호출보다 먼저 다음 조건을 강제한다. Provider handoff-context 조회 역시 같은 Member 자격을 먼저 확인한다. INSERT trigger는 직접 쓰기 경로를 위한 추가 방어선이다.
+
+```text
+subjects.kind = 'member'
+subjects.status = 'active'
+subjects.auth_user_id IS NOT NULL
+subjects.merged_into_subject_id IS NULL
+```
+
+Guest bearer가 유효하다는 사실만으로 유료 구매 자격을 부여하지 않는다. Guest free experience는 계속 허용하되, 유료 구매는 Member 인증 이후에만 시작한다.
+
+과거 Guest 소유 Commerce 기록이 존재하더라도 Receipt/Event/Grant의 역사적 `subject_id`를 새 owner로 rewrite하지 않는다. 이 historical continuity는 신규 Guest 유료 구매를 허용하는 근거가 아니다.
 
 ---
 
@@ -884,7 +899,7 @@ secret/token/raw provider payload 노출
 docs/P0_DECISION_REGISTER.md
 docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md
 docs/COMMERCE_WEB_PSP_DECISION_V1.md
-docs/COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md
+docs/COMMERCE_GUEST_ACCESS_AND_MEMBER_PURCHASE_DECISION_V1.md (current); `COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md` is superseded historical evidence
 ```
 
 그리고 current main의 실제 Commerce/PortOne implementation과 merged issue/PR provenance를 상태 근거로 사용한다.

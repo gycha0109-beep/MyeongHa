@@ -1,6 +1,7 @@
 // Watchtower-Track: commerce
 // Disposable PostgreSQL 17 only. Build the exact production-code SQL queries
-// for one rolled-back synthetic schema execution; never use on hosted DB.
+// for one rolled-back query execution using migrated Saju Record authority.
+// Never re-apply the legacy candidate DDL or use on hosted DB.
 import {readFileSync} from 'node:fs';
 
 if (process.env.GITHUB_ACTIONS!=='true'
@@ -25,7 +26,7 @@ const fields=extract(
 const ledgerFile='apps/api/src/commerce-saju-verified-ledger-source-v1.ts';
 const ledger=extract(ledgerFile,'COMMERCE_SAJU_VERIFIED_LEDGER_SQL_V1');
 const record=extract(ledgerFile,'COMMERCE_SAJU_VERIFIED_RECORD_SQL_V1');
-const recordId="'1219c200-0000-4000-8000-000000000001'::uuid";
+const recordId="'1219c200-0000-4000-8000-000000000023'::uuid";
 const subject='(select subject_id from public.commerce_saju_records_v1 where id='+recordId+')';
 const natal='(select birth_revision_id from public.commerce_saju_records_v1 where id='+recordId+')';
 function binds(sql,args) {
@@ -39,7 +40,7 @@ const output=[
  '\\set ON_ERROR_STOP on',
  'begin;',
  "set local statement_timeout='40s';",
- '\\i docs/operations/candidates/commerce_saju_record_verified_purchase_ledger_v1.sql',
+ '-- Saju Record authority is provided by migration 2330.',
  '-- Existing synthetic B2 Reader Receipt is for SQL execution only,',
  '-- not an authorized Saju entitlement/Product or production Grant mapping.',
  'insert into public.commerce_saju_records_v1(id,subject_id,birth_revision_id)',

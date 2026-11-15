@@ -1,5 +1,7 @@
 # Linux PostgreSQL CI case shell scripts must stay LF even under Windows core.autocrlf.
 test/db/*.sh text eol=lf
+# Disposable PostgreSQL 17 launchers also execute inside Linux containers.
+scripts/local/*.sh text eol=lf
 
 # Preserve the isolated Saju CPU comparison evidence on Windows checkouts.
 docs/operations/REAL_GOTRUE_PG18_SAJU_CPU_COMPARISON_LINUX_OBSERVATION_20261106.json text eol=lf

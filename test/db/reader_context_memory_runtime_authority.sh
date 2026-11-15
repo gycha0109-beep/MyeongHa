@@ -2,8 +2,8 @@
 set -euo pipefail
 
 migration="supabase/migrations/1250_reader_context_memory_runtime_authority.sql"
-projection_migration="supabase/migrations/2330_reader_context_granted_memory_projection_v1.sql"
-retrieval_migration="supabase/migrations/2350_reader_context_memory_retrieval_provenance_v1.sql"
+projection_migration="supabase/migrations/2430_reader_context_granted_memory_projection_v1.sql"
+retrieval_migration="supabase/migrations/2450_reader_context_memory_retrieval_provenance_v1.sql"
 
 grep -Fq "alter table public.record_access_grants enable row level security;" "$migration"
 grep -Fq "to myeongha_api_executor" "$migration"

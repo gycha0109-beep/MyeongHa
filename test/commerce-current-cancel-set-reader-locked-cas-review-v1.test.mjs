@@ -29,6 +29,7 @@ const READING='00000000-0000-4000-8000-000000000007';
 const SCOPE={subjectId:SUBJECT,officialReadingId:READING,
  readerCharacterId:'seyeon',receiptId:RECEIPT,purchaseIntentId:INTENT};
 const P='payment-exact-source',T='transaction-original',C='cancel-8900';
+const SIGNED_WEBHOOK='signed-cancel-8900';
 const SECRET='private-source-hmac-secret-with-more-than-32-bytes';
 const API='private-portone-api-secret-with-more-than-16-bytes';
 const H=(id)=>'hmac-sha256:k1:'+createHmac('sha256',SECRET).update(
@@ -45,6 +46,7 @@ const DB_ROW={
  receiptProvider:'portone_v2',receiptEnvironment:'production',
  receiptStatus:'verified',receiptPaidMinor:'8900',receiptCurrency:'KRW',
  providerPaymentId:P,providerEventId:EVENT,
+ providerWebhookId:SIGNED_WEBHOOK,
  eventType:'Transaction.Cancelled',eventStatus:'verified',
  eventProvider:'portone_v2',eventEnvironment:'production',
  eventSubjectId:SUBJECT,eventResolutionSource:'receipt',
@@ -177,6 +179,59 @@ describe('P4 authenticated entire cancellation set -> exact Reader Event/Grant l
   expect(c.calls.findIndex(x=>x.sql===EVENT_SQL))
    .toBeGreaterThan(c.calls.map(x=>x.sql).lastIndexOf(SET_SQL));
   expect(c.calls.map(x=>x.sql)).not.toContain('commit');
+  expectedNoEffect(result);
+ });
+ it('binds signed webhook + exact item + original Event before rehearsing the exact Reader CAS',async()=>{
+  const c=db();
+  const result=await run(c,{
+   expectedProviderWebhookId:SIGNED_WEBHOOK,
+   expectedCancellationIdHmac:H(C),
+  });
+  expect(result).toMatchObject({
+   kind:'exact_reader_locked_cas_consistent_but_authority_held',
+   exactProviderEventInStoredSet:true,
+   exactSignedCancellationBoundToEvent:true,
+   exactReaderGrantLockedAndCasChecked:true,
+   readerS1LockAndScopeRecheckObserved:true,
+   providerOrderingProven:false,grantRevocationAuthorized:false,
+  });
+  expect(c.calls.filter(x=>x.sql===S1_LOCK_SQL)).toHaveLength(1);
+  expectedNoEffect(result);
+ });
+ it('refuses signed event/item mismatches before any Reader lock or grant mutation',async()=>{
+  for(const overrides of [
+   {expectedProviderWebhookId:'other-webhook',expectedCancellationIdHmac:H(C)},
+   {expectedProviderWebhookId:SIGNED_WEBHOOK,expectedCancellationIdHmac:H('other')},
+  ]){
+   const c=db(),fetchImpl=get();
+   const result=await run(c,{...overrides,fetchImpl});
+   expect(result.kind).toBe('current_cancel_set_or_exact_event_not_ready');
+   expect(c.calls.some(x=>x.sql===S1_LOCK_SQL)).toBe(false);
+   expect(fetchImpl).not.toHaveBeenCalled();
+   expect(result.exactSignedCancellationBoundToEvent).toBe(false);
+   expectedNoEffect(result);
+  }
+ });
+ it('refuses fabricated signed-pair status before any Reader lock',async()=>{
+  const c=db(),lockedCasInspector=vi.fn();
+  const result=await run(c,{
+   expectedProviderWebhookId:SIGNED_WEBHOOK,
+   expectedCancellationIdHmac:H(C),
+   storedSetInspector:async()=>({
+     kind:'authenticated_current_cancel_set_matches_recorded',
+     recordedSetSelfConsistent:true,authenticatedProviderGetObserved:true,
+     observedProviderSetMatched:true,postGetDbSnapshotStable:true,
+     exactProviderEventIncluded:true,exactSignedWebhookIncluded:false,
+     exactSignedCancellationIncluded:true,
+     singleExactFullCancellationObservedAtGet:true,
+     providerOrderingProven:false,currentProviderStateVerified:false,
+     grantRevocationAuthorized:false,providerRefundAuthorized:false,
+     writesPerformed:false,
+   }),
+   lockedCasInspector,
+  });
+  expect(result.kind).toBe('current_cancel_set_or_exact_event_not_ready');
+  expect(lockedCasInspector).not.toHaveBeenCalled();
   expectedNoEffect(result);
  });
  it('holds 3000+5900 partial aggregate before any Reader lock or CAS',async()=>{
@@ -352,6 +407,10 @@ describe('P4 authenticated entire cancellation set -> exact Reader Event/Grant l
    {receiptId:'bad'}, {providerEventId:'bad'},
    {entitlementGrantId:'bad'}, {expectedGrantRevision:'-1'},
    {expectedLastProviderOrderingKey:'newline\ninjection'},
+   {expectedProviderWebhookId:SIGNED_WEBHOOK},
+   {expectedCancellationIdHmac:H(C)},
+   {expectedProviderWebhookId:'bad\nwebhook',expectedCancellationIdHmac:H(C)},
+   {expectedProviderWebhookId:SIGNED_WEBHOOK,expectedCancellationIdHmac:'invalid'},
   ]){
    const c=db();
    await expect(run(c,overrides)).rejects.toThrow('INVALID');

@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '../../../packages/domain/src/index.js';
 import { ApiCommandError } from './api-error.js';
+import {
+  resolveApprovedSajuPurchaseAdmissionV1,
+  type ApprovedSajuPurchaseAuthorityPortV1,
+} from './commerce-approved-saju-purchase-admission-v1.js';
 import type {
   PurchaseIntentIdPortV1,
   PurchaseIntentOfferSnapshotPortV1,
@@ -80,18 +84,31 @@ export class PurchaseIntentCreateAuthorityPortErrorV3 extends Error {
   }
 }
 
+export interface SajuPurchaseOriginInputV1 {
+  readonly sajuRecordId: string;
+  readonly birthRevisionId: string;
+  readonly purchaseKind: 'original';
+  readonly sourceReceiptIds: readonly string[];
+}
+
+export interface PurchaseIntentCreateAuthorityInputV3 {
+  readonly subjectId: string;
+  readonly purchaseIntentId: string;
+  readonly productOfferId: string;
+  readonly providerAccountLinkId: null;
+  readonly idempotencyKey: string;
+  readonly requestHash: string;
+  readonly offerSnapshotJsonb: PurchaseIntentOfferSnapshotV1;
+  readonly offerSnapshotHash: string;
+  readonly capabilitySnapshotJsonb: PurchaseIntentCapabilitySnapshotV3;
+  readonly capabilitySnapshotHash: string;
+}
+
 export interface PurchaseIntentCreateAuthorityPortV3 {
-  createPurchaseIntent(input: {
-    readonly subjectId: string;
-    readonly purchaseIntentId: string;
-    readonly productOfferId: string;
-    readonly providerAccountLinkId: null;
-    readonly idempotencyKey: string;
-    readonly requestHash: string;
-    readonly offerSnapshotJsonb: PurchaseIntentOfferSnapshotV1;
-    readonly offerSnapshotHash: string;
-    readonly capabilitySnapshotJsonb: PurchaseIntentCapabilitySnapshotV3;
-    readonly capabilitySnapshotHash: string;
+  createPurchaseIntent(input: PurchaseIntentCreateAuthorityInputV3):
+    Awaitable<readonly PurchaseIntentCreateAuthorityRowV3[]>;
+  createSajuPurchaseIntent?(input: PurchaseIntentCreateAuthorityInputV3 & {
+    readonly sajuOrigin: SajuPurchaseOriginInputV1;
   }): Awaitable<readonly PurchaseIntentCreateAuthorityRowV3[]>;
 }
 
@@ -102,6 +119,14 @@ export interface CreatePurchaseIntentInputV3 {
   readonly capabilitySnapshotPort: PurchaseIntentCapabilitySnapshotPortV3;
   readonly idPort: PurchaseIntentIdPortV1;
   readonly authorityPort: PurchaseIntentCreateAuthorityPortV3;
+  /** Server-resolved Saju Record context; never accepts an entitlement or scope key. */
+  readonly sajuOrigin?: SajuPurchaseOriginInputV1;
+  /** Server-only selection for the November catalog. Requires a scoped atomic writer. */
+  readonly approvedSaju?: {
+    readonly offerId: string;
+    readonly targetPersonId?: string;
+    readonly authority: ApprovedSajuPurchaseAuthorityPortV1;
+  };
 }
 
 export interface CreatePurchaseIntentResponseV3 {
@@ -144,6 +169,24 @@ function parseRequest(value: unknown): PurchaseIntentCreateRequestV3 {
   }
 
   return Object.freeze({ productOfferId, idempotencyKey });
+}
+
+const SERVER_UUID_V1=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu;
+
+function normalizeSajuPurchaseOriginV1(value: SajuPurchaseOriginInputV1): SajuPurchaseOriginInputV1 {
+  const recordId=typeof value.sajuRecordId==='string'?value.sajuRecordId.toLowerCase():'';
+  const birthId=typeof value.birthRevisionId==='string'?value.birthRevisionId.toLowerCase():'';
+  if(!SERVER_UUID_V1.test(recordId)||!SERVER_UUID_V1.test(birthId)
+     ||value.purchaseKind!=='original'
+     ||!Array.isArray(value.sourceReceiptIds)||value.sourceReceiptIds.length!==0) {
+    throw new ApiCommandError('INVALID_REQUEST','Saju purchase origin is invalid.');
+  }
+  const sources=value.sourceReceiptIds.map(x=>typeof x==='string'?x.toLowerCase():'');
+  if(sources.some(x=>!SERVER_UUID_V1.test(x))||new Set(sources).size!==sources.length) {
+    throw new ApiCommandError('INVALID_REQUEST','Saju upgrade Receipt sources are invalid.');
+  }
+  return Object.freeze({sajuRecordId:recordId,birthRevisionId:birthId,
+    purchaseKind:value.purchaseKind,sourceReceiptIds:Object.freeze(sources)});
 }
 
 function requireServerString(name: string, value: unknown): string {
@@ -230,10 +273,19 @@ function hashCanonical(value: unknown): string {
   return `sha256:v1:${createHash('sha256').update(canonicalJson(value)).digest('hex')}`;
 }
 
-function canonicalPurchaseRequest(request: PurchaseIntentCreateRequestV3): {
-  readonly productOfferId: string;
-} {
-  return Object.freeze({ productOfferId: request.productOfferId });
+function canonicalPurchaseRequest(
+  request: PurchaseIntentCreateRequestV3,
+  sajuOrigin?: SajuPurchaseOriginInputV1,
+): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    productOfferId: request.productOfferId,
+    ...(sajuOrigin === undefined ? {} : {
+      sajuRecordId: sajuOrigin.sajuRecordId,
+      birthRevisionId: sajuOrigin.birthRevisionId,
+      purchaseKind: sajuOrigin.purchaseKind,
+      sourceReceiptIds: [...sajuOrigin.sourceReceiptIds].sort(),
+    }),
+  });
 }
 
 function requireStatus(value: unknown): PurchaseIntentStatusV1 {
@@ -303,7 +355,7 @@ function mapAuthorityError(error: unknown): never {
     case 'SUBJECT_INELIGIBLE':
       throw new ApiCommandError(
         'FORBIDDEN',
-        'Purchase Intent requires an active canonical Guest or Member subject.',
+        'Paid Purchase Intent requires an active authenticated Member.',
       );
     case 'OFFER_NOT_FOUND':
     case 'OFFER_UNAVAILABLE':
@@ -415,16 +467,38 @@ export async function createPurchaseIntentV3(
   }
   const capabilitySnapshot = normalizeCapabilitySnapshot(resolvedCapabilitySnapshot);
 
+  const sajuOrigin=input.sajuOrigin===undefined?undefined:normalizeSajuPurchaseOriginV1(input.sajuOrigin);
+  const approved = input.approvedSaju;
+  if (approved !== undefined && (sajuOrigin === undefined
+    || typeof approved.authority?.resolveAdmission !== 'function'
+    || typeof approved.authority?.createPurchaseIntent !== 'function')) {
+    throw new ApiCommandError('NOT_FOUND', 'Selected product offer is unavailable.');
+  }
+  const approvedAdmission = approved === undefined || sajuOrigin === undefined
+    ? undefined
+    : await resolveApprovedSajuPurchaseAdmissionV1({
+        approvedOfferId: approved.offerId,
+        subjectId,
+        sajuRecordId: sajuOrigin.sajuRecordId,
+        birthRevisionId: sajuOrigin.birthRevisionId,
+        offer: offerSnapshot,
+        capability: capabilitySnapshot,
+        idempotencyKey: request.idempotencyKey,
+        ...(approved.targetPersonId === undefined ? {} : { targetPersonId: approved.targetPersonId }),
+      }, approved.authority).catch(mapAuthorityError);
   const purchaseIntentId = requireServerString(
     'generated purchase intent id',
     await input.idPort.nextPurchaseIntentId(),
   );
-  const requestHash = hashCanonical(canonicalPurchaseRequest(request));
+  const canonicalRequest = canonicalPurchaseRequest(request, sajuOrigin);
+  const approvedAdmissionHash = approvedAdmission === undefined ? undefined : hashCanonical(approvedAdmission);
+  const requestHash = hashCanonical(approvedAdmissionHash === undefined
+    ? canonicalRequest : { ...canonicalRequest, approvedAdmissionHash });
   const offerSnapshotHash = hashCanonical(offerSnapshot);
   const capabilitySnapshotHash = hashCanonical(capabilitySnapshot);
 
   try {
-    const rows = await input.authorityPort.createPurchaseIntent({
+    const authorityInput:PurchaseIntentCreateAuthorityInputV3={
       subjectId,
       purchaseIntentId,
       productOfferId: request.productOfferId,
@@ -435,7 +509,35 @@ export async function createPurchaseIntentV3(
       offerSnapshotHash,
       capabilitySnapshotJsonb: capabilitySnapshot,
       capabilitySnapshotHash,
-    });
+    };
+    if (approved !== undefined) {
+      if (sajuOrigin === undefined || approvedAdmission === undefined || approvedAdmissionHash === undefined) {
+        throw new Error('Approved Saju purchase requires its scoped admission.');
+      }
+      const [row, ...extra] = await approved.authority.createPurchaseIntent({
+        ...authorityInput,
+        sajuOrigin,
+        approvedSajuAdmission: approvedAdmission,
+        approvedSajuAdmissionHash: approvedAdmissionHash,
+      });
+      if (row === undefined || extra.length !== 0
+        || row.approvedSajuAdmissionHash !== approvedAdmissionHash
+        || row.expectedAmountMinor !== approvedAdmission.amountMinor
+        || row.expectedCurrency !== approvedAdmission.currency) {
+        throw new Error('Purchase Intent v3 authority did not bind the approved Saju admission.');
+      }
+      return assembleResponse(row, request, purchaseIntentId, offerSnapshot, offerSnapshotHash,
+        capabilitySnapshot, capabilitySnapshotHash);
+    }
+    const rows = sajuOrigin===undefined
+      ? await input.authorityPort.createPurchaseIntent(authorityInput)
+      : input.authorityPort.createSajuPurchaseIntent===undefined
+        ? (()=>{throw new PurchaseIntentCreateAuthorityPortErrorV3(
+            'CAPABILITY_UNAVAILABLE','Saju Record admission authority is unavailable.',
+          );})()
+        : await input.authorityPort.createSajuPurchaseIntent({
+            ...authorityInput,sajuOrigin,
+          });
     if (rows.length !== 1) {
       throw new Error('Purchase Intent v3 authority must return exactly one successful row.');
     }

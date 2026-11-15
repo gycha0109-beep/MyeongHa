@@ -223,3 +223,30 @@ P0-PR-01 evidence retention
 ```
 
 These remain independent implementation/product gates, not SRC-18 blockers.
+
+
+---
+
+## 7. Approved Saju-only Record scope exception (2026-11-07)
+
+The v1 generic scope contract remains `global | fixed`; the prohibition on client/request-derived
+resource scope and generic `REQUEST_RESOURCE` resolution remains in force.
+
+A separate, narrowly approved Saju exception now adds `scope_mode='saju_record'` only for the
+13 governed Saju Product keys. It is not a generic dynamic scope:
+
+- `fixed_scope_key` is NULL.
+- No client field supplies a Record ID as a Grant scope, a `scope_key`, or an entitlement key.
+- The server resolves the exact verified Receipt, immutable Purchase Origin, same Subject,
+  same Birth revision and Saju Record.
+- The persisted scope is derived from a random, server-generated per-Record opaque identity.
+- Generic Purchase Intent v3 rejects Saju Products unless the Record-locked Saju admission
+  command establishes its private transaction-local context.
+- Account deletion removes the personal Record/Origin/opaque-scope mapping but preserves
+  retained financial Receipt, Provider Event, Grant/Event and refund evidence.
+
+This exception does not change non-Saju `global` or `fixed` semantics and does not activate
+any Product, Offer, customer route, provider rail or LIVE sale. Saju upgrade admission remains
+HOLD until quote-specific immutable Charge Terms can represent the computed price difference.
+
+The approved implementation also defines internal canonical field keys as `saju.<field>` and mirrors the 13 governed Product prices in the database. Admission and Receipt Grant issuance reject Capability Items whose field/key pairing differs from that mapping. Original checkout requires active KRW Offer Charge Terms to equal the governed Product list price. Record-specific upgrades remain HOLD until immutable quote-specific Charge Terms are available.

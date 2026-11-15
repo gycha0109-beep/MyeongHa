@@ -38,7 +38,7 @@ It does not create a new memory database, infer facts, approve new Memory schema
 
 ### 4.1 Batched exact-Character Memory and provenance reads
 
-Migration `2330_reader_context_granted_memory_projection_v1.sql` adds the initial read-only Character-scoped Memory projection. Migration `2350_reader_context_memory_retrieval_provenance_v1.sql` adds provenance-enriched v2 projections for both Life Facts and Memory Items.
+Migration `2430_reader_context_granted_memory_projection_v1.sql` adds the initial read-only Character-scoped Memory projection. Migration `2450_reader_context_memory_retrieval_provenance_v1.sql` adds provenance-enriched v2 projections for both Life Facts and Memory Items.
 
 The public v2 projections are SECURITY INVOKER functions. They compose the
 existing current-owner and exact-Character grant queries with two narrowly
@@ -61,7 +61,7 @@ Missing source references remain NULL. The adapter and retrieval layer do not fa
 
 ### 4.2 Subject-bound relationship projection
 
-Migration `2340_reader_context_relationship_projection_v1.sql` adds a read-only wrapper around the current `user_character_states` projection. It asserts the transaction-local Subject and runs under the existing NOLOGIN/NOBYPASSRLS relationship owner. It returns no row when no baseline exists and never calculates or creates one.
+Migration `2440_reader_context_relationship_projection_v1.sql` adds a read-only wrapper around the current `user_character_states` projection. It asserts the transaction-local Subject and runs under the existing NOLOGIN/NOBYPASSRLS relationship owner. It returns no row when no baseline exists and never calculates or creates one.
 
 ### 4.3 Shared read-only projection
 

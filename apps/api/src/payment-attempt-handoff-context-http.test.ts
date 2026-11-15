@@ -54,8 +54,11 @@ function fakePool(input: {
           if (text.includes('begin_member_subject_context_v1')) {
             return { rows: [{ subjectId: SUBJECT_ID, subjectKind: 'member' } as Row] };
           }
-          if (text.includes('qry_commerce_payment_attempt_handoff_context_v1')) {
-            expect(values).toEqual([SUBJECT_ID, PAYMENT_ATTEMPT_ID]);
+          if (text.includes('qry_commerce_payment_attempt_handoff_context_v1') ||
+              text.includes('read_approved_saju_sandbox_handoff_v1')) {
+            expect(values).toEqual(text.includes('read_approved_saju_sandbox_handoff_v1')
+              ? [SUBJECT_ID, PAYMENT_ATTEMPT_ID, 'first-counterpart']
+              : [SUBJECT_ID, PAYMENT_ATTEMPT_ID]);
             if (input.authorityConstraint !== undefined) {
               throw Object.assign(new Error('private database detail'), {
                 constraint: input.authorityConstraint,
@@ -69,7 +72,9 @@ function fakePool(input: {
               providerRequestId: PROVIDER_REQUEST_ID,
               expectedAmountMinor: '12900',
               expectedCurrency: 'KRW',
-              status: 'created',
+              ...(text.includes('read_approved_saju_sandbox_handoff_v1')
+                ? { externalProductId: 'fixture-first-counterpart' } : {}),
+              status: text.includes('read_approved_saju_sandbox_handoff_v1') ? 'handed_off' : 'created',
             } as Row] };
           }
           throw new Error(`Unexpected SQL in Payment Attempt handoff HTTP test: ${text}`);
@@ -84,6 +89,7 @@ function invoke(input: {
   request?: Request;
   evidence?: VerifiedSubjectIdentityEvidenceV1 | null;
   pool?: PostgresSubjectPoolV1;
+  approvedSajuSandbox?: true;
 } = {}) {
   return handlePaymentAttemptHandoffContextRequestV1({
     request: input.request ?? post({ paymentAttemptId: PAYMENT_ATTEMPT_ID }),
@@ -95,10 +101,21 @@ function invoke(input: {
         : input.evidence,
     ),
     pool: input.pool ?? fakePool(),
+    ...(input.approvedSajuSandbox === true ? { approvedSajuSandbox: true } : {}),
   });
 }
 
 describe('Payment Attempt handoff context authenticated HTTP foundation', () => {
+  it('binds the selected catalog offer only in server-selected sandbox mode', async () => {
+    const body = { paymentAttemptId: PAYMENT_ATTEMPT_ID, approvedOfferId: 'first-counterpart' };
+    expect((await invoke({ request: post(body) })).status).toBe(400);
+    const queriedSql: string[] = [];
+    const response = await invoke({ request: post(body), approvedSajuSandbox: true, pool: fakePool({ queriedSql }) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { externalProductId: 'fixture-first-counterpart' } });
+    expect(queriedSql.some((sql) => sql.includes('read_approved_saju_sandbox_handoff_v1'))).toBe(true);
+    expect(queriedSql.some((sql) => sql.includes('qry_commerce_payment_attempt_handoff_context_v1'))).toBe(false);
+  });
   it('remains intentionally unmounted', () => {
     expect(PAYMENT_ATTEMPT_HANDOFF_CONTEXT_HTTP_BINDINGS_V1.publicRoute).toBeNull();
   });
@@ -137,6 +154,22 @@ describe('Payment Attempt handoff context authenticated HTTP foundation', () => 
     expect(
       queriedSql.some((sql) => sql.includes('qry_commerce_payment_attempt_handoff_context_v1')),
     ).toBe(false);
+  });
+
+  it('requires Member login before reading provider handoff context', async () => {
+    const connect = vi.fn(async () => { throw new Error('must not connect'); });
+    const response = await invoke({
+      evidence: { kind: 'guest', verifiedGuestTokenHash: 'sha256:guest-session-fingerprint' },
+      pool: { connect },
+    });
+    const payload = await response.json() as any;
+    expect(response.status).toBe(403);
+    expect(payload.error).toEqual({
+      code: 'LOGIN_REQUIRED',
+      messageKey: 'payment_attempt.login_required',
+      retryable: false,
+    });
+    expect(connect).not.toHaveBeenCalled();
   });
 
   it('returns only canonical DB-owned handoff context', async () => {

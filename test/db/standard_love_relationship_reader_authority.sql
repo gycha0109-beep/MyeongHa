@@ -160,12 +160,16 @@ select pg_temp.assert_fails(
   'tr_standard_reading_product_spec_semantics_immutable'
 );
 
--- Build an isolated enabled fixture to exercise sparse Reader selection authority.
+-- Build an isolated authenticated Member fixture to exercise paid Reader purchase authority.
+insert into auth.users(id) values (
+  '11380000-0000-0000-0000-000000000001'
+) on conflict do nothing;
+
 insert into public.subjects(
   id, kind, auth_user_id, status, merged_into_subject_id, created_at, updated_at
 ) values (
   '11390000-0000-0000-0000-000000000001',
-  'guest', null, 'active', null, now(), now()
+  'member', '11380000-0000-0000-0000-000000000001', 'active', null, now(), now()
 );
 
 insert into public.content_bundles(

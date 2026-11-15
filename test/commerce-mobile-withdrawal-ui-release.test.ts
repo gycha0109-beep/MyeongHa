@@ -26,7 +26,10 @@ describe('mobile paid Reading withdrawal staged release',()=>{
     expect(form).toContain('epoch.current+=1');
     expect(form).toContain('UUID.test(purchase.trim())');
     expect(form).toContain('UUID.test(unit.trim())');
-    expect(form).toContain('nativeMobileWithdrawalClaimServiceV1.submit');
+    expect(form).toContain('nativeMobileWithdrawalClaimServiceV1.submitWithCurrentStatus');
+    expect(form).toContain('setStatus(result.currentStatus)');
+    expect(form).toContain('result.statusLookupUnavailable');
+    expect(form).toContain('setAccepted({');
     expect(form).toContain('nativeMobileWithdrawalClaimServiceV1.readStatus');
     expect(form).toContain('접수는 환불 승인이 아닙니다');
     expect(form).not.toContain('fetch(');

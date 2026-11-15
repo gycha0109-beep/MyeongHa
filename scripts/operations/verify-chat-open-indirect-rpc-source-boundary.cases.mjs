@@ -94,7 +94,7 @@ test('SQL function and bound subject argument must remain exact',()=>{
 test('transaction must keep local role, subject assertion and rollback',()=>{
   for(const [original,replacement] of [
     ['SET LOCAL ROLE myeongha_api_executor','SET ROLE postgres'],
-    ['await connection.query(ASSERT_SUBJECT_CONTEXT_SQL, [resolvedSubject.subjectId]);',
+    ['await client.query(ASSERT_SUBJECT_CONTEXT_SQL, [resolvedSubject.subjectId]);',
      'await connection.query(COMMIT_SQL);'],
     ['await connection.query(ROLLBACK_SQL);','await connection.query(COMMIT_SQL);'],
   ]){
@@ -136,4 +136,13 @@ test('no raw database SQL definitions or client identifiers in public evidence',
   assert.equal(saved.authority.deployedRouteAndCallerContextTested,false);
   for(const value of Object.values(saved.sourceSha256))
     assert.match(value,/^[a-f0-9]{64}$/u);
+});
+
+test('shared transaction wrapper must apply the execution role before invoking the subject callback',()=>{
+  const x=make();
+  x.sources[tx]=x.sources[tx].replace(
+    'await connection.query(executionRoleSql);',
+    'await connection.query(COMMIT_SQL);',
+  );
+  fail(x);
 });

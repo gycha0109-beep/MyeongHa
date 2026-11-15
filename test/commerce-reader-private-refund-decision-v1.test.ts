@@ -20,6 +20,7 @@ const input={
 function fixture(options:{
   privileged?:boolean;
   readonly?:boolean;
+  roleName?:string|null;
   existing?:boolean;
   conflicting?:boolean;
   noPurchase?:boolean;
@@ -41,7 +42,8 @@ function fixture(options:{
         }
         if(sql.includes('rolsuper or rolbypassrls'))
           return {rows:[{fullVisibility:options.privileged!==false,
-            readOnly:options.readonly===true}] as Row[]};
+            readOnly:options.readonly===true,
+            currentUser:options.roleName===undefined?'postgres':options.roleName}] as Row[]};
         const saved={
           id:authId,receiptId,operatorRef,decisionRef,
           approvedAt:new Date(approvedAt),
@@ -125,7 +127,8 @@ describe('operator-adjudicated private Reader refund intake',()=>{
     const pool:PostgresSubjectPoolV1={connect:async()=>({
       query:async<Row=Record<string,unknown>>(sql:string)=>{
         if(sql.includes('rolsuper or rolbypassrls'))
-          return {rows:[{fullVisibility:true,readOnly:false} as Row]};
+          return {rows:[{fullVisibility:true,readOnly:false,
+            currentUser:'postgres'} as Row]};
         return {rows:[] as Row[]};
       },
       release:()=>{},
@@ -142,6 +145,19 @@ describe('operator-adjudicated private Reader refund intake',()=>{
       expect(f.queries.some(q=>q.sql.startsWith('insert into'))).toBe(false);
       expect(f.queries.at(-1)?.sql).toBe('ROLLBACK');
     });
+  it.each([
+    'anon','authenticated','service_role','myeongha_api_executor',
+    'myeongha_worker_runtime','myeongha_commerce_internal_executor',
+    null,' postgres ',
+  ])('denies non-owner %s before recording a legal refund decision',async roleName=>{
+    const f=fixture({roleName});
+    await expect(record({...input,pool:f.pool}))
+      .rejects.toThrow('READER_REFUND_PRIVILEGED_OWNER_REQUIRED');
+    expect(f.queries.map(q=>q.sql)).toHaveLength(3);
+    expect(f.queries.some(q=>q.sql.startsWith('insert into'))).toBe(false);
+    expect(f.queries.some(q=>q.sql.includes('where receipt_id=$1::uuid'))).toBe(false);
+    expect(f.queries.at(-1)?.sql).toBe('ROLLBACK');
+  });
   it('never claims failure or success after an ambiguous COMMIT',async()=>{
     const f=fixture({commitUnknown:true});
     expect(await record({...input,pool:f.pool})).toEqual({kind:'unknown_commit'});

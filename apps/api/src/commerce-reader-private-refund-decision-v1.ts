@@ -11,11 +11,22 @@ export const READER_REFUND_DECISION_PRIVATE_V1=Object.freeze({
 export type OwnerReaderRefundReasonV1='customer_withdrawal'|'non_delivery'
   |'contract_mismatch'|'duplicate_charge'|'statutory_obligation'|'other_approved';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+// RLS-bypass granted to a routine executor is not legal-owner authority.
+// Reject the same non-owner identities before any durable refund decision.
+const UNSAFE_OWNER_OPERATIONS_ROLES=new Set([
+  'anon','authenticated','service_role','myeongha_api_executor',
+  'myeongha_worker_runtime','myeongha_commerce_internal_executor',
+]);
+const ownerRoleAllowed=(value:unknown):value is string=>
+  typeof value==='string'&&value.length>0&&value.trim()===value&&
+  !UNSAFE_OWNER_OPERATIONS_ROLES.has(value);
+
 const SHA=/^sha256:v1:[a-f0-9]{64}$/u;
 const TIME=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
 const PRIVILEGE=[
   "select (rolsuper or rolbypassrls) as \"fullVisibility\",",
-  "current_setting('transaction_read_only')='on' as \"readOnly\"",
+  "current_setting('transaction_read_only')='on' as \"readOnly\",",
+  'current_user as "currentUser"',
   "from pg_catalog.pg_roles where rolname=current_user",
 ].join('\n');
 const INSERT=[
@@ -111,9 +122,12 @@ export async function recordOwnerApprovedReaderFullRefundDecisionV1(input:Readon
   try{
     await connection.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
     active=true;
-    const privilege=await connection.query<{fullVisibility:unknown;readOnly:unknown}>(PRIVILEGE);
+    const privilege=await connection.query<{
+      fullVisibility:unknown;readOnly:unknown;currentUser:unknown;
+    }>(PRIVILEGE);
     if(privilege.rows.length!==1||privilege.rows[0]?.fullVisibility!==true
-      ||privilege.rows[0]?.readOnly!==false)
+      ||privilege.rows[0]?.readOnly!==false
+      ||!ownerRoleAllowed(privilege.rows[0]?.currentUser))
       throw Error('READER_REFUND_PRIVILEGED_OWNER_REQUIRED');
     const inserted=await connection.query<Saved>(INSERT,[
       input.authorizationId,input.receiptId,input.decisionRef,

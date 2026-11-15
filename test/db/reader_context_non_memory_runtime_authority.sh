@@ -2,7 +2,7 @@
 set -euo pipefail
 
 migration="supabase/migrations/1280_reader_context_non_memory_runtime_authority.sql"
-retrieval_migration="supabase/migrations/2350_reader_context_memory_retrieval_provenance_v1.sql"
+retrieval_migration="supabase/migrations/2450_reader_context_memory_retrieval_provenance_v1.sql"
 
 grep -Fq "alter table public.life_facts enable row level security;" "$migration"
 grep -Fq "alter table public.relationship_events enable row level security;" "$migration"
@@ -39,7 +39,7 @@ fi
 echo "Reader context non-Memory runtime authority migration static checks passed."
 
 
-relationship_projection_migration="supabase/migrations/2340_reader_context_relationship_projection_v1.sql"
+relationship_projection_migration="supabase/migrations/2440_reader_context_relationship_projection_v1.sql"
 grep -Fq "qry_reader_context_relationship_projection_v1" "$relationship_projection_migration"
 grep -Fq "assert_myeongha_subject_context_v1(p_subject_id)" "$relationship_projection_migration"
 grep -Fq "security definer" "$relationship_projection_migration"

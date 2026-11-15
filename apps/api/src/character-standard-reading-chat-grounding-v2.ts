@@ -14,8 +14,12 @@ import {
 } from './chat-receive.js';
 import {
   assertServerPreparedStandardChatPreflightV2,
+  prepareCharacterStandardReadingChatTurnPreflightV2,
   type CharacterStandardReadingChatTurnPreflightV2,
+  type PrepareCharacterStandardReadingChatTurnPreflightInputV2,
 } from './character-standard-reading-chat-turn-preflight-v2.js';
+import { createPostgresApprovedSajuReadingAccessV1 } from './postgres-approved-saju-reading-access-v1.js';
+import type { PostgresSubjectExecutionScopeV1 } from './postgres-subject-execution.js';
 import {
   prepareOfficialReadingReaderAdmissionV1,
   type OfficialReadingReaderAdmissionScopeV1,
@@ -47,6 +51,7 @@ export interface PrepareCharacterStandardChatGroundingInputV2 {
   readonly productReaderEligibilityAuthorityPort: ProductReaderEligibilityAuthorityPortV1;
   readonly currentVerifiedPurchaseAuthorityPort?: import('./official-reader-private-exact-verified-purchase-guard-v1.js').OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  readonly requireExactSourceHash?: true;
 }
 
 export interface CharacterStandardChatGroundingV2 {
@@ -174,6 +179,9 @@ export async function prepareCharacterStandardChatGroundingV2(
   } catch {
     deny('ACCESS_DENIED');
   }
+  if (input.requireExactSourceHash === true && initial.source.productResponseState !== 'delivered') {
+    deny('GROUNDING_UNAVAILABLE');
+  }
 
   let candidate: unknown;
   try {
@@ -202,6 +210,9 @@ export async function prepareCharacterStandardChatGroundingV2(
         !/^[0-9a-f]{64}$/u.test(record.sourceResponseHash) ||
         typeof record.groundingHash !== 'string' ||
         !/^[0-9a-f]{64}$/u.test(record.groundingHash)) {
+      deny('SOURCE_MISMATCH');
+    }
+    if (input.requireExactSourceHash === true && 'sha256:v1:' + record.sourceResponseHash !== initial.source.responseHash) {
       deny('SOURCE_MISMATCH');
     }
     const ref: CharacterSajuGroundingRefV1 = Object.freeze({
@@ -247,4 +258,34 @@ export async function prepareCharacterStandardChatGroundingV2(
   } catch {
     deny('SOURCE_MISMATCH');
   }
+}
+
+/** Private paid follow-up source for the existing Chat V2 planner. */
+export async function prepareApprovedSajuReaderFollowupSourceV1(
+  input: Omit<PrepareCharacterStandardReadingChatTurnPreflightInputV2,
+    'resolvedSubjectId' | 'readingId' | 'accessAuthorityPort' | 'artifactAuthorityPort'
+    | 'currentVerifiedPurchaseAuthorityPort' | 'productReaderEligibilityAuthorityPort'> & {
+    readonly scope: PostgresSubjectExecutionScopeV1;
+    readonly readingId: string;
+    readonly productReaderEligibilityAuthorityPort: ProductReaderEligibilityAuthorityPortV1;
+    readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  },
+): Promise<Readonly<{ preflight: CharacterStandardReadingChatTurnPreflightV2; grounded: CharacterStandardChatGroundingV2 }>> {
+  const { scope, ...request } = input;
+  if (scope.resolvedSubject.subjectKind !== 'member') deny('ACCESS_DENIED');
+  const { accessPort, artifactPort, purchasePort } = createPostgresApprovedSajuReadingAccessV1(scope.client, request.readingId);
+  const authorities = {
+    threadBindingAuthorityPort: request.threadBindingAuthorityPort,
+    accessAuthorityPort: accessPort,
+    artifactAuthorityPort: artifactPort,
+    currentVerifiedPurchaseAuthorityPort: purchasePort,
+    productReaderEligibilityAuthorityPort: request.productReaderEligibilityAuthorityPort,
+  };
+  const preflight = await prepareCharacterStandardReadingChatTurnPreflightV2({
+    ...request, ...authorities, resolvedSubjectId: scope.resolvedSubject.subjectId,
+  });
+  const grounded = await prepareCharacterStandardChatGroundingV2({
+    ...authorities, preflight, groundingProjectionPort: request.groundingProjectionPort, requireExactSourceHash: true,
+  });
+  return Object.freeze({ preflight, grounded });
 }

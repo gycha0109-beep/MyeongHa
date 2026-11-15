@@ -34,6 +34,7 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^test\/db\/commerce_saju_record_ledger_candidate_pg17\.(?:sh|sql)$/u,
   /^test\/db\/saju_official_records_http_e2e_pg17\.sh$/u,
   /^scripts\/verify-saju-official-records-http-postgres-e2e\.mjs$/u,
   /^test\/db\/seyeon_r2_helper_service_role_least_privilege\.sh$/u,
@@ -166,6 +167,15 @@ function classifyMigration(path, selected) {
   const tokens = new Set(name.split(/[^a-z0-9]+/u).filter(Boolean));
   const hasAny = (...values) => values.some((value) => tokens.has(value));
   let classified = false;
+  const paidCheckoutMemberGate = name.includes('paid_purchase_member_auth')
+    || name.includes('paid_checkout_member_command_gate')
+    || name.includes('paid_handoff_member_gate');
+
+  if (paidCheckoutMemberGate) {
+    selected.add('commerce-payment');
+    selected.add('commerce-entitlement');
+    classified = true;
+  }
 
   if (hasAny('commerce', 'payment', 'receipt', 'purchase', 'entitlement', 'product', 'capability', 'offer')) {
     selected.add('commerce-payment');
@@ -179,7 +189,7 @@ function classifyMigration(path, selected) {
     classified = true;
   }
 
-  if (hasAny('birth', 'guest', 'record', 'records', 'subject', 'profile', 'auth', 'authentication', 'rls', 'privacy', 'deletion', 'memory', 'notification')) {
+  if (!paidCheckoutMemberGate && hasAny('birth', 'guest', 'record', 'records', 'subject', 'profile', 'auth', 'authentication', 'rls', 'privacy', 'deletion', 'memory', 'notification')) {
     selected.add('runtime');
     classified = true;
   }
@@ -188,6 +198,8 @@ function classifyMigration(path, selected) {
     name.includes('birth_profile_create')
     || name.includes('content_release')
     || name.includes('member_character_thread')
+    || name.includes('saju_record_scoped_capability')
+    || paidCheckoutMemberGate
   ) {
     selected.add('postgres17');
     classified = true;

@@ -12,7 +12,7 @@ const candidate = readFileSync(
     import.meta.url),
   'utf8',
 );
-const start = candidate.indexOf('create function public.internal_commerce_saju_candidate_overlap_fields_v1(');
+const start = candidate.indexOf('create function public.internal_commerce_saju_product_fields_v1(');
 const end = candidate.indexOf('$saju_overlap_fields$;', start);
 if (start < 0 || end <= start) throw Error('SAJU_PENDING_COLLISION_POLICY_FUNCTION_MISSING');
 const fragment = candidate.slice(start, end);
@@ -49,9 +49,9 @@ describe('Saju pending product overlap candidate follows approved quote fields',
     expect(guard).toContain("SAJU_OVERLAPPING_PENDING_PRODUCT");
     expect(guard).toContain("SAJU_DUPLICATE_PENDING_SAME_PRODUCT");
     expect(guard).toContain("SAJU_PENDING_PRODUCT_FIELDS_UNAVAILABLE");
-    expect(candidate).not.toContain('grant execute on function public.internal_commerce_saju_candidate_overlap_fields_v1');
+    expect(candidate).not.toContain('grant execute on function public.internal_commerce_saju_product_fields_v1');
     expect(candidate).toContain(
-      'revoke all on function public.internal_commerce_saju_candidate_overlap_fields_v1(text)',
+      'revoke all on function public.internal_commerce_saju_product_fields_v1(text)',
     );
   });
 

@@ -66,6 +66,7 @@ describe('Reader Interpretation Preview HTTP seam', () => {
     'groundingRef',
     'perspective',
     'responseSnapshotJsonb',
+    'approvedSajuScope',
   ])('rejects client authority field %s', (field) => {
     expect(() =>
       parseReaderInterpretationPreviewHttpRequestV1({

@@ -70,6 +70,15 @@ describe('Official Reading Records browser contract', () => {
     })).toThrow('reading.reading.readingId does not match readingId');
   });
 
+  it('exposes a recognized approved component only for its matching archive domain', () => {
+    expect(parseOfficialReadingRecordPayloadV1({ ...payload, approvedComponent: 'career' }))
+      .toHaveProperty('approvedComponent', 'career');
+    for (const approvedComponent of ['month', 'unknown']) {
+      expect(() => parseOfficialReadingRecordPayloadV1({ ...payload, approvedComponent }))
+        .toThrow(OfficialReadingRecordContractErrorV1);
+    }
+  });
+
   it('rejects non-openable Product response states at the browser archive boundary', () => {
     for (const productResponseState of ['clarification_required', 'pending']) {
       expect(() => parseOfficialReadingRecordPayloadV1({

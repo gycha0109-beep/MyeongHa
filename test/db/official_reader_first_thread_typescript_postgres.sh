@@ -29,26 +29,20 @@ psql -X -v ON_ERROR_STOP=1 -f "$tmp/official.sql" >"$tmp/fixture.stdout" 2>"$tmp
   exit 1
 }
 
-# Promote the same subject through the existing DB authority, no ownership
-# rewrite. Restore only the initial verified purchase Grant in this test DB.
+# Paid Reader fixtures now create an authenticated Member by default.
+# Retain exact canonical ownership; never forge Guest promotion in the test.
+member_state="$(psql -X -At -v ON_ERROR_STOP=1 -c "
+  select kind||'|'||status||'|'||auth_user_id::text
+  from public.subjects
+  where id='11390000-0000-0000-0000-000000000001'::uuid
+    and merged_into_subject_id is null;")"
+[[ "$member_state" == 'member|active|11380000-0000-0000-0000-000000000001' ]] || {
+  echo 'FAIL: purchased Reader owner is not the exact authenticated Member' >&2
+  exit 1
+}
+
+# Restore only the initial verified purchase Grant in this disposable DB.
 psql -X -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
-insert into auth.users(id)
-values ('c1990000-0000-4000-8000-000000000009'::uuid)
-on conflict do nothing;
-insert into public.guest_sessions(
-  id,subject_id,token_hash,expires_at,consumed_at,
-  claimed_by_subject_id,created_at
-) values (
-  'c3990000-0000-4000-8000-000000000009'::uuid,
-  '11390000-0000-0000-0000-000000000001'::uuid,
-  'd05-real-ts-app-promotion-fixture',
-  clock_timestamp()+interval '1 day',null,null,clock_timestamp()
-);
-select subject_id,subject_kind from public.cmd_promote_guest_v1(
-  '11390000-0000-0000-0000-000000000001'::uuid,
-  'c3990000-0000-4000-8000-000000000009'::uuid,
-  'c1990000-0000-4000-8000-000000000009'::uuid
-);
 update public.entitlement_grants g
 set status='active',revision=revision+1,
     last_effective_at=clock_timestamp(),updated_at=clock_timestamp()

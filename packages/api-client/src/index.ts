@@ -56,8 +56,10 @@ export {
   type MemoryPageV1,
   type ReadingHistoryItemV1,
   readOfficialReadingRecordV1,
+  readApprovedSajuPurchaseReadingsV1,
   parseOfficialReadingIdV1,
   type OfficialReadingRecordV1,
+  type ApprovedSajuPurchaseReadingV1,
   type ReadingHistoryPageV1,
   type RecordsPageOptionsV1,
 } from './records.js';

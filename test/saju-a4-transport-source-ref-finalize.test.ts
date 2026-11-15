@@ -51,9 +51,10 @@ const sourceRequest = {
 
 function fixture() {
   const sourceVerifier: SajuOfficialSourceVerificationPortV1 = {
-    verifyProductionIssue: vi.fn(async () => ({
+    verifyProductionIssue: vi.fn(async ({ executedRequest }) => ({
       state: "production_source_verified" as const,
       nativeReadingId: native.reading.readingId,
+      sourceRequestHash: hashSajuHeldSourceProofRequestV1(executedRequest),
       sourceResponseHash: sourceHash,
       sourceBirthRevisionId: BIRTH_REVISION,
       sourceBirthInputHash: "sha256:v1:" + "b".repeat(64),

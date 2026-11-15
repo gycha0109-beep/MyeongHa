@@ -1,0 +1,47 @@
+\set ON_ERROR_STOP on
+-- Bind exactly one existing governed Auth user ID into a disposable DB.
+-- The actual bearer token is verified by Supabase Auth on every HTTP call.
+\getenv owner_auth_id MYEONGHA_SAJU_TEST_OWNER_AUTH_USER_ID
+begin;
+select set_config('myeongha.local_owner_auth_id', :'owner_auth_id', true);
+do $preconditions$
+begin
+  if current_database() <> 'myeongha_saju_sandbox_v1'
+    or current_setting('server_version_num')::integer < 170000
+    or current_setting('server_version_num')::integer >= 180000
+    or inet_server_addr() is not null
+    or to_regclass('public.myeongha_owner_administrators_v1') is null then
+    raise exception 'HOLD_SAJU14_DISPOSABLE_OWNER_AUTHORITY_UNAVAILABLE';
+  end if;
+end
+$preconditions$;
+insert into auth.users(id, email_confirmed_at)
+values (:'owner_auth_id'::uuid, clock_timestamp())
+on conflict (id) do nothing;
+insert into public.subjects(
+  id, kind, auth_user_id, status, merged_into_subject_id,
+  created_at, updated_at
+) values (
+  gen_random_uuid(), 'member', :'owner_auth_id'::uuid,
+  'active', null, clock_timestamp(), clock_timestamp()
+) on conflict (auth_user_id) where auth_user_id is not null do nothing;
+insert into public.myeongha_owner_administrators_v1(
+  auth_user_id, role, credit_exempt, sandbox_checkout_allowed
+) values (:'owner_auth_id'::uuid, 'superadmin', true, true)
+on conflict (auth_user_id) do nothing;
+do $single_owner$
+declare
+  v_owner uuid := current_setting('myeongha.local_owner_auth_id')::uuid;
+begin
+  if (select count(*) from public.myeongha_owner_administrators_v1) <> 1
+    or (select count(*) from public.myeongha_owner_administrators_v1
+       where auth_user_id=v_owner and sandbox_checkout_allowed and role='superadmin') <> 1
+    or (select count(*) from public.subjects
+       where auth_user_id=v_owner and kind='member' and status='active'
+         and merged_into_subject_id is null) <> 1 then
+    raise exception 'HOLD_SAJU14_OWNER_BOOTSTRAP_CONFLICT';
+  end if;
+end
+$single_owner$;
+commit;
+select 'SAJU14_LOCAL_OWNER_AUTHORITY_READY' as state;

@@ -80,13 +80,19 @@ export function MobileWithdrawalClaimPanel(){
     setPending(true);setError(null);
     const currentEpoch=epoch.current;
     try{
-      const result=await nativeMobileWithdrawalClaimServiceV1.submit({
+      const result=await nativeMobileWithdrawalClaimServiceV1.submitWithCurrentStatus({
         reason,idempotencyKey:requestNonce,
         ...(scoped?{purchaseIntentId:purchase.trim(),unitId:unit.trim()}:{}),
       });
       if(currentEpoch!==epoch.current)return;
-      setAccepted({claimId:result.claimId,receivedAt:result.receivedAt});
-      setStatus('received');
+      setAccepted({
+        claimId:result.submitted.claimId,
+        receivedAt:result.submitted.receivedAt,
+      });
+      setStatus(result.currentStatus);
+      if(result.statusLookupUnavailable){
+        setError('접수는 확인됐지만 현재 처리 상태는 확인하지 못했습니다. 상태 새로고침을 눌러 주세요.');
+      }
     }catch(e){
       if(currentEpoch===epoch.current)setError(
         e instanceof Error && e.message.includes('MOBILE_MEMBER_REQUIRED')

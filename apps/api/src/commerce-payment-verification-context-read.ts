@@ -37,6 +37,10 @@ select
   expected_currency as "expectedCurrency"
 from public.qry_commerce_payment_verification_context_v1($1::uuid, $2::uuid)
 `.trim();
+const READ_APPROVED_SAJU_SANDBOX_CONTEXT_SQL = READ_CONTEXT_SQL.replace(
+  'public.qry_commerce_payment_verification_context_v1',
+  'public.qry_approved_saju_sandbox_verification_context_v1',
+);
 
 function requirePaymentAttemptId(value: unknown): string {
   if (typeof value !== 'string' || !UUID.test(value.trim())) {
@@ -179,12 +183,13 @@ function projectContext(
 export async function loadCommercePaymentVerificationContextV1(input: {
   readonly scope: PostgresSubjectExecutionScopeV1;
   readonly paymentAttemptId: unknown;
+  readonly approvedSajuSandbox?: true;
 }): Promise<CommercePaymentVerificationContextV1> {
   const paymentAttemptId = requirePaymentAttemptId(input.paymentAttemptId);
 
   try {
     const result = await input.scope.client.query<VerificationContextRowV1>(
-      READ_CONTEXT_SQL,
+      input.approvedSajuSandbox === true ? READ_APPROVED_SAJU_SANDBOX_CONTEXT_SQL : READ_CONTEXT_SQL,
       [input.scope.resolvedSubject.subjectId, paymentAttemptId],
     );
     return projectContext(paymentAttemptId, result.rows);

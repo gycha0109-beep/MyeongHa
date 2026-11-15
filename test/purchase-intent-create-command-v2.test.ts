@@ -96,7 +96,7 @@ async function expectApiCode(promise: Promise<unknown>, code: string): Promise<A
 }
 
 describe('Purchase Intent v2 API authority boundary', () => {
-  it('binds only to the additive Guest/Member DB command', () => {
+  it('binds only to the additive Member-only paid DB command', () => {
     expect(PURCHASE_INTENT_CREATE_AUTHORITY_BINDING_V2).toBe(
       'public.cmd_create_purchase_intent_v2',
     );
@@ -106,7 +106,7 @@ describe('Purchase Intent v2 API authority boundary', () => {
     const ports = createPorts();
     const response = await createPurchaseIntentV2({
       resolvedSubjectId: SUBJECT_ID,
-      request: { productOfferId: OFFER_ID, idempotencyKey: 'guest-v2-1' },
+      request: { productOfferId: OFFER_ID, idempotencyKey: 'member-v2-1' },
       ...ports,
     });
 
@@ -119,7 +119,7 @@ describe('Purchase Intent v2 API authority boundary', () => {
       purchaseIntentId: INTENT_ID,
       productOfferId: OFFER_ID,
       providerAccountLinkId: null,
-      idempotencyKey: 'guest-v2-1',
+      idempotencyKey: 'member-v2-1',
       offerSnapshotJsonb: SNAPSHOT,
     });
     expect(call?.requestHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/);

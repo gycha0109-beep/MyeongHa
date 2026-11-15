@@ -3,6 +3,7 @@ import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { recordsReadingSummaryV1, recordsReportCountV1, recordsTimestampV1 } from './records-page-ui-locale.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
+import { getApprovedSajuOfferV1 } from '../../packages/contracts/src/approved-saju-catalog.js';
 import { readingDomainPresentationV1 } from './reading-domain-presentation.js';
 import { ensureActiveBearer, readMemberSession, readGuestBearer, PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
 import { captureReadingResponseOwnerV1, isReadingResponseOwnerCurrentV1 } from './reading-response-owner-guard.js';
@@ -155,6 +156,8 @@ function appendReadingFooter(card, leftText, options = {}) {
 
 function renderPersistedReading(target, reading) {
   const presentation = readingPresentation(reading.sajuDomain);
+  const title = reading.approvedComponent === 'compatibility' ? '관계 비교'
+    : getApprovedSajuOfferV1(reading.approvedComponent)?.title ?? presentation.title;
   const card = document.createElement('article');
   card.className = 'records-reading-card records-reading-card--persisted';
 
@@ -171,7 +174,7 @@ function renderPersistedReading(target, reading) {
   readerBadgeSources.set(badge, reading.readerCharacterIds);
   eyebrow.append(badge);
   eyebrow.append(textElement('span', 'records-reading-period', uiText(productResponseStateLabel(reading.productResponseState))));
-  heading.append(eyebrow, textElement('h3', 'records-reading-title', uiText(presentation.title)));
+  heading.append(eyebrow, textElement('h3', 'records-reading-title', uiText(title)));
   identity.append(heading);
   top.append(identity);
   top.append(textElement('span', 'records-reading-date', formatTimestamp(reading.completedAt)));
@@ -182,7 +185,7 @@ function renderPersistedReading(target, reading) {
     'p', 'records-reading-summary',
     recordsReadingSummaryV1({
       completedAt: reading.completedAt,
-      title: uiText(presentation.title),
+      title: uiText(title),
       openable,
     }, getUiLocale()),
   ));

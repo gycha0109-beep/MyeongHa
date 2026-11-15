@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { MyeongHaApiClientV1, readApprovedSajuPurchaseReadingsV1 } from '../../../packages/api-client/src/index.js';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import { handleOfficialReadingRecordRequestV1 } from './official-reading-record-http.js';
 import type {
@@ -10,6 +11,7 @@ const AUTH_USER_ID = '11111111-1111-4111-8111-111111111111';
 const SUBJECT_ID = '22222222-2222-4222-8222-222222222222';
 const READING_ID = '44444444-4444-4444-8444-444444444444';
 const SESSION_ID = '55555555-5555-4555-8555-555555555555';
+const PURCHASE_ID = '66666666-6666-4666-8666-666666666666';
 
 const SNAPSHOT = Object.freeze({
   responseVersion: 'myeonghwa-product-reading-response-v2',
@@ -59,6 +61,7 @@ function fakePool(input: {
   readonly onAuthorityQuery?: (values: readonly unknown[]) => void;
   readonly onBirthQuery?: (values: readonly unknown[]) => void;
   readonly onRollback?: () => void;
+  readonly archiveRows?: readonly object[];
 } = {}): PostgresSubjectPoolV1 {
   return {
     async connect(): Promise<PostgresSubjectConnectionV1> {
@@ -99,6 +102,10 @@ function fakePool(input: {
             input.onAuthorityQuery?.(values ?? []);
             return { rows: (input.rows ?? [ROW]) as readonly ResultRow[] };
           }
+          if (text.includes('qry_approved_saju_purchase_readings_v1')) {
+            expect(values).toEqual([SUBJECT_ID, PURCHASE_ID]);
+            return { rows: (input.archiveRows ?? []) as readonly ResultRow[] };
+          }
           throw new Error(`Unexpected SQL in Official Reading record HTTP test: ${text}`);
         },
         release: vi.fn(),
@@ -111,6 +118,7 @@ async function invoke(input: {
   readonly request?: Request;
   readonly authenticated?: boolean;
   readonly pool?: PostgresSubjectPoolV1;
+  readonly approvedSajuArchiveEnabled?: true;
   readonly verifiedReadingAnalytics?: { record(request:Request,readingId:string):Promise<'inserted'|'replayed'> };
 } = {}): Promise<Response> {
   return handleOfficialReadingRecordRequestV1({
@@ -119,11 +127,32 @@ async function invoke(input: {
     serverTime: '2026-09-23T00:02:00.000Z',
     identityEvidenceVerifier: verifier(input.authenticated ?? true),
     pool: input.pool ?? fakePool(),
+    ...(input.approvedSajuArchiveEnabled === true ? { approvedSajuArchiveEnabled: true } : {}),
     ...(input.verifiedReadingAnalytics===undefined?{}:{verifiedReadingAnalytics:input.verifiedReadingAnalytics}),
   });
 }
 
 describe('Official Reading record HTTP adapter', () => {
+  it('passes the exact paid order from the client to the opt-in archive and returns safe reopen metadata', async () => {
+    const purchaseRequest = request(`purchaseIntentId=${PURCHASE_ID}`);
+    expect((await invoke({ request: purchaseRequest })).status).toBe(404);
+    expect((await invoke({ request: purchaseRequest, approvedSajuArchiveEnabled: true, authenticated: false })).status).toBe(401);
+    expect((await invoke({ request: purchaseRequest, approvedSajuArchiveEnabled: true })).status).toBe(404);
+    const pool = fakePool({ archiveRows: [
+      { component: 'career', readingId: READING_ID, readingSessionId: SESSION_ID, sajuDomain: 'career',
+        readerCharacterId: 'seyeon', completedAt: ROW.completedAt },
+      { component: 'wealth', readingId: null, readingSessionId: null, sajuDomain: null, readerCharacterId: null, completedAt: null },
+    ] });
+    const client = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.internal',
+      fetchImpl: (url, init) => invoke({ request: new Request(url, init), pool, approvedSajuArchiveEnabled: true }),
+    });
+    await expect(readApprovedSajuPurchaseReadingsV1(client, 'member-secret', PURCHASE_ID)).resolves.toEqual([
+      { component: 'career', state: 'ready', readingId: READING_ID, readingSessionId: SESSION_ID, sajuDomain: 'career',
+        readerCharacterId: 'seyeon', completedAt: ROW.completedAt },
+      { component: 'wealth', state: 'pending' },
+    ]);
+  });
   it.each([
     `readingId=${READING_ID}&readingId=${READING_ID}`,
     'readingId=reading-1',

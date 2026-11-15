@@ -4,7 +4,7 @@ import { buildPrivacyReconciliationPlan } from './build-postgres-privacy-reconci
 import { buildPrivacyRecoveryLedgerManifest } from './build-postgres-privacy-recovery-ledger-manifest.mjs';
 
 const [migration, exporter, ownerTest, route, workflow] = await Promise.all([
-  'supabase/migrations/2380_subject_shared_memory_note_deletion_recovery_v1.sql',
+  'supabase/migrations/2480_subject_shared_memory_note_deletion_recovery_v1.sql',
   'scripts/operations/export-production-postgres-privacy-recovery-ledger.sh',
   'test/db/subject_shared_memory_owner_rls_v1.sql',
   'api/me/shared-memory.ts',

@@ -19,7 +19,7 @@ function exactSourceSql(path, name) {
  const open=source.indexOf(tick,start);
  const close=source.indexOf(tick+'.trim();',open+1);
  if(open<0 || close<open)throw Error('COMMERCE_RECORDED_CLAIM_SQL_SOURCE_DRIFT_'+name);
- const sql=source.slice(open+1,close).trim();
+ const sql=source.slice(open+1,close).replaceAll('\r\n','\n').trim();
  if(!sql.startsWith('select\n') || sql.includes('$'+'{')
     || sql.includes(';')) throw Error('COMMERCE_RECORDED_CLAIM_SQL_UNSAFE_'+name);
  return sql;

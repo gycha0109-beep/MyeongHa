@@ -10,7 +10,7 @@ const intent='33333333-3333-4333-8333-333333333333';
 const unit='44444444-4444-4444-8444-444444444444';
 const receipt='55555555-5555-4555-8555-555555555555';
 type Options={general?:boolean;privileged?:boolean;readOnly?:boolean;
-  missing?:boolean;many?:boolean;conflict?:boolean};
+  missing?:boolean;many?:boolean;conflict?:boolean;roleName?:string|null};
 function fixture(options:Options={}){
   const statements:{sql:string;args:readonly unknown[]|undefined}[]=[];
   // Vitest generic SQL mock is runtime-valid; its generic return cannot be inferred by TS.
@@ -22,7 +22,8 @@ function fixture(options:Options={}){
           return {rows:[] as T[]};
         if(sql.includes('rolsuper or rolbypassrls'))
           return {rows:[{fullVisibility:options.privileged!==false,
-            readOnly:options.readOnly!==false} as T]};
+            readOnly:options.readOnly!==false,
+            currentUser:options.roleName===undefined?'postgres':options.roleName} as T]};
         if(sql.includes('from public.digital_reading_withdrawal_claims_private_v1'))
           return {rows:options.missing?[] as T[]:[{
             claimId:claim,subjectId:subject,
@@ -89,6 +90,21 @@ describe('operations-only Reader withdrawal review / exact refund handoff',()=>{
     const f=fixture(opts);
     await expect(review({pool:f.pool,claimId:claim}))
       .rejects.toThrow('PRIVATE_REVIEW_FULL_VISIBILITY_REQUIRED');
+    expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
+  });
+  it.each([
+    'anon','authenticated','service_role','myeongha_api_executor',
+    'myeongha_worker_runtime','myeongha_commerce_internal_executor',
+    null,' postgres ',
+  ])('denies non-owner %s before reading private customer Claims',async roleName=>{
+    const f=fixture({roleName});
+    await expect(review({pool:f.pool,claimId:claim}))
+      .rejects.toThrow('PRIVATE_REVIEW_FULL_VISIBILITY_REQUIRED');
+    expect(f.statements.map(s=>s.sql)).toHaveLength(3);
+    expect(f.statements.some(s=>s.sql.includes(
+      'from public.digital_reading_withdrawal_claims_private_v1'))).toBe(false);
+    expect(f.statements.some(s=>s.sql.includes('from public.commerce_receipts cr')))
+      .toBe(false);
     expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
   it('rejects receipt from a different purchase unit',async()=>{

@@ -56,7 +56,7 @@ export class PurchaseIntentCreateAuthorityPortErrorV2 extends Error {
 }
 
 /**
- * Trusted persistence boundary for Guest/Member Purchase Intent v2.
+ * Trusted persistence boundary for Member-only paid Purchase Intent v2.
  *
  * The caller never supplies monetary authority. The DB command resolves and pins the
  * current server-owned charge-term version atomically with the Purchase Intent.
@@ -258,7 +258,7 @@ function mapAuthorityError(error: unknown): never {
     case 'SUBJECT_INELIGIBLE':
       throw new ApiCommandError(
         'FORBIDDEN',
-        'Purchase Intent requires an active canonical Guest or Member subject.',
+        'Paid Purchase Intent requires an active authenticated Member.',
       );
     case 'OFFER_NOT_FOUND':
     case 'OFFER_UNAVAILABLE':

@@ -119,6 +119,49 @@ describe('native paid Reader delivery: protected S6 GET and S7 ACK',()=>{
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+
+  it('rejects a protected S6 response whose S7 preparation predates the S5 commit',async()=>{
+    vi.stubGlobal('crypto',{randomUUID:()=>REQUEST});
+    const fetchImpl=vi.fn(async()=>Response.json({
+      ok:true,data:{
+        schemaVersion:'official-reader-paid-chat-message-v1',
+        threadId:THREAD,safeMessageId:MARKER,
+        officialReadingId:READING,readerCharacterId:'seyeon',
+        committedAt:'2026-11-04T02:31:00.000Z',body:'PRIVATE_READING_CONTENT',
+        delivery:{
+          deliveryRequestId:REQUEST,deliveryAttemptId:DELIVERY,
+          responsePreparedAt:'2026-11-04T02:30:00.000Z',
+          acknowledgementToken:TOKEN,replayed:false,
+        },
+      },
+    }));
+    vi.stubGlobal('fetch',fetchImpl);
+    const result=await readMobilePaidReaderChatMessageV1({
+      threadId:THREAD,safeMessageId:MARKER,signal:new AbortController().signal,
+    });
+    expect(result).toEqual({kind:'malformed'});
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not acknowledge an S7 receipt when the server ACK predates preparation',async()=>{
+    const fetchImpl=vi.fn(async()=>Response.json({
+      ok:true,data:{
+        schemaVersion:'official-reader-s7-private-delivery-v1',
+        deliveryAttemptId:DELIVERY,
+        clientAcknowledgedAt:'2026-11-04T02:29:00.000Z',replayed:false,
+      },
+    }));
+    vi.stubGlobal('fetch',fetchImpl);
+    const result=await acknowledgeMobilePaidReaderChatDeliveryV1({
+      threadId:THREAD,safeMessageId:MARKER,
+      receipt:{deliveryRequestId:REQUEST,deliveryAttemptId:DELIVERY,
+        responsePreparedAt:CREATED,acknowledgementToken:TOKEN,replayed:false},
+      signal:new AbortController().signal,
+    });
+    expect(result).toEqual({kind:'unavailable'});
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('never treats an ACK receipt as statutory proof of human consumption',()=>{
     const source=readFileSync(new URL('../apps/mobile/src/features/chat/mobile-paid-reader-chat-reveal.tsx',import.meta.url),'utf8');
     expect(source).toContain('This is NOT evidence a');

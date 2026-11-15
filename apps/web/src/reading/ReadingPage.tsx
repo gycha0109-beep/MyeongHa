@@ -1,5 +1,8 @@
 import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
+import { ApprovedSajuCheckoutPanel } from '../commerce/ApprovedSajuCheckoutPanel.js';
+import type { ApprovedSajuCheckoutPanelPorts } from '../commerce/approved-saju-sandbox-checkout.js';
+import type { ApprovedSajuOfferV1 } from './approved-saju-catalog.js';
 import { APPROVED_SAJU_CATALOG_GROUPS_V1, APPROVED_SAJU_CATALOG_V1, getApprovedSajuOfferV1 } from './approved-saju-catalog.js';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 
@@ -15,7 +18,7 @@ const symbolByOfferId: Readonly<Record<string, string>> = Object.freeze({
   career: '✎', business: '商', wealth: '◇', relationship: '✿', year: '歲', month: '月',
 });
 
-export function ReadingPage() {
+export function ReadingPage({ approvedCheckout }: { approvedCheckout?: ApprovedSajuCheckoutPanelPorts } = {}) {
   const resumedPreview = typeof window === 'undefined' ? null : resumePreviewHrefV1(window.location.search);
   // Preserve historic detail URLs in the route layer, but do not surface the
   // retired general-natal product through the present Home/Saju catalogs.
@@ -23,6 +26,11 @@ export function ReadingPage() {
     ? resumedPreview : null;
   const [chartTab, setChartTab] = useState<'pillars' | 'elements'>('pillars');
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
+  const [checkoutSelection, setCheckoutSelection] = useState<{ offerId: ApprovedSajuOfferV1['id']; sequence: number } | null>(null);
+  useEffect(() => {
+    if (!checkoutSelection || approvedCheckout === undefined) return;
+    document.getElementById('approved-checkout-title')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [checkoutSelection, approvedCheckout]);
   useEffect(() => {
     const onElementSelected = (event: Event) => {
       setSelectedElement((event as CustomEvent<{ element: string | null }>).detail.element);
@@ -168,6 +176,9 @@ export function ReadingPage() {
         <section className="saju-design-products" aria-labelledby="saju-design-products-title">
           <h2 id="saju-design-products-title">사주 해석 상품</h2>
           <p>2026년 11월 6일 확정된 단품·관계 비교·패키지 구성과 가격입니다. 아래 상태는 현재 화면에서 확인 가능한 풀이 경로를 뜻하며, 준비 중 항목은 개인 풀이가 완성된 것처럼 표시하지 않습니다.</p>
+          {approvedCheckout !== undefined && checkoutSelection !== null && (
+            <ApprovedSajuCheckoutPanel ports={approvedCheckout} selection={checkoutSelection} />
+          )}
           {APPROVED_SAJU_CATALOG_GROUPS_V1.map((group) => (
             <section className="saju-design-product-group" key={group.id} aria-labelledby={`approved-saju-group-${group.id}`}>
               <h3 id={`approved-saju-group-${group.id}`}>{group.title}</h3>
@@ -182,7 +193,18 @@ export function ReadingPage() {
                       {offer.includes && <p className="saju-design-product-scope">구성: {offer.includes.map((id) => getApprovedSajuOfferV1(id)?.title).join(' + ')}</p>}
                       {availability?.kind === 'preview'
                         ? <><span className={`reading-topic-availability is-${availability.kind}`}>개인 명식 프리뷰</span><a href={href}>명식 확인하기</a></>
-                        : <><span className="reading-topic-availability is-unavailable">정식 풀이 연결 준비 중</span><p className="saju-design-product-scope">공식 풀이와 구매한 상품의 전달 경로를 연결 중입니다.</p></>}
+                        : approvedCheckout === undefined
+                          ? <><span className="reading-topic-availability is-unavailable">정식 풀이 연결 준비 중</span><p className="saju-design-product-scope">공식 풀이와 구매한 상품의 전달 경로를 연결 중입니다.</p></>
+                          : <span className="reading-topic-availability is-unavailable">정식 판매 전 테스트 전용</span>}
+                      {approvedCheckout !== undefined && (
+                        <button type="button" className="saju-design-product-test-button"
+                          aria-label={`${offer.title} 테스트 결제 진행`}
+                          onClick={() => setCheckoutSelection((current) => ({
+                            offerId: offer.id, sequence: (current?.sequence ?? 0) + 1,
+                          }))}>
+                          테스트 결제·발급 확인
+                        </button>
+                      )}
                     </article>
                   );
                 })}

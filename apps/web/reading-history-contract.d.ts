@@ -1,9 +1,11 @@
 import type { SajuDomainV1 } from './saju-domain-contract.js';
+import type { SajuReadingComponentV1 } from '../../packages/contracts/src/approved-saju-catalog.js';
 
 export interface ReadingHistoryBrowserItemV1 {
   readonly readingId: string;
   readonly readingSessionId: string;
   readonly sajuDomain: SajuDomainV1;
+  readonly approvedComponent?: SajuReadingComponentV1;
   readonly readingContractVersion: string;
   readonly productResponseState: string;
   readonly readerCharacterIds: readonly string[];

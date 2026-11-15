@@ -103,6 +103,21 @@ describe('Saju Product Reading HTTP adapter', () => {
     });
   });
 
+  it('preserves an exact purchase period reference in the source request', () => {
+    const input = {
+      birthRevision: BIRTH_REVISION,
+      readingText: '이번 달',
+      periodReferenceDateTime: '2026-11-30T14:59:59.999Z',
+    };
+    expect(buildSajuProductionReadingRequestV1(input).reading).toEqual({
+      text: input.readingText,
+      periodReferenceDateTime: input.periodReferenceDateTime,
+    });
+    expect(() => buildSajuProductionReadingRequestV1({
+      ...input, periodReferenceDateTime: '2026-11-31T00:00:00.000Z',
+    })).toThrow(SajuProductionReadingHttpAdapterErrorV1);
+  });
+
   it('accepts a source-attested response without duplicating Saju response admission locally', async () => {
     const calls: Array<{ url: string; init: any }> = [];
     const payload = {
@@ -189,6 +204,22 @@ describe('Saju Product Reading HTTP adapter', () => {
       code: 'RESPONSE_ADMISSION_ATTESTATION_REJECTED',
       httpStatus: 200,
     });
+  });
+
+  it('rejects a Preview-labeled response from the Production reading endpoint', async () => {
+    const adapter = createSajuProductionReadingHttpAdapterV1({
+      baseUrl: 'https://saju.example.test',
+      bearerToken: 'service-credential',
+      fetchImpl: async () => jsonResponse(
+        200,
+        { responseVersion: SAJU_PRODUCT_READING_RESPONSE_ADMISSION_VERSION_V1, state: 'delivered' },
+        SAJU_PRODUCT_READING_RESPONSE_ADMISSION_VERSION_V1,
+        SAJU_PREVIEW_READING_LIFECYCLE_V1,
+      ),
+    });
+    await expect(adapter.requestReading(buildSajuProductionReadingRequestV1({
+      birthRevision: BIRTH_REVISION, readingText: '직업운',
+    }))).rejects.toMatchObject({ code: 'RESPONSE_LIFECYCLE_ATTESTATION_REJECTED' });
   });
 
   it('rejects HTTP 200 when the source admission attestation version is not exact', async () => {

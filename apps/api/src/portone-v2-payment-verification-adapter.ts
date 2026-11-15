@@ -637,6 +637,32 @@ function canonicalFraction(fraction: string): string {
   return trimmed.length < 3 ? trimmed.padEnd(3, '0') : trimmed;
 }
 
+/**
+ * Both instants are already strictly validated UTC RFC3339 timestamps from
+ * requirePaidAt. Comparing the whole strings is NOT chronological when one
+ * fractional second is a prefix of the other: the final 'Z' sorts after a
+ * decimal digit. Compare whole seconds, then zero-pad fractional digits to
+ * equal precision. Never round to JavaScript milliseconds.
+ */
+function compareCanonicalPortOneInstants(
+  left: string,
+  right: string,
+): -1 | 0 | 1 {
+  const leftSecond = left.slice(0, 19);
+  const rightSecond = right.slice(0, 19);
+  if (leftSecond !== rightSecond) {
+    return leftSecond < rightSecond ? -1 : 1;
+  }
+  const leftFraction = left.slice(20, -1);
+  const rightFraction = right.slice(20, -1);
+  const precision = Math.max(leftFraction.length, rightFraction.length);
+  const normalizedLeft = leftFraction.padEnd(precision, '0');
+  const normalizedRight = rightFraction.padEnd(precision, '0');
+  return normalizedLeft === normalizedRight
+    ? 0
+    : normalizedLeft < normalizedRight ? -1 : 1;
+}
+
 function requirePaidAt(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 128) {
     return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
@@ -984,7 +1010,17 @@ export function createPortOneV2FullCancellationVerifierV1(
           return fail('INVALID_PAYMENT',
             'PortOne V2 payment is not the exact authoritative full cancellation.');
         }
-        const verifiedAmountMinor=requireAmountMinor(payment.amount);
+        const amount=plainRecord(payment.amount,'PortOne V2 full cancellation amount');
+        const verifiedAmountMinor=requireAmountMinor(amount);
+        // Payment state and the one succeeded cancellation item cannot prove
+        // a full refund if the independently reported paid/cancelled aggregates
+        // are inconsistent. Never let such a snapshot revoke paid Reader access.
+        if(payment.version!=='V2' ||
+           amount.paid!==verifiedAmountMinor ||
+           amount.cancelled!==verifiedAmountMinor) {
+          return fail('INVALID_PAYMENT',
+            'PortOne V2 cumulative full cancellation amount is inconsistent.');
+        }
         // A CANCELLED payment can result from several separate partial
         // cancellations. Such a set must never be promoted into one exact
         // full-refund authority for one exact paid Reader purchase.
@@ -1008,7 +1044,20 @@ export function createPortOneV2FullCancellationVerifierV1(
             'PortOne V2 exact single full cancellation amount is unavailable.');
         }
 
+        // This paid-only Reader purchase must have a coherent provider
+        // lifecycle clock. An out-of-order or unrelated cancellation item
+        // must not become the effective_at used by the existing locked S2
+        // existing private Reader cancellation writer's older-source check.
+        const paidAt=requirePaidAt(payment.paidAt);
         const cancelledAt=requirePaidAt(payment.cancelledAt);
+        const succeededCancelledAt=requirePaidAt(cancellation.cancelledAt);
+        const statusChangedAt=requirePaidAt(payment.statusChangedAt);
+        if (compareCanonicalPortOneInstants(paidAt,succeededCancelledAt)>=0 ||
+            compareCanonicalPortOneInstants(succeededCancelledAt,cancelledAt)!==0 ||
+            compareCanonicalPortOneInstants(statusChangedAt,cancelledAt)<0) {
+          return fail('INVALID_PAYMENT',
+            'PortOne V2 original payment and successful cancellation chronology is inconsistent.');
+        }
         const verifiedCurrency=requireCurrency(payment.currency);
         const canonical=JSON.stringify({
           schemaVersion:'myeongha.portone-v2.full-cancel-evidence.v1',

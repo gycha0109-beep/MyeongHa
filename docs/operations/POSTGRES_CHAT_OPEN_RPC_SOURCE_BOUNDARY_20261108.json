@@ -27,7 +27,7 @@
   "sourceSha256": {
     "apps/api/src/production-chat-read-runtime.ts": "458792c484570c2e27a4367b283ef2907b048759e0872179b2622adc2d37ecbd",
     "apps/api/src/chat-open-http.ts": "433f1350124a616172d6c90f3977be0ef52b02804662f2ace4c54762c1af12d2",
-    "apps/api/src/postgres-subject-execution.ts": "b5f8de160d71f32a3d7d285b9fc0f7293ca692809352937b6442b530792c7f6c"
+    "apps/api/src/postgres-subject-execution.ts": "7f913d11f26b7ad6b2a839bb7602792ca45d0df10577f6644f386616c0a52325"
   },
   "sourceChecks": {
     "routeMountMatched": true,

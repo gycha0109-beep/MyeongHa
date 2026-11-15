@@ -127,6 +127,7 @@ export interface HandleOfficialReaderPaidDeliveryAckHttpInputV1 {
   readonly requestId:string;
   readonly serverTime:string;
   readonly paidReadReleaseEnabled?:boolean;
+  readonly purchaseKind?: 'standard' | 'approved_saju';
   readonly identityEvidenceVerifier?:IdentityEvidenceVerificationPortV1;
   readonly pool?:PostgresSubjectPoolV1;
 }
@@ -182,6 +183,7 @@ export async function handleOfficialReaderPaidDeliveryAckHttpV1(
       deliveryAttemptId:payload.deliveryAttemptId,
       deliveryRequestId:payload.deliveryRequestId,
       acknowledgementToken:payload.acknowledgementToken,
+      ...(input.purchaseKind === undefined ? {} : { purchaseKind: input.purchaseKind }),
     });
 
     return Response.json({

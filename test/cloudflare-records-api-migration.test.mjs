@@ -70,6 +70,11 @@ describe('Cloudflare protected records API migration',()=>{
     expect(allow('/api/readings?cursor=x')).toBe(true);
     expect(allow('/api/readings?pageSize=10')).toBe(true);
     expect(allow('/api/readings?cursor=x&pageSize=10')).toBe(true);
+    expect(allow('/api/readings?purchaseIntentId='+id)).toBe(false);
+    const allowApproved=path=>allowedCloudflareRecordsReadQueryV1(route,new URL(ORIGIN+path),true);
+    expect(allowApproved('/api/readings?purchaseIntentId='+id)).toBe(true);
+    expect(allowApproved('/api/readings?purchaseIntentId='+id+'&readingId='+id)).toBe(false);
+    expect(allowApproved('/api/readings?purchaseIntentId='+id+'&purchaseIntentId='+id)).toBe(false);
     expect(allowedCloudflareRecordsReadQueryV1(
       matchCloudflareApiRoute('/api/life-record'),new URL(ORIGIN+'/api/life-record?pageSize=10')
     )).toBe(true);
