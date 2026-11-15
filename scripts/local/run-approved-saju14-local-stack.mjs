@@ -25,6 +25,100 @@ const pw = Object.fromEntries(roles.map(([key]) => [key, randomBytes(36).toStrin
 const adminPw = randomBytes(36).toString('base64url');
 let created = false;
 let child;
+let issuerChild;
+const issuerRequired = [
+  'MYEONGHA_SAJU_SOURCE_ORIGIN', 'MYEONGHA_SAJU_PAIR_SOURCE_ORIGIN',
+  'MYEONGHA_SAJU_ENGINE_KEY', 'MYEONGHA_SAJU_ENGINE_VERSION',
+  'MYEONGHA_SAJU_SOURCE_TOKEN', 'MYEONGHA_SAJU_SOURCE_AUTHORITY_HASH',
+  'MYEONGHA_SAJU_SOURCE_PROOF_ISSUER', 'MYEONGHA_SAJU_SOURCE_PROOF_AUDIENCE',
+  'MYEONGHA_SAJU_SOURCE_KEY_ID', 'MYEONGHA_SAJU_SOURCE_VERIFY_PEM_B64',
+  'MYEONGHA_SAJU_PAIR_SOURCE_TOKEN', 'MYEONGHA_SAJU_PAIR_PROOF_ISSUER',
+  'MYEONGHA_SAJU_PAIR_PROOF_AUDIENCE', 'MYEONGHA_SAJU_PAIR_PROOF_KEY_ID',
+  'MYEONGHA_SAJU_PAIR_VERIFY_PEM_B64', 'MYEONGHA_SAJU_ISSUER_RELEASES_JSON',
+  'MYEONGHA_SAJU_PAIR_RELEASE_REF', 'MYEONGHA_SAJU_PAIR_READER_ID',
+];
+
+function rebuildCurrentCheckout() {
+  // The local host serves /public, not Vite's dev server. Always compile the
+  // exact checked-out React checkout before accepting TEST credentials.
+  const tasks = [
+    [resolve(root, 'node_modules/typescript/bin/tsc'), ['-p', 'tsconfig.build.json']],
+    [resolve(root, 'scripts/build-web-static.mjs'), []],
+    [resolve(root, 'node_modules/vite/bin/vite.js'), ['build', '--config', 'apps/web/vite.config.ts']],
+  ];
+  for (const [entrypoint, args] of tasks) {
+    const result = spawnSync(process.execPath, [entrypoint, ...args], {
+      cwd: root, encoding: 'utf8', timeout: 90_000,
+      maxBuffer: 5 * 1024 * 1024, windowsHide: true,
+    });
+    if (result.status !== 0) {
+      throw Error('Current Saju checkout build failed: ' +
+        String(result.stderr || result.stdout || result.error?.message).slice(-1500));
+    }
+  }
+}
+
+async function startVerifiedIssuer(env) {
+  const script = resolve(root, 'scripts/local/start-approved-saju-issuers.mjs');
+  const proc = spawn(process.execPath, [script, '--serve'], {
+    env, cwd: root, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+  });
+  await new Promise((resolveReady, rejectReady) => {
+    let output = '';
+    let finished = false;
+    const timer = setTimeout(() => fail('Official signed Saju issuer did not become ready.'), 30_000);
+    const detach = () => {
+      clearTimeout(timer);
+      proc.stdout.off('data', onOutput);
+      proc.off('exit', onExit);
+      proc.off('error', onError);
+    };
+    function success() {
+      if (finished) return;
+      finished = true;
+      detach();
+      resolveReady();
+    }
+    function fail(message) {
+      if (finished) return;
+      finished = true;
+      detach();
+      rejectReady(Error(message));
+    }
+    function onOutput(data) {
+      output = (output + data.toString()).slice(-4096);
+      if (output.includes('Isolated paid-issuance consumer active;')) success();
+    }
+    function onExit() { fail('Official signed Saju issuer exited before checkout admission.'); }
+    function onError() { fail('Official signed Saju issuer cannot start.'); }
+    proc.stdout.on('data', onOutput);
+    proc.once('exit', onExit);
+    proc.once('error', onError);
+  }).catch(error => {
+    proc.kill();
+    throw error;
+  });
+  return proc;
+}
+
+function waitForProcess(proc, label) {
+  return new Promise((resolveDone, rejectDone) => {
+    if (proc.exitCode !== null) {
+      rejectDone(Error(label + ' exited unexpectedly.'));
+      return;
+    }
+    proc.once('error', () => rejectDone(Error(label + ' encountered an error.')));
+    proc.once('exit', (code, signal) => {
+      if (label === 'issuer') {
+        rejectDone(Error('Official Saju issuer stopped; checkout is now closed.'));
+      } else if (code === 0 || signal) {
+        resolveDone();
+      } else {
+        rejectDone(Error('Owner TEST checkout stopped unexpectedly.'));
+      }
+    });
+  });
+}
 
 function docker(args, timeout = 90_000) {
   const r = spawnSync('docker', args, {
@@ -62,11 +156,14 @@ if (mode !== '--check' && mode !== '--serve') {
 } else {
   try {
     if (mode === '--serve') {
+      // Never allow a payment without a live, verified Source/Reader issuer.
       const required = ['MYEONGHA_SAJU_TEST_STORE_ID', 'MYEONGHA_SAJU_TEST_CHANNEL_KEY',
         'MYEONGHA_SAJU_TEST_PORTONE_API_SECRET',
-        'MYEONGHA_SAJU_TEST_EVIDENCE_HMAC_SECRET', 'MYEONGHA_SUPABASE_API_KEY'];
+        'MYEONGHA_SAJU_TEST_EVIDENCE_HMAC_SECRET', 'MYEONGHA_SUPABASE_API_KEY',
+        ...issuerRequired];
       const missing = required.filter(key => !process.env[key]?.trim());
       if (missing.length) throw Error('PortOne TEST / Auth settings are missing: ' + missing.join(', '));
+      rebuildCurrentCheckout();
     }
     const context = docker(['context', 'show']);
     const endpoint = docker(['context', 'inspect', context, '--format', '{{.Endpoints.docker.Host}}']);
@@ -128,22 +225,39 @@ if (mode !== '--check' && mode !== '--serve') {
         'postgresql://' + member[1] + ':' + pw[member[0]] + '@127.0.0.1:' + port + '/' + database;
       env.MYEONGHA_SAJU_TEST_COMMERCE_DB_URL =
         'postgresql://' + commerce[1] + ':' + pw[commerce[0]] + '@127.0.0.1:' + port + '/' + database;
+      const issuer = roles[2], pairReader = roles[3];
+      const issuerEnv = {
+        ...env,
+        MYEONGHA_SAJU_ISSUER_STAGE: 'local-only',
+        MYEONGHA_SAJU_ISSUER_DB_URL:
+          'postgresql://' + issuer[1] + ':' + pw[issuer[0]] + '@127.0.0.1:' + port + '/' + database,
+        MYEONGHA_SAJU_PAIR_READER_DB_URL:
+          'postgresql://' + pairReader[1] + ':' + pw[pairReader[0]] + '@127.0.0.1:' + port + '/' + database,
+      };
+      // Never open a payment-capable server until BOTH existing signed
+      // issuing workers have started successfully on the same isolated DB.
+      issuerChild = await startVerifiedIssuer(issuerEnv);
+      console.log('Local official Saju individual/pair issuer is active.');
       child = spawn(process.execPath,
         [resolve(root, 'scripts/local/start-approved-saju-owner-sandbox.mjs')],
         { env, cwd: root, stdio: 'inherit', windowsHide: true });
-      await new Promise((done, reject) => {
-        child.once('exit', (code, signal) => code === 0 || signal
-          ? done() : reject(Error('Owner test checkout stopped unsuccessfully.')));
-        child.once('error', reject);
-        process.once('SIGINT', () => child.kill('SIGINT'));
-        process.once('SIGTERM', () => child.kill('SIGTERM'));
-      });
+      const stopAll = () => {
+        if (child && child.exitCode === null) child.kill('SIGTERM');
+        if (issuerChild && issuerChild.exitCode === null) issuerChild.kill('SIGTERM');
+      };
+      process.once('SIGINT', stopAll);
+      process.once('SIGTERM', stopAll);
+      await Promise.race([
+        waitForProcess(child, 'checkout'),
+        waitForProcess(issuerChild, 'issuer'),
+      ]);
     }
   } catch (error) {
     console.error(error instanceof Error ? error.message : 'Disposable Saju14 stack failed.');
     process.exitCode = 1;
   } finally {
     if (child && child.exitCode === null) child.kill();
+    if (issuerChild && issuerChild.exitCode === null) issuerChild.kill();
     cleanup();
   }
 }
