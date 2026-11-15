@@ -53,11 +53,11 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: mobileColors.canvas },
   content: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 36, gap: 22 },
   header: { gap: 8 },
-  eyebrow: { color: mobileColors.gold, fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
-  title: { color: mobileColors.ink, fontSize: 32, fontWeight: '700' },
-  description: { color: mobileColors.muted, fontSize: 16, lineHeight: 24 },
-  card: { borderWidth: 1, borderColor: mobileColors.border, borderRadius: 18, backgroundColor: mobileColors.surface, padding: 20, gap: 8 },
-  cardTitle: { color: mobileColors.ink, fontSize: 20, fontWeight: '700' },
-  cardBody: { color: mobileColors.muted, fontSize: 15, lineHeight: 22 },
+  eyebrow: { color: mobileColors.gold, fontSize: 13, fontWeight: '800', letterSpacing: 1.1 },
+  title: { color: mobileColors.ink, fontSize: 36, lineHeight: 44, fontWeight: '800' },
+  description: { color: mobileColors.muted, fontSize: 17, lineHeight: 27, fontWeight: '500' },
+  card: { borderWidth: 1, borderColor: mobileColors.border, borderRadius: 18, backgroundColor: mobileColors.surface, padding: 22, gap: 10 },
+  cardTitle: { color: mobileColors.ink, fontSize: 23, lineHeight: 30, fontWeight: '800' },
+  cardBody: { color: mobileColors.muted, fontSize: 16, lineHeight: 25, fontWeight: '500' },
 });
 const staticStyles = styles;

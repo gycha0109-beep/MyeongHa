@@ -25,6 +25,15 @@ function text(value) {
 }
 
 const EVENT_SPECS = Object.freeze({
+  SHARED_MEMORY_NOTE_DELETED: {
+    keys: ['sharedMemoryItemId', 'subjectId'],
+    call(event) {
+      return `public.internal_replay_shared_memory_note_deletion_v1(${uuid(event.subjectId)}, ${uuid(event.sharedMemoryItemId)}, ${text(event.occurredAt)}::timestamptz)`;
+    },
+    terminal(event) {
+      return `not exists (select 1 from public.subject_shared_memory_items_v1 sm where sm.id = ${uuid(event.sharedMemoryItemId)}) and exists (select 1 from public.subject_shared_memory_delete_events_v1 ev where ev.item_id = ${uuid(event.sharedMemoryItemId)} and ev.subject_id = ${uuid(event.subjectId)} and date_trunc('milliseconds', ev.deleted_at) = ${text(event.occurredAt)}::timestamptz)`;
+    },
+  },
   ACCOUNT_DELETION_STARTED: {
     keys: ['deletionJobId', 'outboxEventId', 'requestDedupeKey', 'subjectId'],
     call(event) {
@@ -295,6 +304,12 @@ export function buildPrivacyReconciliationPlan(rawManifest) {
   for (const event of events) {
     eventTypeCounts[event.type] = (eventTypeCounts[event.type] ?? 0) + 1;
     const spec = EVENT_SPECS[event.type];
+    if (event.type === 'SHARED_MEMORY_NOTE_DELETED') {
+      statements.push(commandCount(spec.call(event)));
+      statements.push(terminalValidation(spec.terminal(event),
+        'shared-memory note deletion recovery did not establish non-resurrection'));
+      continue;
+    }
     if (event.type === 'ACCOUNT_DELETION_STARTED') {
       statements.push(commandCount(spec.call(event)));
       statements.push(
@@ -327,7 +342,7 @@ export function buildPrivacyReconciliationPlan(rawManifest) {
     backupRunId,
     eventCount: events.length,
     eventTypeCounts,
-    privacyReconciliationScope: 'revocation-and-account-deletion-start-only',
+    privacyReconciliationScope: 'revocation-account-deletion-start-and-manual-note-erasure',
     replayIdempotency: 'transactional-terminal-state-validated',
     accountDeletionFinalization: 'runtime-implemented-finalization-executed-separately',
     commerceRetentionDecision: 'decided-p5y-nine-table-baseline',

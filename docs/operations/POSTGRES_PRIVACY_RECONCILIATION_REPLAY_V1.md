@@ -70,6 +70,7 @@ Only existing DB command authority is used:
 | `SHARE_ARTIFACT_REVOKED` | `cmd_revoke_share_artifact_v1` |
 | `DEVICE_INSTALLATION_REVOKED` | `cmd_revoke_device_installation_v1` |
 | `MEMORY_ITEM_REVOKED` | `cmd_revoke_memory_item_v1` |
+| `SHARED_MEMORY_NOTE_DELETED` | `internal_replay_shared_memory_note_deletion_v1` (privileged exact-Subject/ID/time, idempotent erasure) |
 | `LIFE_FACT_REVOKED` | `cmd_revoke_life_fact_v1` |
 | `MEMORY_CHARACTER_GRANT_REVOKED` | `cmd_revoke_memory_character_grant_v1` |
 | `LIFE_FACT_CHARACTER_GRANT_REVOKED` | `cmd_revoke_life_fact_character_grant_v1` |
@@ -115,7 +116,7 @@ The same replay drill used by DB CI is now exposed through:
 scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh
 ```
 
-The isolated restore workflow invokes that script **after** the governed backup has been restored and validated. It creates collision-guarded synthetic fixtures only inside the disposable loopback database, compiles a four-event non-zero replay plan (Memory revoke, Life Fact revoke, Device Installation revoke, and account-deletion start), executes it, executes the identical plan a second time to prove idempotency, and verifies a separate malformed terminal-state case fails closed.
+The isolated restore workflow invokes that script **after** the governed backup has been restored and validated. It creates collision-guarded synthetic fixtures only inside the disposable loopback database, compiles a five-event non-zero replay plan (Memory revoke, Life Fact revoke, Device Installation revoke, manual shared-memory note deletion, and account-deletion start), executes it, executes the identical plan a second time to prove idempotency, and verifies a separate malformed terminal-state case fails closed.
 
 The uploaded synthetic evidence is identifier-free and explicitly records:
 
@@ -160,3 +161,24 @@ After #964 resolves the policy/source authority:
 5. separately execute the approved account-finalization / commerce-retention procedure;
 6. upload only the sanitized evidence report;
 7. compare achieved recovery evidence against approved RPO/RTO before any DR Ready claim.
+
+## 2026-11-10 — Owner-approved individual manual note delete replay
+
+`SHARED_MEMORY_NOTE_DELETED` contains `sharedMemoryItemId`, `subjectId` and the existing `occurredAt`. The captured-window ledger read-only exporter emits these fields without note text; the encrypted manifest is source-bound by the existing digest and backup/incident guard. The recovery plan issues only a privileged, owner-only function call, not inline direct DELETE. This function physically removes the exact restored owner note, records only identifiers/time, and is idempotent for repeated manifests; a conflicting owner or timestamp aborts the whole transaction. A note created and deleted after the backup is allowed to remain absent. Public report still contains counts only.
+
+This is a Draft implementation. Restored DBs must first have governed migration 2380 applied; an older schema must fail closed. There is no extension to the existing P30D encrypted artifact retention and no claim of continuous future-safe privacy reconciliation or DR Ready.
+
+## 2026-11-10 — Manual shared-note deletion in the existing isolated restore drill
+
+The existing non-zero encrypted captured-window synthetic drill now adds one `SHARED_MEMORY_NOTE_DELETED` event before account-deletion start. Its fixture represents text present in a backed-up database but erased by an independently captured post-backup owner deletion. The existing manifest builder, AES-256-CBC encrypted roundtrip, exact replay planner, disposable PostgreSQL execution, repeated replay, finalizer and sanitized report pipeline all remain in use.
+
+- A preflight requires the real `2380` shared-note recovery table and replay function **before any fixture is inserted**. Older restored schema fails closed; no unilateral Production migration is performed.
+- The drill proves the restored note is present before replay, absent after replay, and still absent after an identical second replay. It checks the exact timestamped, identifier-only deletion marker and ensures repeated replay neither changes its clock nor duplicates it.
+- The public synthetic proof adds `shared_memory_note_non_resurrection: synthetic-recovered-db-pass`, with a note deletion event type count of one and no note text or identifiers. `dr_ready=false` is unchanged.
+- Disposable PostgreSQL 15 execution with a fresh clone of the historical catalog plus migration 2380 succeeded, including the existing four privacy event categories and separate negative terminal-state case; missing-migration rejection succeeded separately. This is **synthetic local isolation**, not a live backed-up Production database, independently captured future source, hosted provider restore, approved deployment, or whole-service DR readiness.
+
+## 2026-11-10 — Verbatim Production SELECT source-path synthetic drill
+
+The `db-authority-core` synthetic test now exercises the actual read-only source SQL embedded in `scripts/operations/export-production-postgres-privacy-recovery-ledger.sh`, not a parallel reimplementation. It snapshots a synthetic shared note in an isolated PostgreSQL clone, runs an owner-authorized DELETE against the source DB, captures the generated `SHARED_MEMORY_NOTE_DELETED` event through the actual production SQL, and feeds that result into the existing bounded ledger manifest and replay plan. A second isolated restored clone proves physical erasure, exact Subject/item metadata, replay idempotency and capture-window exclusion. Plaintext never enters the event payload. All temporary raw sources remain local and are deleted.
+
+This test is a **disposable synthetic source-to-restored-database integration check**, not proof of a live or continuously complete off-DB Production ledger, an actual deployed 2380 migration, real backup artifacts, or whole-service DR. `futureSafePrivacyReconciliation=false` and `drReady=false` remain required.

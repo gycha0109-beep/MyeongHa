@@ -44,7 +44,7 @@ describe('Reader relationship PostgreSQL runtime authority adapter', () => {
     }]);
 
     expect(queryClient.query).toHaveBeenCalledWith(
-      expect.stringContaining('qry_character_relationship_v1'),
+      expect.stringContaining('qry_reader_context_relationship_projection_v1'),
       ['11111111-1111-4111-8111-111111111111', 'baekheon'],
     );
   });

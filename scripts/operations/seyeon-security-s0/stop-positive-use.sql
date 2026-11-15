@@ -17,6 +17,12 @@ revoke all on function public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
   uuid,uuid,uuid,uuid,uuid,uuid,uuid,text),
   public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(uuid,uuid,uuid)
   from myeongha_api_executor;
+-- The combined G1 owner entrypoint is default-denied at installation,
+-- but may have been narrowly enabled for a later approved admission.
+-- Emergency stop must revoke that later permission as well.
+revoke all on function public.cmd_pin_seyeon_positive_model_context_sources_v1(
+  uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)
+  from myeongha_api_executor;
 revoke all on function public.cmd_issue_seyeon_positive_first_reply_v1(
   uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea) from myeongha_api_executor;
 -- Keep receipt ACK and request-revoke available: an incident stop must not

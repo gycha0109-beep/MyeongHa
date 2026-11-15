@@ -35,9 +35,15 @@ describe('Se-yeon GLM production cutover stays server-owned and metered',()=>{
     expect(SEYEON_GLM_GOVERNED_POLICY_V1.allowedPurposes).toEqual(['dialogue_render']);
     const worker=readFileSync(new URL('../cloudflare/myeongha-worker.mjs',import.meta.url),'utf8');
     const runtime=readFileSync(new URL('../apps/api/src/production-seyeon-first-memory-node-runtime-v1.ts',import.meta.url),'utf8');
-    expect(worker).toContain("typeof env?.OPENROUTER_API_KEY==='string'");
+    // S0: never read renderer credentials in the Worker before exact G1 Pin.
+    // The request-scoped runtime validates the server key after the Pin and
+    // fails closed before a metered Provider is constructed.
+    expect(worker).not.toContain("env?.OPENROUTER_API_KEY");
     expect(worker).toContain('glmRendererGovernor:createSeyeonGlmContextCapacityGovernorV1()');
+    expect(worker).toContain('SEYEON_SECURITY_S0_PRODUCTION_V1.positiveMemoryFirstReplyApproved');
     expect(runtime).toContain("governorMode: 'ENFORCE'");
+    expect(runtime).toContain('resolveProviderBundleAtRequest: async () => {');
+    expect(runtime).toContain('input.env.OPENROUTER_API_KEY');
     expect(runtime).toContain('Approved GLM renderer requires a server OpenRouter API key.');
   });
 });

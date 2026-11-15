@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "ops-provider-sealed-isolated-row-restore-observation-v1",
+  "roadmapGate": "Gate 1 / Phase 8-B",
+  "execution": {
+    "workflowRunId": 43136341133,
+    "workflowUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/43136341133",
+    "workflowConclusion": "success",
+    "event": "push",
+    "executedMainSha": "553c0c90aae09c303c060be4203fd19acddd15ed",
+    "authorizationPr": 3226,
+    "sourceImplementationPr": 3221,
+    "sourceBackupRunId": 42752268638,
+    "sourceBackupArtifactId": 13734401337,
+    "sourceBackupCommit": "4de4e050e1e9393850a34eb68f8fa60973dc9f63",
+    "target": "disposable-supabase-cli-3.1.0-postgresql17",
+    "productionDatabaseWritten": false,
+    "hostedProviderWritten": false,
+    "paidResourceCreated": false
+  },
+  "sanitizedEvidence": {
+    "isolatedRowReplayArtifactId": 13907413085,
+    "isolatedRowReplayFilename": "myeongha-provider-isolated-row-replay.json",
+    "isolatedRowReplayFileSha256": "0b086178e9a6d3e2ebff2e4d1b5089844934471a605667a08fa119785041e9f1",
+    "sealedHeaderPreflightArtifactId": 13907378335,
+    "sealedHeaderPreflightFilename": "myeongha-provider-sealed-copy-preflight.json",
+    "sealedHeaderPreflightFileSha256": "49789677e69ae8747bad1a3a8cf7a185d245a03118f4d63c6e56dbc299dd8989",
+    "containsPersonalData": false,
+    "containsSourceRowPayload": false,
+    "containsSecrets": false
+  },
+  "actualMeasured": {
+    "sourceProviderCopyBlocks": 33,
+    "actualSourceProviderRows": 93,
+    "restoredIsolatedRowDelta": 93,
+    "perRelationRowCountParityPassed": true,
+    "sourceCopyHeadersAndColumnCompatibilityPassed": true,
+    "formerlyMissingRelationCountNowExact": 29,
+    "formerlyProjectedRelationCountNowExact": 3,
+    "atomicCopyTransactionSucceeded": true,
+    "postgresConstraintsEnforcedOnCopy": true,
+    "privateReplaySqlExported": false,
+    "localServiceContainersStoppedBeforeDataInjection": true
+  },
+  "stillUnproven": {
+    "currentProductionFrontierSameAsBackup": false,
+    "backupCatalogSameMvccSnapshot": false,
+    "sourceTargetSchemaFullyEquivalent": false,
+    "applicationSchemaReplayed": false,
+    "providerMigrationLedgerEquivalent": false,
+    "hostedAuthenticationSessionRecovery": false,
+    "hostedStorageObjectBytesRecovery": false,
+    "independentIncidentTimePrivacyContinuity": false,
+    "futureSafePrivacyReconciliation": false,
+    "wholeServiceRpoRto": false,
+    "providerManagedFullRestore": false
+  },
+  "operationalAdmission": {
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "acceptanceDecision": "NOT_ACCEPTED",
+    "p0Issue": 1887,
+    "gate": "BLOCKED"
+  },
+  "next": "Continue the approved Phase 8-B Provider-managed ledger and Hosted Auth/Storage recovery gap assessment; read-only or disposable only. New paid Hosted DR, Production mutation or Production privacy canary requires separate explicit approval."
+}

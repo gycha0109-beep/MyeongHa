@@ -271,12 +271,16 @@ extends BaseProductionSliceInputV1 {
   readonly baseContext: SeyeonProductionBoundCharacterContextInputV1;
   readonly governance?: RunSeyeonCharacterTurnV2Input['governance'];
   readonly resolveGovernance?: SeyeonProductionGovernanceResolverV1;
-  readonly interpreterProvider:
-    RunSeyeonCharacterTurnV2Input['interpreterProvider'];
-  readonly rendererProvider:
-    RunSeyeonCharacterTurnV2Input['rendererProvider'];
-  readonly semanticReviewerProvider:
-    RunSeyeonCharacterTurnV2Input['semanticReviewerProvider'];
+  /** Created only after the exact positive G1 Pin; G4 admission runs first inside this callback. */
+  readonly prepareModelExecution?: () => Promise<Readonly<{
+    interpreterProvider: RunSeyeonCharacterTurnV2Input['interpreterProvider'];
+    rendererProvider: RunSeyeonCharacterTurnV2Input['rendererProvider'];
+    semanticReviewerProvider: RunSeyeonCharacterTurnV2Input['semanticReviewerProvider'];
+    resolveGovernance?: SeyeonProductionGovernanceResolverV1;
+  }>>;
+  readonly interpreterProvider?: RunSeyeonCharacterTurnV2Input['interpreterProvider'];
+  readonly rendererProvider?: RunSeyeonCharacterTurnV2Input['rendererProvider'];
+  readonly semanticReviewerProvider?: RunSeyeonCharacterTurnV2Input['semanticReviewerProvider'];
   readonly persistencePort: SeyeonProductionChatPersistencePortV1;
   /** Only the existing verified Subject runner may supply this Owner port. */
   readonly positivePersonalSourcePort?: SeyeonPositiveS0OwnerDbPortsV1;
@@ -850,8 +854,36 @@ export async function runSeyeonProductionChatExecutionV1(
           });
         }
 
+        // G1 is now immutable. Only after that proof may G4 reserve customer
+        // credits and resolve provider credentials/configuration. No model
+        // Provider is constructed or invoked before this continuation.
+        const preparedModelExecution = input.prepareModelExecution === undefined
+          ? null
+          : await input.prepareModelExecution();
+        if (positiveModelCorrelation !== null && preparedModelExecution === null) {
+          throw new SeyeonProductionChatExecutionErrorV1(
+            'Positive Memory requires post-Pin credit admission and model preparation.',
+          );
+        }
+        const executionForGovernance = preparedModelExecution?.resolveGovernance === undefined
+          ? input
+          : Object.freeze({
+              ...input,
+              resolveGovernance: preparedModelExecution.resolveGovernance,
+            });
+        const interpreterProvider =
+          preparedModelExecution?.interpreterProvider ?? input.interpreterProvider;
+        const rendererProvider =
+          preparedModelExecution?.rendererProvider ?? input.rendererProvider;
+        const semanticReviewerProvider =
+          preparedModelExecution?.semanticReviewerProvider ?? input.semanticReviewerProvider;
+        if (!interpreterProvider || !rendererProvider || !semanticReviewerProvider) {
+          throw new SeyeonProductionChatExecutionErrorV1(
+            'Model Providers are unavailable after source Pin and credit admission.',
+          );
+        }
         const governance = await resolveTurnGovernance({
-          execution: input,
+          execution: executionForGovernance,
           subjectId,
           threadId,
           userMessageRef: receivedTurn.userMessageId,
@@ -888,9 +920,9 @@ export async function runSeyeonProductionChatExecutionV1(
           replyLocale: input.replyLocale ?? 'ko-KR',
           contextInput,
           governance,
-          interpreterProvider: input.interpreterProvider,
-          rendererProvider: input.rendererProvider,
-          semanticReviewerProvider: input.semanticReviewerProvider,
+          interpreterProvider,
+          rendererProvider,
+          semanticReviewerProvider,
         });
         const generatedHash = sha256(runtime.envelope);
         await input.persistencePort.persistGenerated({

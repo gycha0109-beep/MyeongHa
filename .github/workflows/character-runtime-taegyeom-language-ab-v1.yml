@@ -1,0 +1,49 @@
+name: "[WT:character-runtime-lab] 태겸 GLM vs Luna 언어 비교 144회"
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/character-runtime-taegyeom-language-ab-v1.trigger"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: character-runtime-lab-taegyeom-language-ab-v1
+  cancel-in-progress: false
+jobs:
+  evaluate:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 35
+    steps:
+      - name: Checkout immutable evaluation inputs
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup Node 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build approved character authoring
+        run: npm run build
+      - name: Run isolated two-model synthetic experiment
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TAEGYEOM_EVAL_OUTPUT: ${{ runner.temp }}/taegyeom-language-ab-v1/report.json
+        run: |
+          set -euo pipefail
+          test -n "${OPENROUTER_API_KEY:-}"
+          node scripts/run-taegyeom-language-model-ab-v1.mjs
+      - name: Preserve complete answer evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: taegyeom-language-ab-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/taegyeom-language-ab-v1/report.json
+          if-no-files-found: warn
+          retention-days: 14

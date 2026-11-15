@@ -91,10 +91,11 @@
 .chat-hub-intro p,
 .chat-people-heading p {
   margin: 0;
-  color: var(--mh-ink-muted);
-  font-family: var(--mh-serif);
-  font-size: 13px;
-  line-height: 1.75;
+  color: var(--mh-copy-body, var(--mh-ink));
+  font-family: var(--mh-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.7;
 }
 
 .chat-hub-primary {
@@ -298,10 +299,11 @@
 .chat-continuation-copy p {
   min-height: 52px;
   margin: 0 0 24px;
-  color: #d5cdc3;
-  font-family: var(--mh-serif);
-  font-size: 14px;
-  line-height: 1.75;
+  color: #f0e5d8;
+  font-family: var(--mh-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.7;
 }
 
 .chat-recent-card {
@@ -426,8 +428,8 @@
 .chat-recent-copy span {
   margin-top: 4px;
   overflow: hidden;
-  color: var(--mh-ink-muted);
-  font-size: 11px;
+  color: var(--mh-copy-muted, var(--mh-ink-muted));
+  font-size: 14px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -435,8 +437,8 @@
 .chat-recent-time {
   align-self: start;
   padding-top: 19px;
-  color: var(--mh-ink-faint);
-  font-size: 10px;
+  color: var(--mh-copy-muted, var(--mh-ink-muted));
+  font-size: 13px;
 }
 
 .chat-incoming {
@@ -642,9 +644,9 @@
 
 .chat-person-title-row span {
   overflow: hidden;
-  color: var(--mh-ink-muted);
-  font-family: var(--mh-serif);
-  font-size: 10px;
+  color: var(--mh-copy-muted, var(--mh-ink-muted));
+  font-family: var(--mh-sans);
+  font-size: 13px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -652,9 +654,10 @@
 .chat-person-line {
   min-height: 56px;
   margin: 13px 0 12px;
-  color: var(--mh-ink);
-  font-family: var(--mh-serif);
-  font-size: 12px;
+  color: var(--mh-copy-body, var(--mh-ink));
+  font-family: var(--mh-sans);
+  font-size: 15px;
+  font-weight: 500;
   line-height: 1.7;
 }
 
@@ -674,8 +677,8 @@
   border-radius: 999px;
   color: color-mix(in srgb, var(--mh-ink) 92%, var(--mh-brass-strong));
   background: color-mix(in srgb, var(--person-accent) 10%, var(--chat-paper-strong));
-  font-size: 9px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 html[data-theme="dark"] body.chat-hub-page .chat-person-tag {
@@ -688,9 +691,9 @@ html[data-theme="dark"] body.chat-hub-page .chat-person-tag {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  color: color-mix(in srgb, var(--person-accent) 88%, #333);
-  font-family: var(--mh-serif);
-  font-size: 12px;
+  color: color-mix(in srgb, var(--person-accent) 72%, #27252a);
+  font-family: var(--mh-sans);
+  font-size: 14px;
   font-weight: 700;
 }
 

@@ -24,7 +24,7 @@ const price={
 };
 function fixture(authorize=true){
   const statements:{sql:string;values?:readonly unknown[]}[]=[];
-  const resolutions:{sajuRequestId:string;callId:string;modelKey:string;observedAt:string}[]=[];
+  const resolutions:{sajuRequestId:string;callId:string;modelKey:string;observedAt:string;observation:unknown}[]=[];
   const pool:PostgresSubjectPoolV1={async connect(){return {
     async query<Row>(sql:string,values?:readonly unknown[]){
       statements.push(values===undefined?{sql}:{sql,values});
@@ -37,7 +37,7 @@ function fixture(authorize=true){
     },release(){},
   };}};
   const bindingAuthority={
-    async resolve(value:{sajuRequestId:string;callId:string;modelKey:string;observedAt:string}){
+    async resolve(value:{sajuRequestId:string;callId:string;modelKey:string;observedAt:string;observation:unknown}){
       resolutions.push(value);
       return authorize?binding:null;
     },
@@ -75,6 +75,7 @@ describe('Saju source-side OpenAI usage into private Reading ledger',()=>{
     expect(x.resolutions).toEqual([{
       sajuRequestId:observation.requestId,callId:observation.callId,
       modelKey:observation.modelKey,observedAt:observation.observedAt,
+      observation,
     }]);
     expect(x.statements).toHaveLength(0);
     const valid=fixture();

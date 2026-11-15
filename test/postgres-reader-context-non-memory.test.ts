@@ -23,6 +23,15 @@ describe('Reader non-Memory PostgreSQL runtime authority adapter', () => {
       value: { value: 'designer' },
       grantId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
       granteeCharacterId: 'baekheon',
+      grantReason: 'user_choice',
+      grantedAt: '2026-09-21T00:01:25.000Z',
+      sourceKind: 'user_explicit',
+      sourceMessageId: null,
+      sourceMergeActionId: null,
+      validFrom: null,
+      validTo: null,
+      confirmedAt: '2026-09-21T00:01:20.000Z',
+      createdAt: '2026-09-21T00:01:20.000Z',
     }]);
     const port = createPostgresReaderContextNonMemoryReadAuthorityPortV1(queryClient);
 
@@ -36,10 +45,19 @@ describe('Reader non-Memory PostgreSQL runtime authority adapter', () => {
       value: { value: 'designer' },
       grantId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
       granteeCharacterId: 'baekheon',
+      grantReason: 'user_choice',
+      grantedAt: '2026-09-21T00:01:25.000Z',
+      sourceKind: 'user_explicit',
+      sourceMessageId: null,
+      sourceMergeActionId: null,
+      validFrom: null,
+      validTo: null,
+      confirmedAt: '2026-09-21T00:01:20.000Z',
+      createdAt: '2026-09-21T00:01:20.000Z',
     }]);
 
     expect(queryClient.query).toHaveBeenCalledWith(
-      expect.stringContaining('qry_reader_context_granted_life_facts_v1'),
+      expect.stringContaining('qry_reader_context_granted_life_facts_v2'),
       ['11111111-1111-4111-8111-111111111111', 'baekheon'],
     );
   });

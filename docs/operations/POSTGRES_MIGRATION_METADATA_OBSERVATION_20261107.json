@@ -1,0 +1,1103 @@
+{
+  "schema": "myeongha-production-migration-readonly-observation-v1",
+  "observationDateKst": "2026-11-07",
+  "source": {
+    "repository": "gycha0109-beep/MyeongHa",
+    "mainSha": "2f04f8f2a0d912e42bf348781e17d20ff7094675",
+    "supabaseProjectRef": "cnsfpcdiyofqvhpcegfc",
+    "postgresVersion": "17.6",
+    "readOnly": true,
+    "transactionReadOnly": "on",
+    "rawSqlIncluded": false,
+    "productionMutationPerformed": false
+  },
+  "catalog": {
+    "remoteVersionCount": 241,
+    "repositorySqlFileCount": 276,
+    "remoteFrontier": "20261105075227",
+    "repositoryFrontier": "2320",
+    "remoteOnlyCount": 41,
+    "repositoryOnlyCount": 76,
+    "sameVersionNameDiffers": [],
+    "sameNameDifferentVersion": [
+      {
+        "remoteVersion": "20261027004434",
+        "name": "owner_admin_credit_testing_v1",
+        "repositoryVersions": [
+          "20261026110300"
+        ]
+      },
+      {
+        "remoteVersion": "20261027004544",
+        "name": "portone_chat_credit_catalog_staged_v1",
+        "repositoryVersions": [
+          "20261026100200"
+        ]
+      },
+      {
+        "remoteVersion": "20261027011650",
+        "name": "chat_credit_paid_validity_and_verified_mint_v1",
+        "repositoryVersions": [
+          "20261027101000"
+        ]
+      },
+      {
+        "remoteVersion": "20261027043527",
+        "name": "chat_credit_delivered_ack_private_v1",
+        "repositoryVersions": [
+          "20261027125500"
+        ]
+      },
+      {
+        "remoteVersion": "20261027074247",
+        "name": "commerce_owner_sandbox_credit_checkout_v1",
+        "repositoryVersions": [
+          "20261027163500"
+        ]
+      },
+      {
+        "remoteVersion": "20261027081929",
+        "name": "owner_kcp_sandbox_private_prepare_v1",
+        "repositoryVersions": [
+          "20261027185000"
+        ]
+      },
+      {
+        "remoteVersion": "20261028011357",
+        "name": "owner_sandbox_signed_receipt_persistence_v1",
+        "repositoryVersions": [
+          "20261028110500"
+        ]
+      },
+      {
+        "remoteVersion": "20261029012948",
+        "name": "owner_kcp_sandbox_remove_daily_limit_v1",
+        "repositoryVersions": [
+          "20261029012000"
+        ]
+      }
+    ],
+    "remoteOnly": [
+      {
+        "version": "20261008090417",
+        "name": "seyeon_runtime_1460_1510_acl_before_owner_recovery"
+      },
+      {
+        "version": "20261023054251",
+        "name": "cloudflare_worker_dedicated_api_login_role_20261023"
+      },
+      {
+        "version": "20261025193416",
+        "name": "seyeon_s0_http_receipt_runtime_v1"
+      },
+      {
+        "version": "20261025193454",
+        "name": "seyeon_s0_bounded_activation_20261025"
+      },
+      {
+        "version": "20261025201500",
+        "name": "seyeon_s0_resume_admission_diagnostic_20261025"
+      },
+      {
+        "version": "20261025203519",
+        "name": "seyeon_s0_resume_manual_redirect_20261025"
+      },
+      {
+        "version": "20261027004434",
+        "name": "owner_admin_credit_testing_v1_20261026"
+      },
+      {
+        "version": "20261027004544",
+        "name": "portone_chat_credit_catalog_staged_v1_20261026"
+      },
+      {
+        "version": "20261027011650",
+        "name": "chat_credit_paid_validity_and_verified_mint_v1_20261027"
+      },
+      {
+        "version": "20261027043527",
+        "name": "chat_credit_delivered_ack_private_v1_20261027"
+      },
+      {
+        "version": "20261027074247",
+        "name": "commerce_owner_sandbox_credit_checkout_v1_20261027"
+      },
+      {
+        "version": "20261027081929",
+        "name": "owner_kcp_sandbox_private_prepare_v1_20261027"
+      },
+      {
+        "version": "20261028011357",
+        "name": "owner_sandbox_signed_receipt_persistence_v1_20261028"
+      },
+      {
+        "version": "20261029012948",
+        "name": "owner_kcp_sandbox_remove_daily_limit_v1"
+      },
+      {
+        "version": "20261029070331",
+        "name": "seyeon_s0_member_withdrawal_status_20261029"
+      },
+      {
+        "version": "20261029071539",
+        "name": "admin_console_reader_audit_foundation_v1_20261029"
+      },
+      {
+        "version": "20261030014708",
+        "name": "admin_console_presentation_foundation_v1_20261030"
+      },
+      {
+        "version": "20261030014906",
+        "name": "c09_conversation_reader_columns_acl_v1_20261030"
+      },
+      {
+        "version": "20261030014935",
+        "name": "c09_learning_source_authority_read_gated_v1_20261030"
+      },
+      {
+        "version": "20261030015201",
+        "name": "admin_console_analytics_foundation_v1_20261030"
+      },
+      {
+        "version": "20261030015858",
+        "name": "admin_console_reading_ai_cost_foundation_v1_20261030"
+      },
+      {
+        "version": "20261030020711",
+        "name": "admin_console_audit_retention_foundation_v1_20261030"
+      },
+      {
+        "version": "20261030021027",
+        "name": "admin_console_ai_finance_foundation_v1_20261030"
+      },
+      {
+        "version": "20261031182505",
+        "name": "s0_g0_original_member_message_source_20261101"
+      },
+      {
+        "version": "20261031182550",
+        "name": "s0_g0_original_assistant_and_recent_context_20261101"
+      },
+      {
+        "version": "20261031182926",
+        "name": "s0_g0_relationship_original_lineage_scoped_owner_grant_20261101"
+      },
+      {
+        "version": "20261031185454",
+        "name": "seyeon_owner_legacy_room_archive_preserving_history_20261101"
+      },
+      {
+        "version": "20261031192427",
+        "name": "seyeon_zero_source_first_http_receipt_issuer_20261101"
+      },
+      {
+        "version": "20261031205042",
+        "name": "seyeon_zero_source_exact_selection_census_contract_20261101"
+      },
+      {
+        "version": "20261101095105",
+        "name": "seyeon_zero_source_current_user_proof_12key_20261101"
+      },
+      {
+        "version": "20261101133954",
+        "name": "seyeon_zero_source_verified_history_pin_20261101"
+      },
+      {
+        "version": "20261101151700",
+        "name": "seyeon_recover_exact_failed_user_turn_20261102"
+      },
+      {
+        "version": "20261102060123",
+        "name": "seyeon_explicit_failed_turn_supersede_20261102"
+      },
+      {
+        "version": "20261102060126",
+        "name": "seyeon_abandoned_g0_history_exclusion_20261102"
+      },
+      {
+        "version": "20261102081315",
+        "name": "seyeon_owner_no_daily_cap_20261102"
+      },
+      {
+        "version": "20261103005333",
+        "name": "seyeon_subject_53300_connection_headroom_20261102"
+      },
+      {
+        "version": "20261103072224",
+        "name": "seyeon_unissued_zero_reply_recovery_v1_20261103"
+      },
+      {
+        "version": "20261103083731",
+        "name": "seyeon_g0_followup_original_lineage_20261103"
+      },
+      {
+        "version": "20261104043413",
+        "name": "chat_owner_visible_history_private_rls_runtime_checker_20261104"
+      },
+      {
+        "version": "20261104195925",
+        "name": "seyeon_g0_committed_followup_receipt_20261105"
+      },
+      {
+        "version": "20261105075227",
+        "name": "seyeon_g0_followup_protected_original_user_lock_20261105"
+      }
+    ],
+    "repositoryOnly": [
+      {
+        "version": "1735",
+        "name": "records_official_reading_purchase_grant_reread"
+      },
+      {
+        "version": "1740",
+        "name": "official_reader_scope_lock_private_v1"
+      },
+      {
+        "version": "1750",
+        "name": "official_reader_scope_current_bundle_private_v1"
+      },
+      {
+        "version": "1760",
+        "name": "official_reader_scope_atomic_receipt_bind_v1"
+      },
+      {
+        "version": "1770",
+        "name": "official_reader_scope_provider_effect_revoke_v1"
+      },
+      {
+        "version": "1780",
+        "name": "portone_verified_official_reader_full_cancel_v1"
+      },
+      {
+        "version": "1790",
+        "name": "official_reader_legacy_provider_effect_scope_guard_v1"
+      },
+      {
+        "version": "1800",
+        "name": "official_reader_receipt_grant_prelocked_scope_guard_v1"
+      },
+      {
+        "version": "1810",
+        "name": "official_reader_direct_bind_shared_scope_lock_v1"
+      },
+      {
+        "version": "1820",
+        "name": "official_reader_scope_read_committed_guard_v1"
+      },
+      {
+        "version": "1830",
+        "name": "official_reader_s5_precommit_held_scope_gate_v1"
+      },
+      {
+        "version": "1840",
+        "name": "official_reader_receipt_exact_revision_scope_guard_v1"
+      },
+      {
+        "version": "1850",
+        "name": "official_reader_binding_replay_current_right_and_fresh_clock_v1"
+      },
+      {
+        "version": "1860",
+        "name": "official_reader_bind_final_current_grant_guard_v1"
+      },
+      {
+        "version": "1870",
+        "name": "official_reader_unbound_zero_grant_cancel_purchase_lock_v1"
+      },
+      {
+        "version": "1880",
+        "name": "official_reader_unbound_issued_grant_full_cancel_v1"
+      },
+      {
+        "version": "1890",
+        "name": "official_reader_exact_receipt_multi_payment_cancel_v1"
+      },
+      {
+        "version": "1900",
+        "name": "official_reader_receipt_local_unbound_cancellation_v1"
+      },
+      {
+        "version": "1910",
+        "name": "official_reader_mixed_receipt_grant_full_cancellation_guard_v1"
+      },
+      {
+        "version": "1920",
+        "name": "official_reader_verified_purchase_row_before_receipt_v1"
+      },
+      {
+        "version": "1930",
+        "name": "official_reader_verified_receipt_bind_commerce_bridge_v1"
+      },
+      {
+        "version": "1940",
+        "name": "official_reader_verified_receipt_fulfillment_resolver_v1"
+      },
+      {
+        "version": "1950",
+        "name": "official_reader_protected_answer_storage_private_v1"
+      },
+      {
+        "version": "1960",
+        "name": "official_reader_s5_private_atomic_paid_answer_commit_v1"
+      },
+      {
+        "version": "1970",
+        "name": "official_reader_s6_private_current_entitlement_body_read_v1"
+      },
+      {
+        "version": "1980",
+        "name": "official_reader_s6_chat_marker_paid_answer_resolver_v1"
+      },
+      {
+        "version": "1990",
+        "name": "official_reader_s4_account_deletion_protected_child_purge_v1"
+      },
+      {
+        "version": "2000",
+        "name": "official_reader_s4_last_grant_private_body_purge_v1"
+      },
+      {
+        "version": "2010",
+        "name": "official_reader_s4_account_deletion_privacy_fence_v1"
+      },
+      {
+        "version": "2020",
+        "name": "official_reader_s4_retained_origin_grant_reference_v1"
+      },
+      {
+        "version": "20261026100200",
+        "name": "portone_chat_credit_catalog_staged_v1"
+      },
+      {
+        "version": "20261026110300",
+        "name": "owner_admin_credit_testing_v1"
+      },
+      {
+        "version": "20261027054525",
+        "name": "digital_reading_checkout_notice_evidence_v1"
+      },
+      {
+        "version": "20261027101000",
+        "name": "chat_credit_paid_validity_and_verified_mint_v1"
+      },
+      {
+        "version": "20261027125500",
+        "name": "chat_credit_delivered_ack_private_v1"
+      },
+      {
+        "version": "20261027163500",
+        "name": "commerce_owner_sandbox_credit_checkout_v1"
+      },
+      {
+        "version": "20261027185000",
+        "name": "owner_kcp_sandbox_private_prepare_v1"
+      },
+      {
+        "version": "20261028110500",
+        "name": "owner_sandbox_signed_receipt_persistence_v1"
+      },
+      {
+        "version": "20261029012000",
+        "name": "owner_kcp_sandbox_remove_daily_limit_v1"
+      },
+      {
+        "version": "20261029094500",
+        "name": "records_official_birth_revision_status_v1"
+      },
+      {
+        "version": "20261029111500",
+        "name": "saju_official_issuance_preflight_v1"
+      },
+      {
+        "version": "20261029112500",
+        "name": "saju_official_stored_lineage_v1"
+      },
+      {
+        "version": "20261029145500",
+        "name": "saju_official_attempt_reconciliation_status_v1"
+      },
+      {
+        "version": "20261029164000",
+        "name": "saju_official_stored_engine_lineage_v2"
+      },
+      {
+        "version": "20261029175000",
+        "name": "saju_official_stored_purchase_lineage_v3"
+      },
+      {
+        "version": "20261029185500",
+        "name": "official_reader_verified_purchase_access_v1"
+      },
+      {
+        "version": "2030",
+        "name": "official_reader_s4_protected_answer_no_cascade_delete_v1"
+      },
+      {
+        "version": "2040",
+        "name": "official_reader_s4_offprimary_restore_tombstone_replay_v1"
+      },
+      {
+        "version": "2050",
+        "name": "official_reader_s4_paid_answer_revocation_purge_queue_v1"
+      },
+      {
+        "version": "2060",
+        "name": "official_reader_s4_purge_worker_claim_manifest_finalize_v1"
+      },
+      {
+        "version": "2070",
+        "name": "official_reader_s4_purge_empty_scope_completion_v1"
+      },
+      {
+        "version": "2080",
+        "name": "official_reader_s4_refund_scope_restore_replay_v1"
+      },
+      {
+        "version": "2090",
+        "name": "official_reader_s4_exact_original_body_purge_completion_v1"
+      },
+      {
+        "version": "2100",
+        "name": "official_reader_s4_privacy_purge_worker_lease_renewal_v1"
+      },
+      {
+        "version": "2110",
+        "name": "official_reader_s3_s5_authoritative_source_evidence_private_v1"
+      },
+      {
+        "version": "2120",
+        "name": "official_reader_s6_revalidate_verified_source_on_private_reread_v1"
+      },
+      {
+        "version": "2130",
+        "name": "official_reader_s3_source_receipt_immutability_and_purge_v1"
+      },
+      {
+        "version": "2140",
+        "name": "official_reader_s7_private_delivery_attempt_and_client_ack_v1"
+      },
+      {
+        "version": "2150",
+        "name": "official_reader_s4_revocation_queue_real_entitlement_event_contract_v1"
+      },
+      {
+        "version": "2160",
+        "name": "official_reader_s2_verified_provider_cancellation_status_private_v1"
+      },
+      {
+        "version": "2170",
+        "name": "official_reader_s2_s5_exact_verified_receipt_bundle_pre_generation_gate_v1"
+      },
+      {
+        "version": "2180",
+        "name": "official_reader_s4_ordinary_chat_context_safe_marker_exclusion_v1"
+      },
+      {
+        "version": "2190",
+        "name": "official_reader_s4_safe_marker_memory_outbox_derivation_guards_v1"
+      },
+      {
+        "version": "2200",
+        "name": "official_reader_s4_offline_restore_ordinary_derivation_quarantine_v1"
+      },
+      {
+        "version": "2210",
+        "name": "official_reader_s4_ordinary_records_provenance_read_fence_v1"
+      },
+      {
+        "version": "2220",
+        "name": "official_reader_s4_seyeon_post_turn_outbox_restore_read_fence_v1"
+      },
+      {
+        "version": "2230",
+        "name": "official_reader_s4_restore_derived_quarantine_reason_contract_v1"
+      },
+      {
+        "version": "2240",
+        "name": "official_reader_s7_private_withdrawal_delivery_evidence_v1"
+      },
+      {
+        "version": "2250",
+        "name": "official_reader_withdrawal_original_receipt_state_private_v2"
+      },
+      {
+        "version": "2260",
+        "name": "official_reader_verified_receipt_stable_fulfillment_clock_v1"
+      },
+      {
+        "version": "2270",
+        "name": "official_reader_s4_requeued_purge_creation_clock_v1"
+      },
+      {
+        "version": "2280",
+        "name": "official_reader_s4_inflight_requeue_creation_clock_v1"
+      },
+      {
+        "version": "2290",
+        "name": "official_reader_s4_requeue_original_event_clock_v1"
+      },
+      {
+        "version": "2300",
+        "name": "official_reader_s7_post_lock_receipt_snapshot_v1"
+      },
+      {
+        "version": "2310",
+        "name": "official_reader_private_refund_dispatch_v1"
+      },
+      {
+        "version": "2320",
+        "name": "commerce_digital_reading_claim_account_delete_v1"
+      }
+    ],
+    "sameNameDifferentVersionCount": 8
+  },
+  "verifiedPairs": [
+    {
+      "remoteVersion": "20261027004434",
+      "repositoryVersion": "20261026110300",
+      "name": "owner_admin_credit_testing_v1",
+      "remoteBytes": 2947,
+      "repositoryBytes": 2947,
+      "sha256": "91eaf5fcbfb2835c9b99d31487494df181e88c06c4cdf6552613487b1362ff44",
+      "exactByteEquality": true,
+      "remoteSha256": "91eaf5fcbfb2835c9b99d31487494df181e88c06c4cdf6552613487b1362ff44",
+      "repositorySha256": "91eaf5fcbfb2835c9b99d31487494df181e88c06c4cdf6552613487b1362ff44",
+      "versionIdentityEquality": false,
+      "disposition": "SQL byte equality proven; version identity and application provenance remain separate"
+    },
+    {
+      "remoteVersion": "20261027004544",
+      "repositoryVersion": "20261026100200",
+      "name": "portone_chat_credit_catalog_staged_v1",
+      "remoteBytes": 1979,
+      "repositoryBytes": 1979,
+      "sha256": "eb7dcffc2835c0656af0b83d25f3fa3fbdaef29532cfa3230c3cdc957447af5a",
+      "exactByteEquality": true,
+      "remoteSha256": "eb7dcffc2835c0656af0b83d25f3fa3fbdaef29532cfa3230c3cdc957447af5a",
+      "repositorySha256": "eb7dcffc2835c0656af0b83d25f3fa3fbdaef29532cfa3230c3cdc957447af5a",
+      "versionIdentityEquality": false,
+      "disposition": "SQL byte equality proven; version identity and application provenance remain separate"
+    },
+    {
+      "remoteVersion": "20261027011650",
+      "repositoryVersion": "20261027101000",
+      "name": "chat_credit_paid_validity_and_verified_mint_v1",
+      "remoteBytes": 8360,
+      "repositoryBytes": 8360,
+      "sha256": "fbd450033e94dc7e454bc6b3be34b40b81abccc93b9a040c623a42bc97d9ebc5",
+      "exactByteEquality": true,
+      "remoteSha256": "fbd450033e94dc7e454bc6b3be34b40b81abccc93b9a040c623a42bc97d9ebc5",
+      "repositorySha256": "fbd450033e94dc7e454bc6b3be34b40b81abccc93b9a040c623a42bc97d9ebc5",
+      "versionIdentityEquality": false,
+      "disposition": "SQL byte equality proven; version identity and application provenance remain separate"
+    },
+    {
+      "remoteVersion": "20261027043527",
+      "repositoryVersion": "20261027125500",
+      "name": "chat_credit_delivered_ack_private_v1",
+      "remoteBytes": 4766,
+      "repositoryBytes": 4776,
+      "sha256": "c493715f0ecdac66e18b8649dce1ab79d15b20c926811b5399d1f735fb6af235",
+      "exactByteEquality": false,
+      "repositoryHasTrailing": "\\n\\ncommit;\\n",
+      "repositoryWithoutTrailingEqualsRemote": true,
+      "remoteSha256": "c493715f0ecdac66e18b8649dce1ab79d15b20c926811b5399d1f735fb6af235",
+      "repositorySha256": "c493715f0ecdac66e18b8649dce1ab79d15b20c926811b5399d1f735fb6af235",
+      "versionIdentityEquality": false,
+      "disposition": "Remote SQL equals repository file after removing trailing newline + COMMIT terminator; inspect exact statement framing before treating as migration-equivalent"
+    },
+    {
+      "remoteVersion": "20261027074247",
+      "repositoryVersion": "20261027163500",
+      "name": "commerce_owner_sandbox_credit_checkout_v1",
+      "remoteBytes": 4310,
+      "repositoryBytes": 4320,
+      "sha256": "3e44a8b80c97274760f64d655d3f596862041401003ecc108907e6fd04242186",
+      "exactByteEquality": false,
+      "repositoryHasTrailing": "\\n\\ncommit;\\n",
+      "repositoryWithoutTrailingEqualsRemote": true,
+      "remoteSha256": "3e44a8b80c97274760f64d655d3f596862041401003ecc108907e6fd04242186",
+      "repositorySha256": "3e44a8b80c97274760f64d655d3f596862041401003ecc108907e6fd04242186",
+      "versionIdentityEquality": false,
+      "disposition": "Remote SQL equals repository file after removing trailing newline + COMMIT terminator; inspect exact statement framing before treating as migration-equivalent"
+    },
+    {
+      "remoteVersion": "20261027081929",
+      "repositoryVersion": "20261027185000",
+      "name": "owner_kcp_sandbox_private_prepare_v1",
+      "remoteBytes": 12355,
+      "repositoryBytes": 12365,
+      "sha256": "3673df5921fd53443623130dc37036b23da8b331ad2232d4911515a1a93b4176",
+      "exactByteEquality": false,
+      "repositoryHasTrailing": "\\n\\ncommit;\\n",
+      "repositoryWithoutTrailingEqualsRemote": true,
+      "remoteSha256": "3673df5921fd53443623130dc37036b23da8b331ad2232d4911515a1a93b4176",
+      "repositorySha256": "3673df5921fd53443623130dc37036b23da8b331ad2232d4911515a1a93b4176",
+      "versionIdentityEquality": false,
+      "disposition": "Remote SQL equals repository file after removing trailing newline + COMMIT terminator; inspect exact statement framing before treating as migration-equivalent"
+    },
+    {
+      "remoteVersion": "20261028011357",
+      "repositoryVersion": "20261028110500",
+      "name": "owner_sandbox_signed_receipt_persistence_v1",
+      "remoteBytes": 9260,
+      "repositoryBytes": 9270,
+      "sha256": "e248ae6880f6765305274c4541763a3a93d12ab6822540ef6f1b2f3e1e0967c4",
+      "exactByteEquality": false,
+      "repositoryHasTrailing": "\\n\\ncommit;\\n",
+      "repositoryWithoutTrailingEqualsRemote": true,
+      "remoteSha256": "e248ae6880f6765305274c4541763a3a93d12ab6822540ef6f1b2f3e1e0967c4",
+      "repositorySha256": "e248ae6880f6765305274c4541763a3a93d12ab6822540ef6f1b2f3e1e0967c4",
+      "versionIdentityEquality": false,
+      "disposition": "Remote SQL equals repository file after removing trailing newline + COMMIT terminator; inspect exact statement framing before treating as migration-equivalent"
+    },
+    {
+      "remoteVersion": "20261029012948",
+      "repositoryVersion": "20261029012000",
+      "name": "owner_kcp_sandbox_remove_daily_limit_v1",
+      "remoteBytes": 7349,
+      "repositoryBytes": 7349,
+      "sha256": "b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6",
+      "normalizedSha256": "0cfe257bb188bb8d40961959db6e0ca28f50236115e543eb72d0f283ea3bd53d",
+      "exactByteEquality": true,
+      "remoteSha256": "b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6",
+      "repositorySha256": "b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6",
+      "versionIdentityEquality": false,
+      "disposition": "SQL byte equality proven; version identity and application provenance remain separate"
+    }
+  ],
+  "remoteOnlyBundle": {
+    "version": "20261008090417",
+    "name": "seyeon_runtime_1460_1510_acl_before_owner_recovery",
+    "statementCount": 1,
+    "statementBytes": 104021,
+    "statementMd5": "f70776d8c0f6369f6f13484ba9fa2271",
+    "statementSha256": "4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894",
+    "localMarkers1460To1510": {
+      "present": 6,
+      "emptyStatementCount": 6
+    },
+    "appliedFollowups1520To1640": 13,
+    "pinColumnsPresent": 2,
+    "pinnedFunctionPresent": true,
+    "currentInvestigationStatus": "HOLD_CHANGED_RUNTIME_SCHEMA_REASSESS",
+    "r2RpcCatalog": {
+      "expectedFunctions": 19,
+      "presentFunctions": 19,
+      "apiExecutorEffectiveExecute": 17,
+      "serviceRoleEffectiveExecute": 0,
+      "anonEffectiveExecute": 0,
+      "authenticatedEffectiveExecute": 0,
+      "apiExecutorDeniedFunctions": [
+        "assert_seyeon_chat_thread_runtime_v1",
+        "cmd_mark_seyeon_chat_context_ready_runtime_v1"
+      ]
+    },
+    "pinnedReplacement": {
+      "function": "cmd_mark_seyeon_chat_context_ready_pinned_v1(uuid,uuid,uuid,jsonb)",
+      "present": true,
+      "overloads": 1,
+      "owner": "myeongha_seyeon_chat_runtime_owner",
+      "securityDefiner": true,
+      "apiExecutorExecute": true,
+      "serviceRoleExecute": false,
+      "anonExecute": false,
+      "authenticatedExecute": false
+    },
+    "note": "Historical actor/request-ID pursuit remains CLOSED_RISK_ACCEPTED; this snapshot does not reopen it. Current technical DDL/ACL/role/policy equivalence and provenance disposition remain separate."
+  },
+  "limitations": [
+    "The exact-version catalog comparison is not a semantic DDL comparison.",
+    "A matching SQL body does not prove authenticated deployment actor or approval provenance.",
+    "The remote 20261008090417 statement was not exported; only its metadata/hash and safe catalog observations are included.",
+    "Provider-managed Hosted Auth/Storage restoration, independent privacy continuity, and whole-service RPO/RTO remain unproven.",
+    "Eight same-name/different-version pairs were identified; three have exact byte equality and four are exact prefixes after removing the repository's trailing newline + COMMIT terminator; SQL framing semantics and version identity remain distinct. One pair 20261029012948 is byte-exact."
+  ],
+  "currentFrontierAssessment": {
+    "observationDateKst": "2026-11-07",
+    "source": {
+      "repository": "gycha0109-beep/MyeongHa",
+      "mainSha": "cdf71d9453c96b42489a27857a6159936155065e",
+      "supabaseProjectRef": "cnsfpcdiyofqvhpcegfc",
+      "postgresVersion": "17.6",
+      "readOnly": true,
+      "productionMutationPerformed": false
+    },
+    "historicalBundle": {
+      "version": "20261008090417",
+      "bytes": 104021,
+      "sha256": "4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894",
+      "sourceRoutines": 19,
+      "liveRoutinesPresent": 19,
+      "sourceOwnerTransfers": 18,
+      "liveOwnerTransfersMatched": 18,
+      "sourcePolicies": 19,
+      "liveSourcePoliciesMatchedByNameRelationCommandAndRole": 19,
+      "liveRelatedPolicyCount": 38,
+      "liveAdditionalPoliciesBeyondHistoricalBundle": 19,
+      "liveRoutineSearchPathMatched": "pg_catalog, public",
+      "liveSecurityDefinerCount": 17,
+      "liveInvokerCount": 2,
+      "apiExecutorEffectiveExecute": 17,
+      "anonAuthenticatedServiceRoleEffectiveExecute": 0,
+      "currentReapplyPreflight": "FAILS_BY_DESIGN: six history markers, owner roles, and Se-yeon policies already exist; current runtime also contains later Pin and RLS changes",
+      "disposition": "Do not replay the 104,021-byte historical bundle. The historical preflight and owner-membership postcheck do not describe the current frontier."
+    },
+    "roleMembership": {
+      "role": "myeongha_seyeon_chat_runtime_owner",
+      "member": "postgres",
+      "rows": [
+        {
+          "grantor": "supabase_admin",
+          "adminOption": true,
+          "inheritOption": false,
+          "setOption": false
+        },
+        {
+          "grantor": "postgres",
+          "adminOption": false,
+          "inheritOption": false,
+          "setOption": false
+        }
+      ],
+      "pgHasRole": {
+        "member": true,
+        "usage": false,
+        "set": false
+      },
+      "currentMembershipCount": 2,
+      "explanation": "The later applied remote-only migration 20261104043413 temporarily grants SET TRUE and then executes REVOKE SET OPTION FOR the role from postgres. The remaining postgres-grantor row is non-admin, non-inheriting, and non-SET; it does not grant effective role switching or privilege inheritance. The older one-row owner-membership postcheck is superseded at the current frontier."
+    },
+    "laterRemoteMigration": {
+      "version": "20261104043413",
+      "name": "chat_owner_visible_history_private_rls_runtime_checker_20261104",
+      "statementCount": 1,
+      "bytes": 15075,
+      "sha256": "689ec756ba696f9e62450a27d52370cdfb202e7f5b4fb9889665666170eb85a4",
+      "repositoryFilePresent": false,
+      "relevantRoleSequence": [
+        "GRANT myeongha_seyeon_chat_runtime_owner TO postgres WITH INHERIT FALSE, SET TRUE",
+        "REVOKE SET OPTION FOR myeongha_seyeon_chat_runtime_owner FROM postgres"
+      ],
+      "currentCatalogEffectVerified": true,
+      "classification": "Applied remote-only migration that intentionally changes the earlier owner-role membership shape; keep it in current-frontier parity scope and do not classify the remaining membership row as effective SET access."
+    },
+    "migrationSourceDrift": {
+      "version": "1640",
+      "name": "seyeon_zero_personal_source_pre_model_pin_v1",
+      "remoteBytes": 10303,
+      "remoteSha256": "ce347be8446be958c4ed6d5f2b9f527b1910032076652e3ffd021eebc9721b50",
+      "repositoryPath": "supabase/migrations/1640_seyeon_zero_personal_source_pre_model_pin_v1.sql",
+      "repositoryBytes": 10147,
+      "repositoryBlobSha": "51862c2b4adcfcf65d76ab08459b1c26a12e0fba",
+      "repositorySha256": "77fe56de1d0c51c538c0cf80189708ff385923438209e97fecc6ba460de78cd5",
+      "whitespaceStrippedEqual": false,
+      "remoteBehavior": [
+        "SET ROLE myeongha_seyeon_chat_runtime_owner",
+        "RESET ROLE",
+        "REVOKE myeongha_seyeon_chat_runtime_owner FROM postgres GRANTED BY postgres"
+      ],
+      "repositoryBehavior": [
+        "REVOKE myeongha_seyeon_chat_runtime_owner FROM current_user",
+        "direct REVOKE EXECUTE on legacy context-ready RPC"
+      ],
+      "disposition": "Applied remote SQL and current-main migration file differ materially in the ownership/ACL handoff. Do not rewrite the applied migration or replay it. Keep as an explicit source/provenance reconciliation item."
+    },
+    "migrationSourcePair": {
+      "version": "20261026025332",
+      "name": "seyeon_chat_helper_service_role_least_privilege",
+      "remoteStatementCount": 9,
+      "remoteReconstructedBytes": 6987,
+      "remoteReconstructedSha256": "0fd1fa55e2d8c6665c82b01e5a36d796f6d168365099ba08b986c360e9ca25e0",
+      "repositoryPath": "supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql",
+      "repositoryBytes": 6986,
+      "repositoryBlobSha": "c051a1dde2b3a260cdde5efafdcf1583c79d608d",
+      "repositorySha256": "6ca818ecebef8ca000b9c2af1247ed4a7ffcf690572f03919098b74d6cc3c7cd",
+      "whitespaceStrippedTokenStreamEqual": true,
+      "disposition": "Remote statement array reconstructed from nine stored statements and repository file differ in whitespace formatting; whitespace-stripped comparison is equal. Keep exact statement framing/version identity separate."
+    },
+    "limitations": [
+      "Policy comparison for the 19 historical policies covers policy name, relation, command and target role; it does not claim full expression-tree equivalence for all later policies.",
+      "The 19-function source-body extraction was not used as proof because the SQL regex did not isolate function bodies reliably; function body equivalence must use the existing reviewed per-function verifier or a corrected parser.",
+      "The current related-policy count of 38 includes 19 policies added by later applied migrations and must not be compared to the historical bundle's 19-policy count as if the extra policies were drift.",
+      "Twelve current Production migration records from the S0/Se-yeon sequence have no corresponding current-main migration file. Two remote migration comments explicitly say no Production migration/deployment, and one says disposable S0 only; the remote ledger nevertheless records them as applied. This is a source/provenance and environment-guard discrepancy, not by itself proof of unauthorized execution.",
+      "The current `memory_proposals` RLS policies are inert because relrowsecurity=false. The new S0 proposal acceptance function is not executable by API/service/anon/authenticated roles, has no catalog callers, and the only conversation_recall registry row is disabled. This is currently fail-closed at the application entrypoint but remains an RLS hardening gate before enabling the type.",
+      "The legacy service_role-only chat commit function remains a separate user-choice memory proposal path and does not consult the new positive-source registry; its deployment/use must be treated separately from the disabled S0 conversation_recall acceptance path.",
+      "The current disabled conversation_recall registry is not a global chat or billing kill switch. Current models are active, 29 historic call events are settled, and 24 carry the owner daily-limit exemption; no fresh paid call was executed in this audit."
+    ],
+    "readOnlyAuditScript": {
+      "path": "scripts/operations/production-authority-frontier-readonly.sql",
+      "blobSha": "e796dadffb37996efbd3d474c46abbf47d0d8dcd",
+      "bytes": 15923,
+      "verifiedAgainstProduction": true,
+      "transactionReadOnly": "on",
+      "executionDisposition": "SELECT-only inventory completed and transaction rolled back; output contains catalog metadata and hashes, no application rows or raw function source."
+    },
+    "remoteOnlyS0Migrations": [
+      {
+        "version": "20261025193416",
+        "name": "seyeon_s0_http_receipt_runtime_v1",
+        "bytes": 82624,
+        "sha256": "20f335556c0c861275100e76d4e3380296d0e8c4f211f89f29d09643279bcc98",
+        "statementCount": 1,
+        "sourceOnlyComment": true,
+        "noProductionComment": true,
+        "targetGuard": "current_user/current_database postgres, PostgreSQL 17, seyeon_private absent; no project-specific environment identity",
+        "mainFilePresent": false
+      },
+      {
+        "version": "20261031182505",
+        "name": "s0_g0_original_member_message_source_20261101",
+        "bytes": 3086,
+        "sha256": "0a82f51c60188afb32f9ea22252ef544206d4329169ecbb085f84c74fcb45cd0",
+        "statementCount": 1,
+        "stagedDisposableComment": true,
+        "mainFilePresent": false
+      },
+      {
+        "version": "20261031182550",
+        "name": "s0_g0_original_assistant_and_recent_context_20261101",
+        "bytes": 12361,
+        "sha256": "1753bf4c284f587342404fed5aeef9d59baf081c4bcf2f5aec3107d2376a56b2",
+        "statementCount": 1,
+        "mainFilePresent": false
+      },
+      {
+        "version": "20261031182926",
+        "name": "s0_g0_relationship_original_lineage_scoped_owner_grant_20261101",
+        "bytes": 10531,
+        "sha256": "6e46e6fba6c328120393b4592153d25f51d46aa464bea00aec43d398e5d813d4",
+        "statementCount": 1,
+        "noProductionComment": true,
+        "stagedDisposableComment": true,
+        "targetGuard": "none detected in statement text",
+        "mainFilePresent": false
+      },
+      {
+        "version": "20261031205042",
+        "name": "seyeon_zero_source_exact_selection_census_contract_20261101",
+        "bytes": 6089,
+        "sha256": "acfc6b0071b9420df19a99b74fca40a42a1fc1c3f872d4c8c1326d827b19ef7f",
+        "statementCount": 1,
+        "mainFilePresent": false
+      },
+      {
+        "version": "20261101095105",
+        "name": "seyeon_zero_source_current_user_proof_12key_20261101",
+        "bytes": 9033,
+        "sha256": "643bf0d2f9532b64686709b411e18ad9ead27c0a31d4a8eb28e3d3c0328b9fb3",
+        "statementCount": 1,
+        "mainFilePresent": false
+      },
+      {
+        "version": "20261101133954",
+        "name": "seyeon_zero_source_verified_history_pin_20261101",
+        "bytes": 13933,
+        "sha256": "324dae7506d260110e7144708bd3b34dfa09c1295445aa36159a0efbc40f057c",
+        "statementCount": 1,
+        "mainFilePresent": false
+      },
+      {
+        "version": "20261101151700",
+        "name": "seyeon_recover_exact_failed_user_turn_20261102",
+        "bytes": 4572,
+        "sha256": "c757c6696c19657643fb2c8f8ec7903a07d53d399b3b9e41ee1603daf7dcf3b0",
+        "statementCount": 1,
+        "mainFilePresent": false
+      },
+      {
+        "version": "20261102060123",
+        "name": "seyeon_explicit_failed_turn_supersede_20261102",
+        "bytes": 5896,
+        "sha256": "fe20ee9e01500c1ea266ea3b0f497d43dde2d16b8e02023389a12b0096a28810",
+        "statementCount": 1,
+        "mainFilePresent": false
+      },
+      {
+        "version": "20261102060126",
+        "name": "seyeon_abandoned_g0_history_exclusion_20261102",
+        "bytes": 5923,
+        "sha256": "6be817f46fed3c796a1ba99a0af68136d171f13de9fff0dfe7eb2ccbd5fab757",
+        "statementCount": 1,
+        "mainFilePresent": false
+      },
+      {
+        "version": "20261103083731",
+        "name": "seyeon_g0_followup_original_lineage_20261103",
+        "bytes": 14694,
+        "sha256": "5ef8cdd2b83c648c6cb7cb4ba7f3bfa6b93cae54bc8ee42d2e972bcbad672108",
+        "statementCount": 1,
+        "mainFilePresent": false
+      },
+      {
+        "version": "20261104043413",
+        "name": "chat_owner_visible_history_private_rls_runtime_checker_20261104",
+        "bytes": 15075,
+        "sha256": "689ec756ba696f9e62450a27d52370cdfb202e7f5b4fb9889665666170eb85a4",
+        "statementCount": 1,
+        "targetGuard": "seyeon/chat_private schema absence and runtime role preconditions; no database/project-specific environment identity",
+        "mainFilePresent": false
+      }
+    ],
+    "rowSecurityAndRuntimeBoundary": {
+      "rlsEnabledTables": [
+        "subjects",
+        "conversation_threads",
+        "conversation_thread_characters",
+        "conversation_messages",
+        "outbox_events",
+        "memory_items",
+        "record_access_grants",
+        "relationship_history_entries",
+        "relationship_event_records",
+        "relationship_event_provenance_refs",
+        "seyeon_positive_source_type_registry_v1",
+        "seyeon_ai_call_cost_events",
+        "seyeon_ai_governor_model_policies_v1",
+        "seyeon_ai_governor_daily_budgets_v1"
+      ],
+      "rlsDisabledTablesWithPolicies": {
+        "ai_execution_groundings": {
+          "policyCount": 1,
+          "apiExecutorDirectTableAndColumnPrivileges": false
+        },
+        "ai_execution_logs": {
+          "policyCount": 1,
+          "apiExecutorDirectTableAndColumnPrivileges": false
+        },
+        "chat_turns": {
+          "policyCount": 3,
+          "subjectScopeInCurrentS0DefinerFunctions": true,
+          "apiExecutorDirectTableAndColumnPrivileges": false
+        },
+        "chat_turn_attempts": {
+          "policyCount": 3,
+          "subjectScopeInCurrentS0DefinerFunctions": true,
+          "apiExecutorDirectTableAndColumnPrivileges": false
+        },
+        "memory_proposals": {
+          "policyCount": 2,
+          "anonDirectTablePrivilege": false,
+          "authenticatedDirectTablePrivilege": false,
+          "chatOwnerColumnPrivileges": true,
+          "serviceRoleBroadPrivilege": true,
+          "apiExecutorDirectTableAndColumnPrivileges": false
+        }
+      },
+      "memoryProposalFailClosedBoundary": {
+        "tableRlsEnabled": false,
+        "policiesAreEnforced": false,
+        "positiveSourceRegistry": {
+          "enabled": false,
+          "writableEnabled": false
+        },
+        "proposalAcceptanceFunction": "public.cmd_accept_seyeon_private_conversation_recall_proposal_v1",
+        "proposalAcceptanceApiExecutorExecute": false,
+        "proposalAcceptanceServiceRoleExecute": false,
+        "proposalAcceptanceAnonExecute": false,
+        "proposalAcceptanceAuthenticatedExecute": false,
+        "catalogFunctionCallersFound": 0,
+        "disposition": "No API entrypoint is currently available for the new S0 proposal-acceptance function and the registered conversation_recall type is disabled. RLS policies on memory_proposals are dormant; before enabling this type, RLS must be enabled or a formally accepted alternative row-scope control must be evidenced.",
+        "apiExecutorDirectTablePrivilege": false,
+        "apiExecutorDirectColumnPrivilege": false,
+        "ownerRoleColumnPrivileges": {
+          "select": true,
+          "update": true,
+          "insert": false
+        }
+      },
+      "apiOnlyS0Functions": [
+        "public.qry_seyeon_g0_current_source_recent_messages_v1",
+        "public.qry_seyeon_g0_current_source_relationship_history_v1",
+        "public.qry_seyeon_recover_exact_failed_user_turn_v1",
+        "public.cmd_seyeon_supersede_stale_failed_turn_v1"
+      ],
+      "apiOnlyS0FunctionBoundary": {
+        "owner": "myeongha_seyeon_chat_runtime_owner",
+        "securityDefiner": true,
+        "apiExecutorExecute": true,
+        "serviceRoleExecute": false,
+        "anonExecute": false,
+        "authenticatedExecute": false,
+        "checks": "Subject context and subject/thread predicates; G0 queries validate original message provenance and exact content hashes; failed-turn supersede requires exactly one retryable uncommitted turn with no active attempt, assistant output, or provider execution."
+      },
+      "historyReaderPath": {
+        "publicWrapper": "public.qry_chat_thread_owner_visible_history_v1",
+        "wrapperSecurityDefiner": false,
+        "privateFunction": "chat_private.qry_chat_thread_owner_visible_history_v1",
+        "privateOwner": "myeongha_chat_history_reader_v1",
+        "privateSecurityDefiner": true,
+        "rowSecurityOn": true,
+        "apiExecutorExecute": true,
+        "serviceRoleExecute": false,
+        "anonExecute": false,
+        "authenticatedExecute": false,
+        "note": "API executor has no direct message-table SELECT grant; private function executes under a NOLOGIN, NOBYPASSRLS reader role and relies on active conversation-message/thread RLS."
+      },
+      "positiveMemoryBoundary": {
+        "pinnedContextReadyFunctionApiExecutorExecute": true,
+        "registryEnabled": false,
+        "pinnedFunctionDisposition": "Fails closed at the registry-enabled check before private record/grant reads.",
+        "legacyCommitFunction": "public.cmd_commit_chat_turn_legacy_v1",
+        "legacyCommitFunctionSecurityDefiner": false,
+        "legacyCommitFunctionServiceRoleExecute": true,
+        "legacyCommitFunctionApiExecutorExecute": false,
+        "legacyCommitFunctionNote": "Separate legacy service_role-only user-choice proposal path; it can persist memory_proposals through the existing chat commit flow and does not reference the new positive-source registry. API executor, anon and authenticated cannot execute this legacy function. Treat it as a distinct trusted-backend path rather than claiming the registry disables all memory acceptance."
+      }
+    },
+    "positiveMemoryAndAiCostBoundary": {
+      "observedUtcDate": "2026-11-07",
+      "postgresqlVersion": "17.6",
+      "readOnlySnapshotScript": "scripts/operations/production-authority-frontier-readonly.sql",
+      "migrationVersionCount": 241,
+      "latestMigrationVersion": "20261105075227",
+      "positiveSourceRegistry": {
+        "recordType": "conversation_recall",
+        "enabled": false,
+        "writableEnabled": false
+      },
+      "governorModelPolicies": [
+        {
+          "provider": "openai-responses",
+          "model": "gpt-5.6-terra",
+          "policyVersion": "seyeon-s0-receipt-production-20261025",
+          "active": true
+        },
+        {
+          "provider": "openrouter-chat",
+          "model": "z-ai/glm-5.3-flash",
+          "policyVersion": "seyeon-glm53flash-context-capacity-20261031",
+          "active": true
+        }
+      ],
+      "dailyBudgets": {
+        "count": 7,
+        "firstUtcDay": "2026-10-25",
+        "lastUtcDay": "2026-10-31",
+        "rowsOnObservedDay": 0
+      },
+      "costLedger": {
+        "totalEvents": 29,
+        "settledEvents": 29,
+        "unsettledEvents": 0,
+        "ownerNoDailyLimitEvents": 24,
+        "unknownUsageEvents": 1,
+        "firstEventUtc": "2026-10-25T20:35:54.305929+00:00",
+        "latestEventUtc": "2026-11-06T06:34:54.742037+00:00",
+        "totalEffectiveMicroUsd": 294968
+      },
+      "memory": {
+        "unrevokedMemoryItems": 1,
+        "proposals": 0,
+        "pendingProposals": 0
+      },
+      "callableBoundaries": {
+        "apiExecutorPositiveCommit": true,
+        "apiExecutorNewProposalAccept": false,
+        "serviceRoleLegacyCommit": true
+      },
+      "interpretation": "The new positive-source registry is disabled and new proposal-accept entrypoint denied, but two model policies remain active, protected positive commit is API-executable, the legacy service_role commit remains callable, and 29 historical billed calls exist. Do not characterize all Se-yeon runtime, billing, or memory pathways as globally disabled. The absence of a current UTC daily budget row causes the non-owner guarded admission path to fail closed; the verified owner-admin exception is separate and still requires the other call controls. No new model dispatch was performed.",
+      "noProductionMutation": true
+    }
+  }
+}

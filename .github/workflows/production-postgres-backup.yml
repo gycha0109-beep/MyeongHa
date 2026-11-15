@@ -8,6 +8,12 @@ on:
     paths:
       - '.github/ops/postgres-backup-migration-20261029012948-20261029.once'
   workflow_dispatch:
+    inputs:
+      capture_provider_ledger:
+        description: Seal a full read-only Provider migration source ledger in a separate encrypted artifact (no history repair)
+        required: false
+        default: false
+        type: boolean
   schedule:
     # 03:17 KST. The non-round minute reduces fleet-wide scheduler contention.
     - cron: '17 18 * * *'
@@ -127,6 +133,7 @@ jobs:
           POOL_HOST: ${{ steps.database.outputs.pool_host }}
           POOL_PORT: ${{ steps.database.outputs.pool_port }}
           POOL_DB: ${{ steps.database.outputs.pool_db }}
+          MH_OPS_CAPTURE_PROVIDER_LEDGER: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_provider_ledger && 'true' || 'false' }}
         run: bash scripts/operations/export-production-postgres-backup.sh
       - name: Guard one-shot backup actual deployed migration frontier
         if: ${{ github.event_name == 'push' }}
@@ -146,6 +153,19 @@ jobs:
             ${{ steps.dump.outputs.archive }}
             ${{ steps.dump.outputs.checksum }}
             ${{ steps.dump.outputs.manifest }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Upload optional encrypted Provider migration source only
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_provider_ledger }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.dump.outputs.provider_ledger_artifact_name }}
+          path: |
+            ${{ steps.dump.outputs.provider_ledger_archive }}
+            ${{ steps.dump.outputs.provider_ledger_checksum }}
+            ${{ steps.dump.outputs.provider_ledger_public_manifest }}
           if-no-files-found: error
           retention-days: 30
           compression-level: 0

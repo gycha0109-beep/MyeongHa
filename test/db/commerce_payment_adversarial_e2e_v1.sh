@@ -40,7 +40,7 @@ expect_balance "MEMBER_A_BALANCE" "$alice" '50|50'
 expect_balance "GUEST_PROMOTION_EXPIRED" "$carol" '0|50'
 expect_denied "CROSS_TENANT_BALANCE" 'subject execution context mismatch' "begin; set local role myeongha_api_executor; set local myeongha.subject_id='$alice'; select * from public.internal_qry_chat_credit_balance_v1('$carol'); rollback;"
 expect_denied "NO_TRUSTED_SUBJECT_CONTEXT" 'trusted MyeongHa subject execution context is required' "begin; set local role myeongha_api_executor; select * from public.internal_qry_chat_credit_balance_v1('$alice'); rollback;"
-expect_denied "DELETED_MEMBER_WALLET_READ" 'Credit owner is not an active Subject' "begin; set local role myeongha_api_executor; set local myeongha.subject_id='$bob'; select * from public.internal_qry_chat_credit_balance_v1('$bob'); rollback;"
+expect_denied "DELETION_PENDING_WALLET_READ" 'Credit owner is not an active Subject' "begin; set local role myeongha_api_executor; set local myeongha.subject_id='$bob'; select * from public.internal_qry_chat_credit_balance_v1('$bob'); rollback;"
 expect_denied "ANONYMOUS_DIRECT_LEDGER" 'permission denied for table chat_credit_lots_v1' 'begin; set local role anon; select * from public.chat_credit_lots_v1 limit 1; rollback;'
 expect_denied "AUTHENTICATED_DIRECT_LEDGER" 'permission denied for table chat_credit_lots_v1' 'begin; set local role authenticated; select * from public.chat_credit_lots_v1 limit 1; rollback;'
 expect_denied "SERVICE_ROLE_DIRECT_LEDGER" 'permission denied for table chat_credit_lots_v1' 'begin; set local role service_role; select * from public.chat_credit_lots_v1 limit 1; rollback;'

@@ -1,18 +1,60 @@
 /* Shared product readability: loaded after route styles and before header authority. */
-:root { --mh-copy-muted: #64585a; --mh-copy-soft: #78696b; }
-html[data-theme="dark"] { --mh-copy-muted: #c7bbb3; --mh-copy-soft: #b7a9a0; }
-body.product-page { font-family: var(--mh-sans); font-size: 15px; line-height: 1.65; text-rendering: optimizeLegibility; }
+:root { --mh-copy-muted: #4a3b45; --mh-copy-soft: #62535c; --mh-copy-body: #2c2530; }
+html[data-theme="dark"] { --mh-copy-muted: #d8cac3; --mh-copy-soft: #bfb0aa; --mh-copy-body: #f7efe5; }
+body.product-page { font-family: var(--mh-sans); font-size: 1rem; font-weight: 500; line-height: 1.7; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
 body.product-page :is(button,input,select,textarea) { font-family: var(--mh-sans); }
 body.product-page :is(a,button,input,select,textarea):focus-visible { outline: 2px solid var(--mh-brass-strong); outline-offset: 3px; }
 /* Only actual copy is enlarged; decorative symbols and fixed-size art are untouched. */
-body.product-page :is(.gm-lede, .gm-section-support, .gm-product-card small, .gm-saju-reading-card small, .gm-recent-copy p, .gm-recent-time, .gm-flow-copy p, .gm-question-copy small, .gm-month-copy p, .mhx-topic-copy small, .mhx-hero-actions p small, .mhx-characters-intro p, .mhx-character-footer p, .chat-continuation-copy p, .chat-recent-time, .chat-person-line, .chat-hub-intro > p, .conversation-thread-note, .character-compose-status, .records-lead, .records-status, .records-panel-head p, .records-reading-period, .records-reading-date, .records-reading-chip, .records-report-count, .records-tab, .my-lead, .my-account-meta, .my-detail-hint, .face-hero-copy > p, .face-description, .face-reader-copy p, .reading-authority-note, .reading-chart-caption, .saju-design-hero p, .saju-design-birth-fields > div, .saju-design-source-note, .saju-design-chart-foot, .saju-design-pillars .saju-pillar-meta, .saju-design-product-card ul, .saju-design-product-card .saju-design-product-scope) { font-size: max(13px, .8125rem); line-height: 1.65; }
+body.product-page :is(.gm-lede, .gm-section-support, .gm-product-card small, .gm-saju-reading-card small, .gm-recent-copy p, .gm-recent-time, .gm-flow-copy p, .gm-question-copy small, .gm-month-copy p, .mhx-topic-copy small, .mhx-hero-actions p small, .mhx-characters-intro p, .mhx-character-footer p, .chat-continuation-copy p, .chat-recent-time, .chat-person-line, .chat-hub-intro > p, .conversation-thread-note, .character-compose-status, .records-lead, .records-status, .records-panel-head p, .records-reading-period, .records-reading-date, .records-reading-chip, .records-report-count, .records-tab, .my-lead, .my-account-meta, .my-detail-hint, .face-hero-copy > p, .face-description, .face-reader-copy p, .reading-authority-note, .reading-chart-caption, .saju-design-hero p, .saju-design-birth-fields > div, .saju-design-source-note, .saju-design-chart-foot, .saju-design-pillars .saju-pillar-meta, .saju-design-product-card ul, .saju-design-product-card .saju-design-product-scope) { font-size: max(14px, .875rem); line-height: 1.7; }
 body.product-page :is(.gm-section-support, .gm-month-copy p, .mhx-topic-copy small, .mhx-characters-intro p, .mhx-character-footer p, .records-lead, .records-status, .records-panel-head p, .records-reading-period, .records-reading-date, .records-reading-chip, .my-lead, .my-account-meta, .my-detail-hint, .saju-design-source-note, .saju-design-chart-foot, .saju-design-pillars .saju-pillar-meta) { color: var(--mh-copy-muted); }
 body.product-page :is(.records-lead, .records-status, .records-tab, .saju-design-birth-fields, .saju-design-product-card ul, .saju-design-product-card .saju-design-product-scope, .my-account-meta, .my-detail-hint) { font-family: var(--mh-sans); }
 body.product-page :is(.records-tab,.saju-design-chart-tabs button) { font-size: 14px; font-weight: 600; }
-body.product-page :is(.saju-design-birth-fields dt,.saju-design-pillars .saju-pillar-label) { color: var(--mh-copy-muted); font-size: 13px; }
+body.product-page :is(.saju-design-birth-fields dt,.saju-design-pillars .saju-pillar-label) { color: var(--mh-copy-muted); font-size: .875rem; }
 body.product-page :is(.saju-design-products h2,.gm-section-title,.mhx-section-title,.records-panel-head h2,.my-section-heading h2) { line-height: 1.4; letter-spacing: -.025em; }
 body.product-page.face-reading-page { --mh-copy-muted: #b9c5c3; --mh-copy-soft: #a8b7b6; }
 body.face-reading-page :is(.face-reader-copy p,.face-hero-copy > p,.face-description) { color: var(--mh-copy-muted); }
+/* Readable body copy and the dense Saju surfaces, without touching decorative art. */
+body.product-page :is(.gm-lede, .records-lead, .my-lead, .face-description, .saju-design-hero p) {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+body.product-page :is(.saju-design-product-card ul, .saju-design-product-card .saju-design-product-scope, .saju-design-example-copy p, .saju-design-example-sheet p) {
+  font-family: var(--mh-sans);
+  font-size: .9375rem;
+  line-height: 1.75;
+}
+body.product-page .saju-design-product-card h3 { font-size: 1.125rem; }
+/* Mobile continuation notices remain body copy, not tiny decorative labels. */
+body.product-page .chat-pending-copy { font-size: .875rem; line-height: 1.7; }
+body.product-page .saju-design-chart-tabs button:not(.is-selected) {
+  color: var(--mh-copy-muted);
+  background: #fffaf5;
+}
+html[data-theme="dark"] body.product-page .saju-design-chart-tabs button:not(.is-selected) {
+  color: #eaded4;
+  background: #443740;
+  border-color: #8f6772;
+}
+/* The original white-on-pale-rose badge was below readable contrast. */
+body.product-page .saju-design-example h2 span {
+  color: #fff9f5;
+  background: #76394f;
+  font-size: .8125rem;
+}
+html[data-theme="dark"] body.product-page .saju-design-example h2 span { background: #8f4d61; }
+body.product-page .saju-design-product-card a {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  font-size: .9375rem;
+}
+html[data-theme="dark"] body.product-page .saju-design-product-card a {
+  color: #fff9f5;
+  background: #70384f;
+  border-color: #be8598;
+}
+html[data-theme="dark"] body.product-page .saju-design-product-card a:hover { background: #874b63; }
+
 /* Six equally weighted navigation icons; no platform-specific glyph fonts. */
 body.product-page .mobile-bottom-nav .mobile-nav-link[href="hall.html"] { --mh-nav-icon: url("assets/myeongha-icons/home.png"); }
 body.product-page .mobile-bottom-nav .mobile-nav-link[href="reading.html"] { --mh-nav-icon: url("assets/myeongha-icons/saju.png"); }
@@ -30,4 +72,33 @@ body.product-page .mobile-bottom-nav .mobile-nav-link[href="my.html"] { --mh-nav
   html[data-theme="dark"] body.product-page .mobile-bottom-nav .mobile-nav-link { color: #d0c4b7; }
   html[data-theme="dark"] body.product-page .mobile-bottom-nav .mobile-nav-link[aria-current="page"] { color: #f4e7d4; background: #2c3c47; border-color: #c49a5c; }
   body.product-page :is(input,select,textarea) { font-size: max(16px, 1rem); }
+}
+
+/* Prior approved typography: restrained serif headings, sans-serif reading copy. */
+body.product-page :is(.saju-design-hero h2, .saju-design-products h2, .records-title, .my-title) {
+  font-family: var(--mh-serif);
+  color: var(--mh-title-accent);
+}
+body.product-page :is(.records-reading-summary, .my-lead, .reading-block p, .reading-character-block p) {
+  font-family: var(--mh-sans);
+}
+
+/* Product reading hierarchy; page-specific styles retain approved art and geometry. */
+body.product-page :is(.records-reading-summary, .reading-block p, .reading-character-block p, .official-report-primary, .official-report-supporting) {
+  font-family: var(--mh-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.8;
+}
+body.product-page :is(.gm-section-title,.mhx-section-title,.records-panel-head h2,.my-section-heading h2) {
+  font-size: clamp(25px, 2.25vw, 32px);
+  font-weight: 700;
+  letter-spacing: -.035em;
+}
+body.product-page :is(.saju-design-chart-tabs button,.saju-design-product-card a,.my-primary-action,.chat-person-action) {
+  font-family: var(--mh-sans);
+  font-weight: 700;
+}
+html[data-theme="dark"] body.product-page :is(.records-reading-summary,.reading-block p,.reading-character-block p) {
+  color: var(--mh-copy-body);
 }

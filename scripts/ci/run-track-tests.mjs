@@ -7,6 +7,14 @@ const plan = resolveWorkTrackPlan(changed, { eventName: process.env.GITHUB_EVENT
 const vitest = 'node_modules/vitest/vitest.mjs';
 const run = (args) => execFileSync(process.execPath, [vitest, ...args], { stdio: 'inherit' });
 
+// The Yeoul review tests are owned by node:test, not Vitest.
+if (changed.some(path => path.startsWith('scripts/character-runtime-lab/'))) {
+  const tests = readdirSync('scripts/character-runtime-lab')
+    .filter(name => name.endsWith('.test.mjs'))
+    .map(name => 'scripts/character-runtime-lab/' + name);
+  if (tests.length) execFileSync(process.execPath, ['--test', ...tests], { stdio: 'inherit' });
+}
+
 if (plan.full) {
   run(['run']);
 } else {

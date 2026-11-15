@@ -138,16 +138,23 @@ for (const staleFragment of [
   }
 }
 
+// These entries must describe the current checked restore; historical
+// snapshots stay in the document but may not satisfy the current gate.
 const requiredStatusFragments = [
-  'verified_isolated_restore_run_id: 40817391430',
+  'verified_isolated_restore_run_id: 42375717923',
   'verified_isolated_restore_result: SUCCESS',
-  'verified_isolated_restore_backup_run_id: 40812111605',
-  'verified_isolated_restore_backup_migration: 20261029012948',
-  'verified_isolated_restore_artifact_id: 12872589146',
-  'verified_isolated_restore_artifact_sha256: 38dc5b4024cdb45d7e69ef5793bd89010b67089602217bdb4413082a390b79fb',
-  'verified_provider_rows_skipped_in_loopback: 112',
-  'verified_provider_rows_projected_in_loopback: 53',
-  'verified_provider_rows_replayed_in_loopback: 54',
+  'verified_isolated_restore_head_sha: 61736e57979d886559451d15a853292fb3bf586e',
+  'verified_isolated_restore_backup_source_sha: 8ccf60d89eb6d3fab789fb34e0d479c51d84b9af',
+  'verified_isolated_restore_artifact_expires_at: 2026-12-07T13:11:05Z',
+  'observed_live_production_migration_version: 20261105075227',
+  'repository_latest_migration_file_version: 20261029185500',
+  'verified_isolated_restore_backup_run_id: 42309503582',
+  'verified_isolated_restore_backup_migration: 20261105075227',
+  'verified_isolated_restore_artifact_id: 13575965386',
+  'verified_isolated_restore_artifact_sha256: a474462113eeb780f30f7bb996d7a400ac81fa6538657199cfd891ac3ab504b9',
+  'verified_provider_rows_skipped_in_loopback: 138',
+  'verified_provider_rows_projected_in_loopback: 77',
+  'verified_provider_rows_replayed_in_loopback: 257',
   'verified_isolated_restore_authoritative_privacy: not_exercised_without_production_ledger',
   'verified_isolated_restore_synthetic_privacy: PASS',
   'verified_isolated_restore_serving_gate: BLOCKED',

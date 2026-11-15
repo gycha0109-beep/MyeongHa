@@ -1,0 +1,78 @@
+{
+    "evidenceScope":  "Phase 8-A same-encrypted-backup isolated PG17 source application catalog parity",
+    "restoreRunId":  42474143273,
+    "restoreRunUrl":  "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42474143273",
+    "restoreArtifactId":  13614578247,
+    "restoreArtifactSha256":  {
+                                  "appSchemaParity":  "f0b9bf20da7e8674f53d8daa697b93db87a5a39507ec7001c5e80756c3a49481",
+                                  "restoreEvidence":  "4644abe4204b07c25cb646af348dea2f435c9ac988655ac3412e53973eba648c",
+                                  "privacyReconciliation":  "c76f4629600199ab3d8670c06fa324f33f54ae5285a3e4ee818a687e684633c5",
+                                  "recoveredServingAdmission":  "ebf69eee9e6292beb173a0a49d40550a7c43c21558890e66c0342628be89f13b"
+                              },
+    "restoreWorkflowResult":  "success",
+    "restoreExecutionSourceSha":  "a211b2c451879610c245259249a74c21d87ad02a",
+    "backupRunId":  42417503612,
+    "backupSourceSha":  "4482936a759e91d9cdac066b52d90426ea830ce1",
+    "backupFrontier":  "20261105075227",
+    "sourceCatalogProvenance":  "encrypted_backup_bracketed_readonly_v1",
+    "sourceCatalogProvenanceHold":  "SOURCE_BACKUP_EXECUTION_BRACKETED_NO_SHARED_MVCC_SNAPSHOT",
+    "sourceCatalogBoundToBackupSnapshot":  false,
+    "restoreMismatchRootCauseProven":  false,
+    "migrationFrontierAligned":  true,
+    "postgresVersionEqual":  true,
+    "applicationScopeVerdict":  "HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH",
+    "verifiedApplicationScopeEquivalence":  false,
+    "verifiedFullSchemaCatalogEquivalence":  false,
+    "catalogObjectKinds":  {
+                               "schemas":  {
+                                               "sourceCount":  3,
+                                               "restoredCount":  3,
+                                               "matchingCount":  1,
+                                               "missingCount":  0,
+                                               "additionalCount":  0,
+                                               "changedCount":  2,
+                                               "changedFields":  {
+                                                                     "acl_sha256":  2
+                                                                 }
+                                           },
+                               "tables":  {
+                                              "sourceCount":  94,
+                                              "restoredCount":  94,
+                                              "matchingCount":  63,
+                                              "missingCount":  0,
+                                              "additionalCount":  0,
+                                              "changedCount":  31,
+                                              "changedFields":  {
+                                                                    "structural_sha256":  31
+                                                                }
+                                          },
+                               "functions":  {
+                                                 "sourceCount":  318,
+                                                 "restoredCount":  318,
+                                                 "matchingCount":  138,
+                                                 "missingCount":  0,
+                                                 "additionalCount":  0,
+                                                 "changedCount":  180,
+                                                 "changedFields":  {
+                                                                       "acl_sha256":  180
+                                                                   }
+                                             }
+                           },
+    "changedSchemaNames":  [
+                               "public",
+                               "seyeon_private"
+                           ],
+    "providerManagedFullRestore":  false,
+    "providerDataBlocksSkipped":  27,
+    "providerDataBlocksProjected":  3,
+    "providerRowsSkipped":  58,
+    "providerRowsProjected":  23,
+    "privacyReplayScope":  "captured-window-only",
+    "syntheticPrivacyEventCount":  4,
+    "authoritativePrivacyReconciliation":  false,
+    "futureSafePrivacyReconciliation":  false,
+    "servingGate":  "BLOCKED",
+    "drReady":  false,
+    "serviceResumptionAllowed":  false,
+    "evidenceBoundary":  "No shared PostgreSQL MVCC snapshot; hashes do not identify exact DDL/ACL root cause. Full hosted and provider parity not proven."
+}

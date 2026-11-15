@@ -74,6 +74,7 @@ export default {
     const firstReplyRoute=/^\/api\/chat\/[a-f0-9-]+\/turns$/u.test(url.pathname);
     if(approvedCloudflareAuthOriginV1(request,env)!==null && request.method==='POST' && url.search==='' && SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled &&
        (receiptRoute||revokeRoute||(firstReplyRoute&&SEYEON_SECURITY_S0_PRODUCTION_V1.modelUseEnabled&&
+       SEYEON_SECURITY_S0_PRODUCTION_V1.positiveMemoryFirstReplyApproved&&
        !cloudflareEmergencyHoldEnabledV1(env)))){
       // Import inside the request: DB pools/credentials never become isolate
       // global state. Every alias/history/replay still reaches the sealed router.
@@ -94,28 +95,31 @@ export default {
         // whereas withdrawal still verifies the current Member and Subject.
         // Both stay independent from the metered model/governed DB.
         runtime=receiptRoute
-          ?createCloudflareSeyeonIssuedReplyReceiptRuntimeV1({env})
+          ?createCloudflareSeyeonIssuedReplyReceiptRuntimeV1({
+            env,
+            creditSettlementEnabled:SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling.productionMounted,
+          })
           :firstReplyRoute
             ?createCloudflareSeyeonFirstMemoryRuntimeV1({
               env,
+              creditBillingProductionMounted:SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling.productionMounted,
               ...(SEYEON_SECURITY_S0_PRODUCTION_V1.zeroSourceFirstReplyApproved
                 ? {zeroSourceFirstReplyApproved:true} : {}),
-              ...(SEYEON_SECURITY_S0_PRODUCTION_V1.glmRendererApproved &&
-                  typeof env?.OPENROUTER_API_KEY==='string' &&
-                  env.OPENROUTER_API_KEY.trim().length>0
+              ...(SEYEON_SECURITY_S0_PRODUCTION_V1.glmRendererApproved
                 ? {glmRendererGovernor:createSeyeonGlmContextCapacityGovernorV1()}
                 : {}),
-              approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
+              approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.positiveMemoryFirstReplyApproved,
               governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
             })
             :createCloudflareSeyeonReceiptWithdrawalRuntimeV1({
               env,approvedWithdrawalWriteAdmission:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
             });
-        // The general paid rail remains sealed until atomic reservation and
-        // delivery-receipt settlement are actually mounted. The sole DB-bound
-        // Owner Admin may test the existing governed, G1/G2/G3-protected AI.
-        // Even a server-side account lookup failure must not admit a model.
-        if(firstReplyRoute && !(await runtime.verifyOwnerCreditExemption(request))){
+        // Before the paid rail is mounted, only the DB-verified Owner Admin
+        // may reach the G1/G4-gated internal smoke path. Once mounted, G4
+        // performs the Owner exemption or ordinary Member reservation after G1.
+        if(firstReplyRoute &&
+           !SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling.productionMounted &&
+           !(await runtime.verifyOwnerCreditExemption(request))){
           return Response.json({ok:false,error:{code:'CREDIT_AUTHORITY_UNAVAILABLE',retryable:false}},
             {status:503,headers:HEALTH_HEADERS});
         }

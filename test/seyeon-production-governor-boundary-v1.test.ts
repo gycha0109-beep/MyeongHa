@@ -124,7 +124,7 @@ describe('PR-04D3A Production Governor pre-activation gates (offline)', () => {
       databaseConfig, providerConfig:base,governorMode:'ENFORCE',
       roleProviderConfigs:{ preflight:base },
       costGovernorForRole: () => { throw Error('should not be called'); },
-    })).toThrow('four explicit');
+    })).toThrow('ENFORCE requires a separate Governed DB credential');
     expect(() => createProductionSeyeonPostTurnWorkerRuntimeV1({
       databaseConfig,providerConfig:base,governorMode:'ENFORCE',
     })).toThrow('server-owned');

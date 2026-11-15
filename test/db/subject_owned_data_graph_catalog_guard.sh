@@ -83,6 +83,33 @@ if ! printf '%s\n' "$actual" | grep -Fxq 'commerce_saju_records_v1|subject_id'; 
   exit 1
 fi
 actual="$(printf '%s\n' "$actual" | sed '/^commerce_saju_records_v1|subject_id$/d; /^chat_credit_lots_v1|subject_id$/d')"
+
+# Shared My Page memory is an independently approved, manually managed owner lane.
+# Admit exactly this new Subject FK without mutating frozen P0-PR-01 inventory.
+shared_memory_edge='subject_shared_memory_items_v1|subject_id'
+if ! printf '%s\n' "$actual" | grep -Fxq "$shared_memory_edge"; then
+  echo 'Expected Subject-owned shared memory FK is absent.' >&2
+  exit 1
+fi
+shared_memory_cascade="$(psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL'
+select count(*)
+from pg_catalog.pg_constraint con
+join pg_catalog.pg_attribute child_col
+  on child_col.attrelid = con.conrelid
+  and child_col.attnum = any(con.conkey)
+where con.contype = 'f'
+  and con.conrelid = 'public.subject_shared_memory_items_v1'::pg_catalog.regclass
+  and con.confrelid = 'public.subjects'::pg_catalog.regclass
+  and child_col.attname = 'subject_id'
+  and pg_catalog.array_length(con.conkey, 1) = 1
+  and con.confdeltype = 'c';
+SQL
+)"
+if [[ "$shared_memory_cascade" != '1' ]]; then
+  echo 'Subject-owned shared memory must have exactly one ON DELETE CASCADE Subject FK.' >&2
+  exit 1
+fi
+actual="$(printf '%s\n' "$actual" | grep -Fxv "$shared_memory_edge")"
 if [[ "$actual" != "$expected" ]]; then
   echo "Subject-owned data graph inventory drifted." >&2
   echo "--- inventory" >&2

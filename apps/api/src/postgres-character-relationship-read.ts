@@ -30,7 +30,7 @@ select
   revision,
   last_interaction_at::text as "lastInteractionAt",
   updated_at::text as "updatedAt"
-from public.qry_character_relationship_v1(
+from public.qry_reader_context_relationship_projection_v1(
   $1::uuid,
   $2::text
 )
@@ -76,16 +76,21 @@ function postgresConstraint(error: unknown): string | null {
 
 function mapPostgresError(error: unknown): never {
   switch (postgresConstraint(error)) {
+    case 'qry_reader_context_relationship_identity_required':
     case 'qry_character_relationship_identity_required':
       throw new CharacterRelationshipReadAuthorityPortErrorV1(
         'INVALID_INPUT',
         'Reader relationship identity input was rejected.',
       );
+    case 'qry_reader_context_relationship_subject_ineligible':
+    case 'myeongha_subject_context_required':
+    case 'myeongha_subject_context_mismatch':
     case 'qry_character_relationship_subject_ineligible':
       throw new CharacterRelationshipReadAuthorityPortErrorV1(
         'SUBJECT_INELIGIBLE',
         'Reader relationship subject is unavailable.',
       );
+    case 'qry_reader_context_relationship_character_not_found':
     case 'qry_character_relationship_character_not_found':
       throw new CharacterRelationshipReadAuthorityPortErrorV1(
         'CHARACTER_UNAVAILABLE',

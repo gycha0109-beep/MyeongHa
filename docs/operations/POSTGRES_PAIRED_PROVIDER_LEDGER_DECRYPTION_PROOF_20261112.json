@@ -1,0 +1,98 @@
+{
+  "schemaVersion": "ops-provider-paired-decryption-and-restore-parity-observation-v1",
+  "evidenceDateKst": "2026-11-12",
+  "sourceBackupRunId": 43174606843,
+  "sourceCommitSha": "05ee24d45ff4c99a7615449a51384222f7ca4247",
+  "pairedSourceArtifactId": 13923871638,
+  "pairedBackupArtifactId": 13923088346,
+  "isolatedRestoreRunId": 43179685582,
+  "isolatedRestoreRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/43179685582",
+  "isolatedRestoreResult": "success",
+  "isolatedEvidenceArtifactId": 13925513219,
+  "isolatedEvidenceZipSha256": "a5588a9c6b553e4820d6bdf3a3ef5db2a8659421d12164316388812a32441d8f",
+  "sourceMigrationCount": 242,
+  "sourceMigrationFrontier": 20261109071019,
+  "sourceMigrationCatalogSha256": "91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47",
+  "encryptedArchiveSha256": "4a9c94ed42896d623a1cb519376601d7bf02851fc0eb9258c63cb8a44aff1054",
+  "sourcePacketSha256": "e5a2285acc6f44c29f981d3f9c1d2567d5794b845ec3217ee2869243482af686",
+  "sourceStatementBodiesMissingCount": 12,
+  "sourceCreatedByMetadataRows": 46,
+  "encryptedSourceDecryptionVerified": true,
+  "originalHistoryPayloadIntegrityVerified": true,
+  "sourceSqlBodiesComplete": false,
+  "originalHistoryAppliedToTarget": false,
+  "providerMigrationLedgerRestored": false,
+  "applicationSchemaComparison": {
+    "sourceCatalogBracketingVerified": true,
+    "sharedSourceBackupMvccSnapshotProven": false,
+    "sourceAndIsolatedPostgresVersionsMatch": true,
+    "sourceAndTargetMigrationFrontiersMatch": true,
+    "schemaCount": {
+      "source": 3,
+      "isolated": 3,
+      "missing": 0,
+      "additional": 0,
+      "legacyAclHashDifferent": 2
+    },
+    "tableCount": {
+      "source": 94,
+      "isolated": 94,
+      "missing": 0,
+      "additional": 0,
+      "legacyAclRelatedStructuralHashDifferent": 8
+    },
+    "functionCount": {
+      "source": 322,
+      "isolated": 322,
+      "missing": 0,
+      "additional": 0,
+      "legacyAclHashDifferent": 19
+    },
+    "reportedDifferentObjectsWithDirectGranteePrivilegeDifferenceCount": 0,
+    "reportedDifferentObjectsWithCanonicalGrantorEntryDifferenceCount": 0,
+    "canonicalAclWitnessComplete": true,
+    "canonicalAclApplicationCatalogParityObserved": true,
+    "applicationInternalRoles": {
+      "source": 43,
+      "isolated": 43,
+      "sourceDirectEdges": 7,
+      "isolatedDirectEdges": 7,
+      "roleAttributeDifferences": 0,
+      "membershipOptionDifferences": 0,
+      "grantorAttributionDifferenceGroups": 7,
+      "portableGrantorRewriteCompatibleGroups": 7
+    },
+    "externalRoleBoundary": {
+      "sourceDirectEdges": 48,
+      "isolatedDirectEdges": 48,
+      "membershipOptionDifferences": 0,
+      "grantorAttributionDifferenceGroups": 0,
+      "providerOwnedOnlyProven": false,
+      "inheritedEffectiveRightsProven": false
+    },
+    "filteredRoleDump": {
+      "sourceExternalEdgePairs": 48,
+      "retainedEdgePairs": 0,
+      "excludedReservedRecipientCandidates": 48,
+      "missingOtherRecipients": 0,
+      "fullProviderCompatibleRestoreProven": false
+    },
+    "verifiedApplicationScopeEquivalence": false,
+    "verifiedFullSchemaCatalogEquivalence": false,
+    "restoreMismatchRootCauseProven": false
+  },
+  "hostedAuthStorageEquivalent": false,
+  "independentPrivacyContinuityProven": false,
+  "wholeServiceRpoRtoProven": false,
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "verdict": "SOURCE_DECRYPTION_VERIFIED__FULL_SERVICE_DR_BLOCKED",
+  "limitations": [
+    "Original source history SQL can be decrypted and rehashed, but 12 source migration rows have missing statement bodies and cannot prove their executed SQL.",
+    "Exact Provider ledger replay is not performed; this is not a migration history restoration test.",
+    "Legacy ACL hash differences and filtered role exclusions cannot be promoted to service permission or security equivalence claims, despite matching normalized direct-grant observations.",
+    "Source catalog is bracketed around backup execution, not guaranteed to share its MVCC snapshot.",
+    "Hosted Auth login/refresh/revocation, Storage object bytes and access, independent privacy continuity and complete service RPO/RTO remain untested.",
+    "No Production SQL modification, hosted provisioning, or privacy canary occurred."
+  ]
+}

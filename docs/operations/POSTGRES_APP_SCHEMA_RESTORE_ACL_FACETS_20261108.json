@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "ops-postgres-facet-restored-app-catalog-report-v1",
+  "backupRunId": 42481834384,
+  "backupSourceSha": "c4a6f842156a1fb426a307e3901de42eb4eaea88",
+  "backupMigrationFrontier": "20261105075227",
+  "restoreRunId": 42483472256,
+  "restoreRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42483472256",
+  "restoreExecutionSha": "c4a6f842156a1fb426a307e3901de42eb4eaea88",
+  "restoreWorkflowConclusion": "success",
+  "restoreArtifactId": 13618159526,
+  "restoreArtifactSha256": {
+    "app-schema-parity.json": "13966cdb658e3d8886b8c61eb12860f6b6f38f88df941832091036d031aa162e",
+    "restore-evidence.json": "b6f51c8573507a984e4b73fd6955245b3fed3c47c3e4e6309d6ae6eacd17d2d6",
+    "privacy-reconciliation-evidence.json": "63f7f579f323f90134769a6543e73cab1686a958b05421fbf2b32b1a6a4f18f8",
+    "recovered-serving-admission.json": "65331a1d20eedac12b1d7a4e25123717930351b1adb3be48ac81ba5cba0b5b10"
+  },
+  "sourceWitness": {
+    "provenance": "encrypted_backup_bracketed_readonly_v1",
+    "hold": "SOURCE_BACKUP_EXECUTION_BRACKETED_NO_SHARED_MVCC_SNAPSHOT",
+    "sameMvccSnapshot": false,
+    "rootCauseProven": false
+  },
+  "currentFrontierAligned": true,
+  "postgresVersionEqual": true,
+  "componentHashEvidence": {
+    "tableStructure": true,
+    "schemaAclGrantEntries": true,
+    "routineAclGrantEntries": true
+  },
+  "appScopeVerdict": "HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH",
+  "catalogObjectKinds": {
+    "schemas": {
+      "sourceCount": 3,
+      "restoredCount": 3,
+      "matchingCount": 1,
+      "missingCount": 0,
+      "additionalCount": 0,
+      "changedCount": 2,
+      "changeCategories": {
+        "GRANT_ENTRIES_DIFFER": 2
+      }
+    },
+    "tables": {
+      "sourceCount": 94,
+      "restoredCount": 94,
+      "matchingCount": 63,
+      "missingCount": 0,
+      "additionalCount": 0,
+      "changedCount": 31,
+      "changeCategories": {
+        "acl": 31
+      }
+    },
+    "functions": {
+      "sourceCount": 322,
+      "restoredCount": 322,
+      "matchingCount": 141,
+      "missingCount": 0,
+      "additionalCount": 0,
+      "changedCount": 181,
+      "changeCategories": {
+        "GRANT_ENTRIES_DIFFER": 181
+      }
+    }
+  },
+  "changedSchemaNames": [
+    "public",
+    "seyeon_private"
+  ],
+  "providerManagedFullRestore": false,
+  "providerCopyBlocksSkipped": 27,
+  "providerCopyBlocksProjected": 3,
+  "providerRowsSkipped": 60,
+  "providerRowsProjected": 24,
+  "providerManagedRolesAbsentFromIsolatedTarget": [
+    "supabase_realtime_admin"
+  ],
+  "syntheticPrivacyEvents": 4,
+  "authoritativePrivacyReconciliation": false,
+  "futureSafePrivacyReconciliation": false,
+  "servingGate": "BLOCKED",
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "classificationBoundary": "The table drift is ACL-only in the sealed 10-facet comparison. Schema/function changes are not grantor-only; the specific grantees are not yet determined by the source witness. No same MVCC snapshot."
+}

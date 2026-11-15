@@ -4,14 +4,14 @@ import { readFile } from 'node:fs/promises';
 import { validateDrCurrentEvidence } from './validate-postgres-dr-current-evidence.mjs';
 
 const status = await readFile('docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md', 'utf8');
-const frontier = 20261029012000;
+const frontier = 20261029185500;
 const result = validateDrCurrentEvidence(status, frontier);
-assert.equal(result.latestEvidenceDate, '2026-10-29');
-assert.equal(result.restoreRunId, 40817391430);
-assert.equal(result.backupRunId, 40812111605);
-assert.equal(result.restoreArtifactId, 12872589146);
-assert.equal(result.restoredBackupMigration, 20261029012948);
-assert.equal(result.observedLiveMigrationVersion, 20261029012948);
+assert.equal(result.latestEvidenceDate, '2026-11-07');
+assert.equal(result.restoreRunId, 42375717923);
+assert.equal(result.backupRunId, 42309503582);
+assert.equal(result.restoreArtifactId, 13575965386);
+assert.equal(result.restoredBackupMigration, 20261105075227);
+assert.equal(result.observedLiveMigrationVersion, 20261105075227);
 assert.equal(result.documentedRepositoryMigrationVersion, frontier);
 assert.equal(result.restoredBackupMatchesObservedMigrationVersion, true);
 assert.equal(result.fullSchemaCatalogEquivalenceProven, false);
@@ -39,7 +39,7 @@ assert.equal(
     'production_schema_latest_deployed_migration: 1310',
     'production_schema_latest_deployed_migration: 99999999999999',
   ), frontier).observedLiveMigrationVersion,
-  20261029012948,
+  20261105075227,
 );
 
 function mutate(oldText, newText, error) {
@@ -68,7 +68,7 @@ mutate(
   /latest evidence verified_isolated_restore_serving_gate/u,
 );
 mutate(
-  'verified_isolated_restore_backup_migration: 20261029012948',
+  'verified_isolated_restore_backup_migration: 20261105075227',
   'verified_isolated_restore_backup_migration: 20261027043527',
   /restored backup migration does not match/u,
 );
@@ -78,12 +78,12 @@ mutate(
   /duplicate latest evidence key/u,
 );
 mutate(
-  'verified_isolated_restore_artifact_sha256: 38dc5b4024cdb45d7e69ef5793bd89010b67089602217bdb4413082a390b79fb',
+  'verified_isolated_restore_artifact_sha256: a474462113eeb780f30f7bb996d7a400ac81fa6538657199cfd891ac3ab504b9',
   'verified_isolated_restore_artifact_sha256: fake',
   /verified_isolated_restore_artifact_sha256 has invalid fingerprint/u,
 );
 mutate(
-  'verified_isolated_restore_artifact_expires_at: 2026-11-28T04:23:26Z',
+  'verified_isolated_restore_artifact_expires_at: 2026-12-07T13:11:05Z',
   'verified_isolated_restore_artifact_expires_at: 2026-10-29T00:00:00Z',
   /restore artifact expiration must follow/u,
 );
@@ -100,7 +100,7 @@ assert.equal(prCandidate.repositoryCandidateBeyondObservation, true);
 assert.equal(prCandidate.drReady, false);
 assert.throws(
   () => validateDrCurrentEvidence(status.replace(
-    '## 2026-10-29 verified restore status (latest observation)',
+    '## 2026-11-07 verified restore status (latest observation)',
     '## 2026-10-29 old snapshot',
   ), frontier),
   /exactly one latest dated verified restore/u,
@@ -109,4 +109,10 @@ execFileSync('node', ['scripts/verify-postgres-dr-readiness-authority.mjs'], {
   stdio: 'inherit',
   env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request' },
 });
-console.log('PostgreSQL DR current evidence PASS: backup 40812111605 restored on PG17 in run 40817391430; Provider rows are partially omitted, privacy synthetic-only, Hosted/DR serving remains BLOCKED.');
+const ambiguousHistory = status.replace(
+  '## 2026-10-29 verified restore status (historical observation)',
+  '## 2026-10-29 verified restore status (latest observation)',
+);
+assert.throws(() => validateDrCurrentEvidence(ambiguousHistory, frontier),
+  /exactly one latest dated verified restore/u);
+console.log('PostgreSQL DR current evidence PASS: backup 42309503582 restored on PG17 in run 42375717923; Provider rows remain partly omitted, privacy synthetic-only, Hosted/DR serving BLOCKED.');

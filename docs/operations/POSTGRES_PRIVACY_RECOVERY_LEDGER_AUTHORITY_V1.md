@@ -216,3 +216,9 @@ This authority does not claim:
 - DR Ready.
 
 RPO `PT24H` and RTO `PT6H` are Product Owner approved, and run `35659483080` measures this authoritative isolated procedure at a 5,536-second data-loss window and 67-second workflow duration, both within those objectives. Those comparisons do not override the separate provider-equivalence gate.
+
+## 2026-11-10 — Owner-approved manual note deletion: Draft-only source extension
+
+A dedicated `SHARED_MEMORY_NOTE_DELETED` privacy event is now implemented in the character-memory Draft branch, independent of Character `MEMORY_ITEM_REVOKED`. Forward-only migration 2380 records only the original note UUID, canonical Subject UUID and database deletion timestamp atomically with the original note-text DELETE. No original text enters the event table or the existing encrypted off-primary snapshot. The existing `AUTHORITATIVE_CAPTURED_WINDOW_V1` manifest/encryption/overlap mechanism and P30D artifact retention remain unchanged; the governed restored-DB command erases the exact note and preserves its original deletion timestamp on replay.
+
+**Coverage is only valid for newly migrated sources and corresponding captured windows.** Backups lacking the new table/function, a missing supported event, a failed extraction or a ledger whose coverage ends before the reference time must block service resumption. Snapshot overlap and the nominal hourly schedule do not prove independent continuous source capture. Until exact HEAD CI, governed isolated restore and deployment lineage are actually evidenced, no claim of Production completeness is authorized. `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false` and `drReady=false` continue to apply.

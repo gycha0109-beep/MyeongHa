@@ -81,17 +81,27 @@ describe('Cloudflare workers.dev private Admin URL',()=>{
  });
  it('denies Access failures before assets or API, including the sign-in path',async()=>{
   const {handler,called}=setup(false);
-  for(const path of ['/admin','/admin/assets/index.js','/api/admin/overview','/api/auth/sign-in']){
+  for(const path of ['/','/admin','/admin/assets/index.js','/api/admin/overview','/api/auth/sign-in']){
     const res=await handler(new Request(ORIGIN+path));
     expect(res.status).toBe(403);
     expect(res.headers.get('cache-control')).toBe('no-store');
   }
-  expect(called).toEqual(['access','access','access','access']);
+  expect(called).toEqual(['access','access','access','access','access']);
+ });
+ it('redirects root bookmarks and shared links after Access without passing tracking queries',async()=>{
+  const {handler,called}=setup();
+  for(const method of ['GET','HEAD']){
+    const res=await handler(new Request(ORIGIN+'/?utm_source=chatgpt.com',{method}));
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe(ORIGIN+'/admin/');
+    expect(res.headers.get('cache-control')).toBe('no-store');
+  }
+  expect(called).toEqual(['access','access']);
  });
  it('rejects other hostnames and unknown resources without exposing assets',async()=>{
   const {handler,called}=setup();
   expect((await handler(new Request('https://untrusted.example/admin'))).status).toBe(421);
-  expect((await handler(new Request(ORIGIN+'/'))).status).toBe(404);
+  expect((await handler(new Request(ORIGIN+'/unrecognized'))).status).toBe(404);
   expect((await handler(new Request(ORIGIN+'/admin/not-a-real-page'))).status).toBe(404);
   expect(called).toEqual(['access','access','asset:/not-a-real-page']);
  });

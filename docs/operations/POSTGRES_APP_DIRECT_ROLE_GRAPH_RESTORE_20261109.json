@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "ops-application-direct-role-membership-restore-observation-v1",
+  "backupRunId": 42584865734,
+  "backupUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42584865734",
+  "encryptedBackupArtifactId": 13658419071,
+  "backupSourceSha": "07ae476f7913930c8880e70b5766d23c30a53f8a",
+  "backupMigrationFrontier": "20261109071019",
+  "restoreRunId": 42587519188,
+  "restoreUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42587519188",
+  "restoreArtifactId": 13659811874,
+  "restoreConclusion": "success",
+  "artifactFileSha256": {
+    "app-schema-parity.json": "586651f0eec263edf206d6bcf088cc9eecc93f061e6f7e7a60206eb6ba216956",
+    "restore-evidence.json": "a50c6b8186c1cfb90d780f752cdfe7c1cd38b40713384c8ade4d0dd9bb5f26ba",
+    "privacy-reconciliation-evidence.json": "e3ca0050996fb819c11b26f3323d1cfa940e63be67c4549612cb650a45a637fe",
+    "recovered-serving-admission.json": "4ec989e6a996172bcc824170677b9fc7203fc1a5c5ee6cd72bc4f81395da1067"
+  },
+  "sourceCatalogProvenance": "encrypted_backup_bracketed_readonly_v1",
+  "sourceCatalogBoundToBackupSnapshot": false,
+  "roleGraphScope": "myeongha_to_myeongha_direct_membership_only_v1",
+  "sourceWitnessAvailable": true,
+  "providerBoundaryMembershipsIncluded": false,
+  "observedMembershipOptionsParity": true,
+  "observedGrantorAttributionParity": false,
+  "directRoleGraphCounts": {
+    "sourceRoleCount": 43,
+    "restoredRoleCount": 43,
+    "sourceDirectMembershipCount": 7,
+    "restoredDirectMembershipCount": 7,
+    "missingRoleCount": 0,
+    "addedRoleCount": 0,
+    "roleAttributesDifferentCount": 0,
+    "missingMembershipEntryCount": 0,
+    "addedMembershipEntryCount": 0,
+    "grantorAttributionDifferenceGroupCount": 7
+  },
+  "portableRoleGrantorNormalizationCount": 7,
+  "grantorDifferenceCountEqualsNormalizationCount": true,
+  "grantorPerMembershipCausalIdentityProven": false,
+  "applicationCatalogObjects": {
+    "schemas": {
+      "sourceObjectCount": 3,
+      "restoredObjectCount": 3,
+      "legacyAclHashOnlyMismatchCount": 2,
+      "missingCount": 0,
+      "additionalCount": 0
+    },
+    "tables": {
+      "sourceObjectCount": 94,
+      "restoredObjectCount": 94,
+      "legacyAclHashOnlyMismatchCount": 8,
+      "missingCount": 0,
+      "additionalCount": 0
+    },
+    "functions": {
+      "sourceObjectCount": 322,
+      "restoredObjectCount": 322,
+      "legacyAclHashOnlyMismatchCount": 19,
+      "missingCount": 0,
+      "additionalCount": 0
+    }
+  },
+  "observedCanonicalAclApplicationCatalogParity": true,
+  "legacyApplicationScopeVerdict": "HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH",
+  "roleMembershipParityProven": false,
+  "fullProviderManagedRestore": false,
+  "providerManagedCopyBlocksSkipped": 29,
+  "providerManagedCopyBlocksProjected": 3,
+  "authoritativePrivacyReconciliation": false,
+  "futureSafePrivacyReconciliation": false,
+  "servingGate": "BLOCKED",
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "interpretationLimits": [
+    "All 43 application role attributes and seven direct MyeongHa-to-MyeongHa membership option sets agree in the sealed source and isolated target.",
+    "Seven grantor attribution groups differ, and exactly seven grantor-provenance removal statements were counted during portable replay; counts alone do not prove exact per-edge causation.",
+    "No provider-owned cross-boundary roles or grants, inherited effective access, whole provider migration ledger, or Hosted Auth/Storage parity is proven.",
+    "Read-only source catalog was bracketed to the backup execution but does not share its PostgreSQL MVCC snapshot.",
+    "Legacy ACL hashes still differ on 29 objects despite canonical ACL agreement. The existing fail-closed application scope verdict is HOLD.",
+    "No full-service RPO/RTO, nonzero independent privacy ledger continuity, or recovered-serving approval."
+  ]
+}

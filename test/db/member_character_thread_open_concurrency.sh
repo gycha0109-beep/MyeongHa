@@ -6,6 +6,10 @@ psql_base=(psql -X -qAt -v ON_ERROR_STOP=1)
 fail() { echo "FAIL $*" >&2; exit 1; }
 pass() { echo "PASS $*"; }
 
+sha256_v1() {
+  printf '%s' "$1" | sha256sum | awk '{ print "sha256:v1:" $1 }'
+}
+
 runtime_query() {
   local subject_id="$1"
   local sql="$2"
@@ -299,5 +303,270 @@ pass "thread open wrapper preserves command-only least-privilege runtime authori
 if [[ "${CI:-}" == 'true' && "${PGDATABASE:-}" == myeongha_ci_case_* ]] &&
    (( $(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num') >= 170000 )); then
   bash test/db/seyeon_relationship_isolated_restore_proof.sh
+
+  # Four additional Character chat-open branches must work with exact
+  # independently published releases in disposable PG17, not Production.
+  psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/character-chat/production-01-four-character-independent-release-open-20261106.sql >/dev/null
+  psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/character-chat/production-02-four-character-published-artifact-read-20261106.sql >/dev/null
+  psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/character-chat/production-03-four-character-chat-turn-runtime-20261106.sql >/dev/null
+  psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
+insert into public.content_bundles(
+ id,content_version,content_hash,artifact_ref,artifact_schema_version,
+ min_client_capability,asset_manifest_hash,cue_schema_version,manifest_jsonb,
+ published_at,retired_at)
+values ('c3000000-0000-0000-0000-000000000003','four-test',
+ 'sha256:v1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+ 'docs/character/four-test-publication-v1.json','v1','web-v1',
+ 'asset-test','cue-v1','{}'::jsonb,clock_timestamp(),null);
+insert into public.content_releases(
+ id,release_key,content_bundle_id,status,is_default,rollout_jsonb,
+ rollout_policy_version,rollout_seed,activated_at,retired_at,created_at)
+values ('c4000000-0000-0000-0000-000000000003','four-test-release',
+ 'c3000000-0000-0000-0000-000000000003','active',false,null,
+ 'uniform-default-v1','synthetic',clock_timestamp(),null,clock_timestamp());
+insert into public.characters(character_id,created_at,retired_at) values
+ ('baekheon',clock_timestamp(),null),('yeoul',clock_timestamp(),null),
+ ('rahyeon',clock_timestamp(),null),('taegyeom',clock_timestamp(),null),
+ ('yunho',clock_timestamp(),null);
+insert into public.character_runtime_catalog(
+ character_id,content_bundle_id,availability,enabled,release_at,retire_at,published_at)
+select character_id,'c3000000-0000-0000-0000-000000000003',
+ 'available',true,null,null,clock_timestamp()
+from public.characters where character_id in
+ ('baekheon','yeoul','rahyeon','taegyeom','yunho');
+SQL
+  case_index=0
+  for target in baekheon yeoul rahyeon taegyeom; do
+    case_index=$((case_index+1))
+    candidate_thread="$(printf 'c5000000-0000-0000-0000-%012d' "$case_index")"
+    candidate_part="$(printf 'c6000000-0000-0000-0000-%012d' "$case_index")"
+    expected="$target|t|c4000000-0000-0000-0000-000000000003|c3000000-0000-0000-0000-000000000003"
+    actual="$(psql -X -qAt -v ON_ERROR_STOP=1 <<SQL
+begin;
+set local role myeongha_api_executor;
+set local myeongha.subject_id='b2000000-0000-0000-0000-000000000003';
+select character_id,created,active_content_release_id,active_content_bundle_id
+from public.cmd_open_member_single_character_thread_v1(
+'b2000000-0000-0000-0000-000000000003','$target','$candidate_thread','$candidate_part');
+commit;
+SQL
+)"
+    [[ "$actual" == "$expected" ]] || fail "four-character independent $target open failed: $actual"
+    again="$(psql -X -qAt -v ON_ERROR_STOP=1 <<SQL
+begin;
+set local role myeongha_api_executor;
+set local myeongha.subject_id='b2000000-0000-0000-0000-000000000003';
+select thread_id,created
+from public.cmd_open_member_single_character_thread_v1(
+'b2000000-0000-0000-0000-000000000003','$target',
+'c7000000-0000-0000-0000-000000000099',
+'c8000000-0000-0000-0000-000000000099');
+commit;
+SQL
+)"
+    [[ "$again" == "$candidate_thread|f" ]] || fail "four-character independent $target reuse failed: $again"
+    pass "independent $target chat room opens and reuses without rebinding"
+    evidence="$(runtime_query 'b2000000-0000-0000-0000-000000000003' "
+      select character_id,content_version,artifact_ref
+      from public.qry_four_character_published_artifact_v1(
+        'b2000000-0000-0000-0000-000000000003',
+        '$candidate_thread','$target',
+        'c4000000-0000-0000-0000-000000000003',
+        'c3000000-0000-0000-0000-000000000003'
+      );")"
+    [[ "$evidence" == "$target|four-test|docs/character/four-test-publication-v1.json" ]] ||
+      fail "independent $target published artifact read mismatch: $evidence"
+    pass "independent $target published DB artifact is scoped to pinned Member room"
+  done
+
+  expect_runtime_fail "foreign Member cannot read another Member pinned publication" \
+    'b2000000-0000-0000-0000-000000000004' \
+    'Published Character source is unavailable' "
+      select * from public.qry_four_character_published_artifact_v1(
+        'b2000000-0000-0000-0000-000000000004',
+        'c5000000-0000-0000-0000-000000000001',
+        'baekheon',
+        'c4000000-0000-0000-0000-000000000003',
+        'c3000000-0000-0000-0000-000000000003'
+      );"
+
+  expect_runtime_fail "forged publication release must fail closed" \
+    'b2000000-0000-0000-0000-000000000003' \
+    'Published Character source is unavailable' "
+      select * from public.qry_four_character_published_artifact_v1(
+        'b2000000-0000-0000-0000-000000000003',
+        'c5000000-0000-0000-0000-000000000001',
+        'baekheon',
+        'b4000000-0000-0000-0000-000000000001',
+        'c3000000-0000-0000-0000-000000000003'
+      );"
+
+  expect_runtime_fail "Yunho cannot read non-default Character artifact" \
+    'b2000000-0000-0000-0000-000000000003' \
+    'Published Character source is unavailable' "
+      select * from public.qry_four_character_published_artifact_v1(
+        'b2000000-0000-0000-0000-000000000003',
+        'c5000000-0000-0000-0000-000000000001',
+        'yunho',
+        'c4000000-0000-0000-0000-000000000003',
+        'c3000000-0000-0000-0000-000000000003'
+      );"
+
+  published_read_public=$("${psql_base[@]}" -c "select has_function_privilege('public','public.qry_four_character_published_artifact_v1(uuid,uuid,text,uuid,uuid)','EXECUTE')::int;")
+  published_read_executor=$("${psql_base[@]}" -c "select has_function_privilege('myeongha_api_executor','public.qry_four_character_published_artifact_v1(uuid,uuid,text,uuid,uuid)','EXECUTE')::int;")
+  [[ "$published_read_public" == '0' && "$published_read_executor" == '1' ]] ||
+    fail "published artifact reader must be executable only through API role"
+
+  # Exercise the optional four-Character turn runtime against the same
+  # disposable PG17 database: receive -> allocate -> generate -> validate
+  # -> atomic commit + receipt -> idempotent recipient ACK.
+  member_id='b2000000-0000-0000-0000-000000000003'
+  thread_id='c5000000-0000-0000-0000-000000000001'
+  release_id='c4000000-0000-0000-0000-000000000003'
+  bundle_id='c3000000-0000-0000-0000-000000000003'
+  turn_id='d1000000-0000-0000-0000-000000000001'
+  user_message_id='d2000000-0000-0000-0000-000000000001'
+  attempt_id='d3000000-0000-0000-0000-000000000001'
+  generation_log_id='d4000000-0000-0000-0000-000000000001'
+  assistant_message_id='d5000000-0000-0000-0000-000000000001'
+  outbox_event_id='d6000000-0000-0000-0000-000000000001'
+  delivery_receipt_id='d7000000-0000-0000-0000-000000000001'
+  validation_log_id='d8000000-0000-0000-0000-000000000001'
+  source_digest='sha256:v1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+  user_text='four-character database integration test'
+  assistant_text='four-character database reply'
+  request_snapshot=$(printf '{"bundleId":"%s","characterId":"baekheon","releaseId":"%s","schemaVersion":"four-character-chat-request-v1","sourceDigest":"%s","userText":"%s"}' "$bundle_id" "$release_id" "$source_digest" "$user_text")
+  request_hash=$(sha256_v1 "$request_snapshot")
+  user_content_hash=$(sha256_v1 "$user_text")
+  assistant_content_hash=$(sha256_v1 "$assistant_text")
+
+  received=$(runtime_query "$member_id" "
+    select turn_id::text || '|' || user_message_id::text || '|' ||
+           thread_character_id::text || '|' || turn_state || '|' ||
+           content_release_id::text || '|' || content_bundle_id::text || '|' ||
+           replayed::text
+    from public.cmd_receive_four_character_chat_turn_runtime_v1(
+      '$member_id','$thread_id','four-character-client-turn-1',
+      '$request_hash','four-character-chat-request-v1',
+      '$request_snapshot'::jsonb,'$release_id','$bundle_id',
+      '$turn_id','$user_message_id','$user_text','$user_content_hash'
+    );")
+  [[ "$received" == "$turn_id|$user_message_id|c6000000-0000-0000-0000-000000000001|received|$release_id|$bundle_id|false" ]] ||
+    fail "four-Character receive did not preserve the exact Member/thread/source Pin: $received"
+  pass "four-Character receive binds Member, pinned Character, release, bundle and source digest"
+
+  allocated=$(runtime_query "$member_id" "
+    select attempt_id::text || '|' || attempt_no::text || '|' || replayed::text
+    from public.cmd_allocate_four_character_chat_attempt_runtime_v1(
+      '$member_id','$turn_id','$attempt_id','four-character-chat-planner-v1'
+    );")
+  [[ "$allocated" == "$attempt_id|1|false" ]] || fail "four-Character attempt allocation failed: $allocated"
+  context_ready=$(runtime_query "$member_id" "
+    select public.cmd_mark_four_character_chat_context_ready_runtime_v1(
+      '$member_id','$turn_id','$attempt_id'
+    );")
+  [[ "$context_ready" == 'f' ]] || fail "four-Character context-ready transition was unexpectedly replayed: $context_ready"
+
+  generated=$(runtime_query "$member_id" "
+    select public.cmd_persist_four_character_chat_generated_runtime_v1(
+      '$member_id','$turn_id','$attempt_id',
+      'c6000000-0000-0000-0000-000000000001','$generation_log_id',
+      'four-character-test-provider','four-character-test-model',
+      'four-character-chat-renderer-v1','$assistant_text',
+      jsonb_build_object('text','$assistant_text'),
+      'four-character-chat-message-v1','$assistant_content_hash','[]'::jsonb
+    );")
+  [[ -n "$generated" ]] || fail "four-Character generated output persistence returned no result"
+
+  validated=$(runtime_query "$member_id" "
+    select public.cmd_persist_four_character_chat_validated_runtime_v1(
+      '$member_id','$turn_id','$attempt_id','$validation_log_id',
+      'myeongha-internal','deterministic-four-character-output-guard',
+      'four-character-output-guard-v1','$assistant_content_hash',
+      jsonb_build_object(
+        'approved',true,
+        'characterId','baekheon',
+        'sourceDigest','$source_digest',
+        'generatedContentHash','$assistant_content_hash',
+        'outputGuardVersion','four-character-output-guard-v1',
+        'groundingRefs','[]'::jsonb
+      ),
+      '[]'::jsonb
+    );")
+  [[ -n "$validated" ]] || fail "four-Character validation persistence returned no result"
+
+  committed=$(runtime_query "$member_id" "
+    select turn_id::text || '|' || attempt_id::text || '|' ||
+           assistant_message_id::text || '|' || delivery_receipt_id::text || '|' ||
+           replayed::text
+    from public.cmd_commit_four_character_chat_turn_with_receipt_runtime_v1(
+      '$member_id','$thread_id','$turn_id','$attempt_id',
+      '$assistant_message_id','$outbox_event_id','$delivery_receipt_id','$source_digest'
+    );")
+  [[ "$committed" == "$turn_id|$attempt_id|$assistant_message_id|$delivery_receipt_id|false" ]] ||
+    fail "four-Character atomic commit/receipt issue failed: $committed"
+  pass "four-Character validated turn commits once and issues a source-bound receipt"
+
+  expect_runtime_fail "four-Character commit rejects a changed source digest" \
+    "$member_id" \
+    "Delivery receipt source does not match the exact received Character publication" "
+      select * from public.cmd_commit_four_character_chat_turn_with_receipt_runtime_v1(
+        '$member_id','$thread_id','$turn_id','$attempt_id',
+        '$assistant_message_id','$outbox_event_id','$delivery_receipt_id',
+        'sha256:v1:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+      );"
+
+  acked=$(runtime_query "$member_id" "
+    select delivery_receipt_id::text || '|' || assistant_message_id::text || '|' ||
+           (acknowledged_at is not null)::text || '|' || replayed::text
+    from public.cmd_ack_four_character_chat_delivery_receipt_v1(
+      '$member_id','$thread_id','$delivery_receipt_id'
+    );")
+  [[ "$acked" == "$delivery_receipt_id|$assistant_message_id|true|false" ]] ||
+    fail "four-Character delivery ACK failed: $acked"
+  ack_replayed=$(runtime_query "$member_id" "
+    select delivery_receipt_id::text || '|' || assistant_message_id::text || '|' ||
+           (acknowledged_at is not null)::text || '|' || replayed::text
+    from public.cmd_ack_four_character_chat_delivery_receipt_v1(
+      '$member_id','$thread_id','$delivery_receipt_id'
+    );")
+  [[ "$ack_replayed" == "$delivery_receipt_id|$assistant_message_id|true|true" ]] ||
+    fail "four-Character delivery ACK replay was not idempotent: $ack_replayed"
+  receipt_state=$("${psql_base[@]}" -c "
+    select character_id || '|' || source_digest || '|' ||
+           case when acknowledged_at is not null then 't' else 'f' end
+    from public.four_character_chat_delivery_receipts_v1
+    where id='$delivery_receipt_id';")
+  [[ "$receipt_state" == "baekheon|$source_digest|t" ]] ||
+    fail "four-Character receipt did not retain its exact source/ACK state: $receipt_state"
+  pass "four-Character recipient ACK is source-bound and idempotent"
+
+  runtime_acl=$("${psql_base[@]}" -c "
+    select
+      has_function_privilege('myeongha_api_executor','public.cmd_commit_four_character_chat_turn_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid)','EXECUTE')::int,
+      has_function_privilege('myeongha_api_executor','public.cmd_commit_four_character_chat_turn_with_receipt_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)','EXECUTE')::int,
+      has_function_privilege('myeongha_api_executor','public.cmd_ack_four_character_chat_delivery_receipt_v1(uuid,uuid,uuid)','EXECUTE')::int,
+      has_table_privilege('myeongha_api_executor','public.four_character_chat_delivery_receipts_v1','SELECT,INSERT,UPDATE,DELETE')::int;
+  ")
+  [[ "$runtime_acl" == '0|1|1|0' ]] ||
+    fail "four-Character runtime must expose only receipt-aware commands, not direct receipt table access: $runtime_acl"
+  pass "four-Character runtime keeps receipt table private and exposes only narrow commands"
+
+  set +e
+  yunho_out="$(psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL' 2>&1
+begin;
+set local role myeongha_api_executor;
+set local myeongha.subject_id='b2000000-0000-0000-0000-000000000003';
+select * from public.cmd_open_member_single_character_thread_v1(
+'b2000000-0000-0000-0000-000000000003','yunho',
+'c5000000-0000-0000-0000-000000000099',
+'c6000000-0000-0000-0000-000000000099');
+commit;
+SQL
+)"
+  yunho_rc=$?
+  set -e
+  [[ "$yunho_rc" -ne 0 && "$yunho_out" == *"selected Character has no active published content release"* ]] || fail "Yunho independent release must remain disconnected"
+  pass "Yunho discovery remains untouched, but non-default chat-open stays denied"
 fi
 echo "Member Character thread open persistence/concurrency tests passed"

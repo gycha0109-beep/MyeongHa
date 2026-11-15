@@ -1,4 +1,40 @@
+## 2026-11-14 workerd slow-DB / local acquisition timeout — actual Linux PASS
+
+- Corrected request-local PostgreSQL client code from [PR #3310](https://github.com/gycha0109-beep/MyeongHa/pull/3310); exact main `5ad56e5775644e656db6b1029612c3911c5032a8`; [isolated run #43597769780](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43597769780) SUCCESS. Evidence artifact `14115168226`, JSON SHA-256 `2c5768e300090d6d9bfa230793e4df26a4b3b42cf4a761ed5af7c931678e2c14` (expires 2026-11-28 UTC).
+- Real disposable GoTrue JWT/PG18 RLS/Saju/workerd: 12/12 baseline 200; under a real synthetic PostgreSQL table lock 4/4 bounded 503; local fixture two-slot gate at 125ms observed 16 acquisition attempts, two acquisition failures/timeouts and peak two; health 200; release lock then recovery 4/4 HTTP 200 (p95 279.819ms). Anonymous denied, no identifiers in artifact and disposable runtime/Docker cleanup PASS.
+- Separate PG18 RLS/pool proof artifact `14115073288` also PASS. Historical first attempt [#43592572032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43592572032) remains FAILED, not rewritten. Existing DB outage and 900-second overlap runs are reused.
+- Acceptance: missing Phase 11 **isolated** slow DB/acquisition condition now OBSERVED and PASS. It is not Hosted Hyperdrive acquisition data, Cloudflare Production admission, Production capacity, production scaling policy or service DR. All related HOLD flags remain unchanged.
+
+Watchtower-Track: ops
+
+## 2026-11-14 workerd 느린 DB 첫 보호 실행 결과 — BLOCKED, 요청별 연결 수정
+
+[실행 #43592572032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43592572032): 기본 PG18 RLS·합성 압력 PASS, 실제 workerd 제품 경로 `workerd_requests` 실패. 실증 상태는 `BLOCKED_INCOMPLETE`이며 계획된 4개 동시 요청의 제한 실패·획득 대기 초과·복구 4/4 수용을 완료하지 못했다.
+
+Cloudflare Workers는 서로 다른 요청 사이에 DB socket/`pg.Pool`을 공유할 수 없으므로 테스트 fixture의 전역 Pool을 폐기한다. 새 실험은 각 요청에서 새 DB Client를 사용하고 전역에는 비식별 숫자형 2-slot 획득 제한/125ms 대기 초과만 저장한다. 이는 **local fixture의 슬롯 대기**이지 Hosted Hyperdrive 및 Production Pool 측정이 아니다. 기존 503·Health 200·4/4 복구 조건을 유지하고 실제 최고 동시 슬롯 2 이하를 확인한다. 정확한 최신 `main` 병합 후 동일 수동 실험을 재시도하며 새 성공 artifact 확인 전에는 실증 `NOT_OBSERVED`로 유지한다.
+
+Watchtower-Track: ops
+
+## 2026-11-14 isolated workerd slow DB / pool acquisition timeout experiment - implementation, not evidence
+
+Reuse real workerd DB outage [#42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024) and the 15-minute overlap [#42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347). Execute only the missing slow DB/pool scenario as a manual main-only dispatch after merge:
+
+    gh workflow run postgres-isolated-rls-capacity-acceptance.yml -R gycha0109-beep/MyeongHa --ref main -f experiment=workerd_db_slow_pool
+
+The manual workflow uses local workerd with a disposable GoTrue, PG18 RLS and fixed real Saju engine. Only this mode enables a maximum two-connection/125ms-acquisition-timeout local pool and a temporary ACCESS EXCLUSIVE lock on a synthetic table. It must observe four simultaneous bounded 503 responses, a positive local pool acquisition timeout count, independent Health 200 and full 4/4 recovery after unlocking. Existing workerd, workerd_overlap and workerd_db_failover modes are unchanged.
+
+Actual Linux proof is NOT_OBSERVED before a successful run and inspection of its original artifact. This cannot establish Production capacity or Hosted Hyperdrive performance. Keep productionWorkerAdmissionMeasured=false, hostedHyperdriveMeasured=false, productionCapacityProven=false, productionScalingThresholdApproved=false, drReady=false, serviceResumptionAllowed=false, ROADMAP_COMPLETE=false. No Production change or external paid resource is authorized.
+
+Watchtower-Track: ops
+
 # Phase 11 — Controlled non-production loopback capacity probe
+
+## 2026-11-13 증거 정렬 — 기존 workerd DB 장애·회복 실증 재사용
+
+- 기존 보호된 `main`의 [실제 Linux 실행 #42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024)은 **SUCCESS**였으며, source `3bdec3c162b132284498ebed38e15feaf32c0ff9` 및 [증거 아티팩트 #13586047057](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024/artifacts/13586047057)에서 확인한 ZIP SHA-256은 `1f0047d4cb5276e726733966869618f99902d0e8f39c46d34bfda0ca609ac145`다.
+- 실제 `workerd` + GoTrue + PostgreSQL18 강제 RLS + 고정 Saju 제품 경로의 기준 요청 **12/12 성공**. 격리 DB 프로세스 실제 중지 후 **4/4 bounded unavailable**, 독립 Health **200**, 재기동 후 동시 4개 요청 **4/4 성공**, 추가 시도 1번. 익명 거부·런타임·Docker 정리 성공.
+- 이는 **Phase 11의 DB unavailable 시 bounded-fail/독립 Health/회복 항목에 재사용 가능한 실측**이다. 추가 동일 실험은 시행하지 않는다. `workerd` 제품 경로에서의 **slow DB·pool acquisition timeout**은 여전히 별도 미입증이며, 실제 Hosted Hyperdrive·현재 배포 Worker/Production 용량은 별도다. [비식별 원본 근거 정렬](PHASE11_DISPOSABLE_WORKERD_DB_OUTAGE_EVIDENCE_20261113.json).
+- `productionWorkerAdmissionMeasured=false`, `hostedHyperdriveMeasured=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false` 유지한다.
 
 ## Actual local Workers runtime observation
 

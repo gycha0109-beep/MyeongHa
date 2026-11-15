@@ -55,6 +55,10 @@ try {
     and not has_table_privilege('myeongha_api_executor','public.record_access_grants','UPDATE')
     and not has_table_privilege('myeongha_api_executor','public.record_access_grants','INSERT')
     and not has_function_privilege('myeongha_api_executor',
+      'public.cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.pin_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
       'seyeon_private.lock_memory_subject_v1(uuid)', 'EXECUTE')
     and not has_function_privilege('myeongha_api_executor',
       'public.cmd_grant_seyeon_owned_conversation_recall_v1(uuid,uuid,uuid)', 'EXECUTE')

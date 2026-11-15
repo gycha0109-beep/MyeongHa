@@ -9,9 +9,13 @@ const createPrivacy=vi.fn(()=>({handleRequest:privacyHandleRequest,close:privacy
 const receiptHandleRequest=vi.fn(async()=>Response.json({ok:true,data:{accepted:true}}));
 const receiptClose=vi.fn(async()=>{});
 const createReceipt=vi.fn(()=>({handleRequest:receiptHandleRequest,close:receiptClose}));
+const policyState=vi.hoisted(()=>({positiveMemoryFirstReplyApproved:true,creditBillingProductionMounted:false}));
 vi.mock('../apps/api/src/seyeon-security-s0-production-policy-v1.js',()=>({
-  SEYEON_SECURITY_S0_PRODUCTION_V1:{receiptAndWithdrawalEnabled:true,modelUseEnabled:true,
-    creditBilling:{productionMounted:false}},
+  get SEYEON_SECURITY_S0_PRODUCTION_V1(){return{
+    receiptAndWithdrawalEnabled:true,modelUseEnabled:true,
+    positiveMemoryFirstReplyApproved:policyState.positiveMemoryFirstReplyApproved,
+    creditBilling:{productionMounted:policyState.creditBillingProductionMounted},
+  };},
   SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1:{},
 }));
 vi.mock('../workers/cloudflare-seyeon-first-memory-runtime.mjs',()=>({
@@ -27,12 +31,35 @@ const env=()=>({MYEONGHA_CLOUDFLARE_AUTH_DB_MODE:'approved-auth-db-v1',
   MYEONGHA_CLOUDFLARE_AUTH_ORIGIN:root,MYEONGHA_CLOUDFLARE_WORKERS_DEV_ORIGIN:root,
   MYEONGHA_AUTH_RATE_LIMIT_SECRET:'x'.repeat(64),
   AUTH_RATE_LIMITER:{limit:vi.fn(async()=>({success:true}))}});
-afterEach(()=>vi.clearAllMocks());
+afterEach(()=>{vi.clearAllMocks();policyState.positiveMemoryFirstReplyApproved=true;policyState.creditBillingProductionMounted=false;});
 describe('primary Worker S0 receipt routing',()=>{
  it('admits exact receipt through the shared edge limiter before the request-local runtime',async()=>{
    const bindings={...env(),CF_VERSION_METADATA:{id:'11111111-2222-4333-8444-555555555555'}};const r=await worker.default.fetch(request('/api/chat/delivery-receipts/'+id),bindings,{});
    expect(r.status).toBe(200);expect(r.headers.get('x-myeongha-worker-version')).toBe(bindings.CF_VERSION_METADATA.id);expect(createReceipt).toHaveBeenCalledTimes(1);
+   expect(createReceipt).toHaveBeenCalledWith(expect.objectContaining({creditSettlementEnabled:false}));
    expect(receiptClose).toHaveBeenCalledTimes(1);expect(bindings.AUTH_RATE_LIMITER.limit).toHaveBeenCalledTimes(1);
+ });
+ it('keeps the positive Memory route closed until the server source approval is true',async()=>{
+   policyState.positiveMemoryFirstReplyApproved=false;
+   const response=await worker.default.fetch(request('/api/chat/'+id+'/turns'),env(),{});
+   expect(response.status).toBe(503);
+   expect(create).not.toHaveBeenCalled();
+   expect(verifyOwnerCreditExemption).not.toHaveBeenCalled();
+   expect(handleRequest).not.toHaveBeenCalled();
+ });
+ it('routes mounted paid turns through G4 without the Owner-only precheck',async()=>{
+   policyState.creditBillingProductionMounted=true;
+   const response=await worker.default.fetch(request('/api/chat/'+id+'/turns'),env(),{});
+   expect(response.status).toBe(200);
+   expect(create).toHaveBeenCalledWith(expect.objectContaining({creditBillingProductionMounted:true}));
+   expect(verifyOwnerCreditExemption).not.toHaveBeenCalled();
+   expect(handleRequest).toHaveBeenCalledTimes(1);
+ });
+ it('passes the mounted credit settlement state to the receipt bridge runtime',async()=>{
+   policyState.creditBillingProductionMounted=true;
+   const response=await worker.default.fetch(request('/api/chat/delivery-receipts/'+id),env(),{});
+   expect(response.status).toBe(200);
+   expect(createReceipt).toHaveBeenCalledWith(expect.objectContaining({creditSettlementEnabled:true}));
  });
  it('fails closed before any DB runtime when admission is absent or rate limited',async()=>{
    expect((await worker.default.fetch(request('/api/chat/delivery-receipts/'+id),{},{})).status).toBe(503);

@@ -56,7 +56,7 @@ function parseQuotedIdentifiers(raw) {
   return values;
 }
 
-function parseCopyHeader(line) {
+export function parseCopyHeader(line) {
   const match = line.match(/^COPY "((?:[^"]|"")+)"\."((?:[^"]|"")+)" \((.*)\) FROM stdin;$/);
   if (!match) {
     if (line.startsWith('COPY ')) throw new Error(`Unsupported COPY statement: ${line}`);
@@ -77,7 +77,7 @@ function buildCopyHeader(copy, columns) {
   return `COPY ${quoteIdentifier(copy.schema)}.${quoteIdentifier(copy.table)} (${columns.map(quoteIdentifier).join(', ')}) FROM stdin;`;
 }
 
-function buildCatalog(records) {
+export function buildCatalog(records) {
   if (!Array.isArray(records)) throw new Error('Target catalog must be a JSON array.');
   const catalog = new Map();
   for (const record of records) {
@@ -99,7 +99,7 @@ function buildCatalog(records) {
   return catalog;
 }
 
-function assessCompatibility(copy, catalog) {
+export function assessCompatibility(copy, catalog) {
   const key = `${copy.schema}\u0000${copy.table}`;
   const targetColumns = catalog.get(key);
   if (!targetColumns) {

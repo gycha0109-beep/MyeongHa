@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "ops-chat-open-rpc-source-boundary-v1",
+  "metadataSource": "docs/operations/POSTGRES_CURRENT_INDIRECT_RPC_REFERENCE_CANDIDATES_20261108.json",
+  "grantSource": "docs/operations/POSTGRES_CURRENT_RLS_DISABLED_ROLE_GRANTS_20261108.json",
+  "projectRef": "cnsfpcdiyofqvhpcegfc",
+  "method": "POST",
+  "route": "/api/chat",
+  "command": {
+    "schema": "public",
+    "name": "cmd_open_member_single_character_thread_v1",
+    "signature": "p_subject_id uuid, p_character_id text, p_thread_id uuid, p_thread_character_id uuid",
+    "owner": "myeongha_chat_thread_open_owner",
+    "definitionSha256": "0a12e9d127007b07c0c119e380d8a6a0495bdd86cb395ad14579aeb029e1a808",
+    "securityDefiner": true,
+    "apiExecutorCallable": true,
+    "anonCallable": false,
+    "authenticatedCallable": false,
+    "serviceRoleCallable": false,
+    "searchPathKind": "nonempty",
+    "tableNameHints": [
+      "character_runtime_catalog",
+      "content_bundles",
+      "content_releases"
+    ],
+    "concreteCatalogDependenciesConfirmed": false
+  },
+  "sourceSha256": {
+    "apps/api/src/production-chat-read-runtime.ts": "458792c484570c2e27a4367b283ef2907b048759e0872179b2622adc2d37ecbd",
+    "apps/api/src/chat-open-http.ts": "433f1350124a616172d6c90f3977be0ef52b02804662f2ace4c54762c1af12d2",
+    "apps/api/src/postgres-subject-execution.ts": "b5f8de160d71f32a3d7d285b9fc0f7293ca692809352937b6442b530792c7f6c"
+  },
+  "sourceChecks": {
+    "routeMountMatched": true,
+    "identityVerificationBeforeBodyMatched": true,
+    "memberOnlyCheckBeforeQueryMatched": true,
+    "parameterizedCommandMatched": true,
+    "transactionLocalRoleMatched": true,
+    "subjectAssertionBeforeQueryMatched": true,
+    "rollbackAndReleaseTextMatched": true
+  },
+  "authority": {
+    "staticSourceBoundaryMatched": true,
+    "liveFunctionGrantsObserved": true,
+    "deployedRouteAndCallerContextTested": false,
+    "databaseFunctionBodyAuthorizationAudited": false,
+    "SQLCallGraphProven": false,
+    "isolatedRestoreParityProven": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false
+  }
+}

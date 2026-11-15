@@ -689,8 +689,8 @@
 .conversation-chat-kicker {
   display: block;
   margin-bottom: 3px;
-  color: var(--conversation-brass);
-  font-size: 9px;
+  color: var(--conversation-brass-dark);
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: .16em;
 }
@@ -708,8 +708,8 @@
 }
 
 .conversation-chat-head .character-dialogue-name-row span {
-  color: #857a6e;
-  font-size: 13px;
+  color: #53434b;
+  font-size: 14px;
 }
 
 .conversation-chat-head-actions {
@@ -795,13 +795,14 @@
 
 .conversation-message-heading strong,
 .conversation-message-body > strong {
-  color: #4a4037;
-  font-size: 12px;
+  color: #352d2c;
+  font-size: 14px;
 }
 
 .conversation-message-heading time {
-  color: #a09990;
-  font-size: 10px;
+  color: #62535c;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .conversation-message-body p {
@@ -809,9 +810,12 @@
   padding: 11px 14px;
   border: 1px solid rgba(153,116,70,.18);
   border-radius: 5px 13px 13px 13px;
-  color: #413b35;
-  background: rgba(255,252,247,.9);
-  line-height: 1.65;
+  color: #2c2530;
+  background: rgba(255,252,247,.97);
+  font-family: var(--mh-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -827,7 +831,7 @@
 .conversation-message[data-sender="user"] .conversation-message-body p {
   border-color: rgba(144,112,72,.20);
   border-radius: 13px 5px 13px 13px;
-  background: #efe4d4;
+  background: #efe0cc;
 }
 
 .conversation-composer {
@@ -854,8 +858,8 @@
   flex: 0 0 auto;
   min-height: 18px;
   margin: -8px 24px 10px;
-  color: #96705c;
-  font-size: 11px;
+  color: #5e4b40;
+  font-size: 13px;
 }
 
 /* Mobile */
@@ -1267,12 +1271,12 @@
 }
 
 .character-room-v2[data-character="seyeon"] .conversation-message-body p {
-  background: rgba(255,252,246,.90);
+  background: rgba(255,252,246,.97);
   border-color: rgba(183,134,96,.20);
 }
 
 .character-room-v2[data-character="seyeon"] .conversation-message[data-sender="user"] .conversation-message-body p {
-  background: rgba(239,224,204,.94);
+  background: rgba(239,224,204,.98);
 }
 
 .character-room-v2[data-character="seyeon"] [data-character-avatar],
@@ -1322,19 +1326,19 @@ html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .convers
 
 html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-chat-head .character-dialogue-name-row span,
 html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-message-heading time {
-  color: #7f7165;
+  color: #5e5148;
 }
 
 html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-message-body p {
-  color: #413b35;
-  border-color: rgba(183,134,96,.20);
-  background: rgba(255,252,246,.90);
+  color: #2c2530;
+  border-color: rgba(183,134,96,.28);
+  background: rgba(255,252,246,.97);
 }
 
 html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-message[data-sender="user"] .conversation-message-body p {
-  color: #45372d;
-  border-color: rgba(144,112,72,.20);
-  background: rgba(239,224,204,.94);
+  color: #352b32;
+  border-color: rgba(144,112,72,.28);
+  background: rgba(239,224,204,.98);
 }
 
 html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-composer {

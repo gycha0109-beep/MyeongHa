@@ -90,16 +90,27 @@ function projectExactCountRequest(
 export function createSeyeonOpenAiInputTokenCountAdmissionV1(
   config: SeyeonOpenAiInputTokenCountConfigV1,
 ): SeyeonAiGovernorAdmissionV1 {
-  const policy = validateSeyeonCostGovernorModelPolicyV1(config.policy);
+  const validated = validateSeyeonCostGovernorModelPolicyV1(config.policy);
+  // The token-certification endpoint is part of the same paid-dispatch
+  // authority as the Governor. Pin *owned* immutable copies: callers may
+  // mutate the original model, rate card, key or headroom after construction.
+  const policy = Object.freeze({
+    ...validated,
+    allowedPurposes: Object.freeze([...validated.allowedPurposes]),
+    priceQuote: Object.freeze({...validated.priceQuote}),
+  });
+  const apiKey = config.apiKey;
+  const model = config.model;
+  const reservedHeadroomTokens = config.reservedHeadroomTokens;
   if (policy.providerKey !== 'openai-responses' ||
-      config.model !== policy.modelKey ||
-      typeof config.apiKey !== 'string' ||
-      config.apiKey.trim() !== config.apiKey ||
-      config.apiKey.length < 10 ||
-      /[\r\n]/u.test(config.apiKey) ||
-      !Number.isSafeInteger(config.reservedHeadroomTokens) ||
-      config.reservedHeadroomTokens < 1 ||
-      config.reservedHeadroomTokens >= policy.maximumInputTokens) {
+      model !== policy.modelKey ||
+      typeof apiKey !== 'string' ||
+      apiKey.trim() !== apiKey ||
+      apiKey.length < 10 ||
+      /[\r\n]/u.test(apiKey) ||
+      !Number.isSafeInteger(reservedHeadroomTokens) ||
+      reservedHeadroomTokens < 1 ||
+      reservedHeadroomTokens >= policy.maximumInputTokens) {
     throw new Error('Input token count requires a valid server-owned OpenAI policy.');
   }
   const limitMs = config.timeoutMs ?? 8000;
@@ -135,7 +146,7 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
           result = await awaitBoundedUpstreamJsonResponseHeadersV1(send(SEYEON_OPENAI_INPUT_TOKEN_COUNT_ENDPOINT_V1,{
             method:'POST',
             headers:{
-              authorization:'Bearer '+config.apiKey,
+              authorization:'Bearer '+apiKey,
               accept:'application/json',
               'content-type':'application/json',
             },
@@ -186,7 +197,7 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
             (payload.input_tokens as number)<1) {
           throw new Error('Input token count receipt is malformed.');
         }
-        const resultUpperBound=(payload.input_tokens as number)+config.reservedHeadroomTokens;
+        const resultUpperBound=(payload.input_tokens as number)+reservedHeadroomTokens;
         if (!Number.isSafeInteger(resultUpperBound) ||
             resultUpperBound>policy.maximumInputTokens) {
           throw new Error('Input token count exceeds approved model budget.');

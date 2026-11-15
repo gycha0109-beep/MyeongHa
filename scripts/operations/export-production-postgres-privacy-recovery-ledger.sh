@@ -76,6 +76,22 @@ supported_events as (
   union all
 
   select
+    ev.deleted_at,
+    'SHARED_MEMORY_NOTE_DELETED',
+    ev.item_id::text,
+    jsonb_build_object(
+      'occurredAt', to_char(ev.deleted_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+      'type', 'SHARED_MEMORY_NOTE_DELETED',
+      'sharedMemoryItemId', ev.item_id,
+      'subjectId', ev.subject_id
+    )
+  from public.subject_shared_memory_delete_events_v1 ev
+  where ev.deleted_at > :'cutoff'::timestamptz
+    and ev.deleted_at <= :'captured'::timestamptz
+
+  union all
+
+  select
     sa.revoked_at,
     'SHARE_ARTIFACT_REVOKED',
     sa.id::text,

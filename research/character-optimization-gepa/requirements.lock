@@ -1,0 +1,3 @@
+# Research-only GEPA source reference. Not a fully hash-pinned PyPI/apt dependency closure.
+# Python runtime image is separately pinned by Docker digest.
+gepa @ git+https://github.com/gepa-ai/gepa.git@ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309

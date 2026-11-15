@@ -14,7 +14,12 @@ describe('Production Seyeon provider routing', () => {
     const runtime = readFileSync(new URL('../apps/api/src/production-seyeon-chat-runtime-v1.ts', import.meta.url), 'utf8');
     expect(send).toContain("glmRendererConfig: { apiKey: optionalEnv(input.env, 'OPENROUTER_API_KEY') ?? '' }");
     expect(runtime).toContain('createSeyeonGlmRendererV1({');
-    expect(runtime).toContain("if (role === 'renderer' && input.glmRendererConfig !== undefined)");
+    // The model configuration is now resolved lazily after G1; both governed
+    // and ungoverned renderer branches reference the post-Pin bundle.
+    expect(runtime).toContain("if (role === 'renderer' && bundle.glmRendererConfig !== undefined");
+    expect(runtime).toContain('createGovernedSeyeonGlmRendererV1({');
+    expect(runtime).toContain('governor: input.glmRendererGovernor!');
+    expect(runtime).toContain('await input.beforeProviderAdmission?.({');
   });
 
   it('uses the server-owned direct OpenAI key and model', async () => {

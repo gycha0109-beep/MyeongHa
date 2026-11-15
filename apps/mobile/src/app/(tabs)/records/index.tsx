@@ -190,9 +190,9 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 25, paddingBottom: 36 },
   headerStack: { gap: 18, marginBottom: 20 },
   header: { gap: 7 },
-  eyebrow: { color: mobileColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
-  title: { color: mobileColors.ink, fontSize: 31, fontWeight: '900', letterSpacing: -0.55 },
-  description: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
+  eyebrow: { color: mobileColors.gold, fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
+  title: { color: mobileColors.ink, fontSize: 36, fontWeight: '900', letterSpacing: -0.55 },
+  description: { color: mobileColors.muted, fontSize: 16, lineHeight: 25, fontWeight: '500' },
   separator: { height: 13 },
   loadingCard: {
     borderWidth: 1,

@@ -6,14 +6,14 @@ export type MobileTheme = 'light' | 'dark';
 
 export const mobileThemePalettes = Object.freeze({
   light: Object.freeze({
-    canvas: '#F7F1E8', surface: '#FBF7EF', ink: '#1B2838',
-    muted: '#746D64', navy: '#102A46', gold: '#B08A52',
-    border: '#DCC9A8', seal: '#A44E42',
+    canvas: '#F7F0E7', surface: '#FFFBF6', ink: '#20252B',
+    muted: '#4A3B45', navy: '#172838', gold: '#946A35',
+    border: '#CFB9A5', seal: '#823332',
   }),
   dark: Object.freeze({
-    canvas: '#0B1419', surface: '#111C22', ink: '#F0E7D9',
-    muted: '#B3A89A', navy: '#E4C18B', gold: '#C49A5C',
-    border: '#48505A', seal: '#E18B80',
+    canvas: '#0B151A', surface: '#152129', ink: '#F7EFE5',
+    muted: '#D8CAC3', navy: '#E4C18B', gold: '#D7B478',
+    border: '#53616A', seal: '#E8A9BE',
   }),
 });
 

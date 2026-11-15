@@ -65,6 +65,69 @@ function runner(query:ReturnType<typeof vi.fn>):SeyeonProductionSubjectTransacti
   };
 }
 describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>{
+  it('W115 pins token policy, headroom and API credential against post-assembly changes',async()=>{
+    const mutablePolicy:SeyeonCostGovernorModelPolicyV1={
+      ...policy,
+      allowedPurposes:[...policy.allowedPurposes],
+      priceQuote:{...policy.priceQuote},
+    };
+    const countFetch=vi.fn(async(_url:string,init:RequestInit)=>{
+      expect(new Headers(init.headers).get('authorization')).toBe(
+        'Bearer '+serverKey,
+      );
+      const parsed=JSON.parse(String(init.body));
+      expect(parsed.model).toBe('synthetic-model');
+      expect(Object.keys(parsed).sort()).toEqual([
+        'input','instructions','model','text',
+      ]);
+      return Response.json({object:'response.input_tokens',input_tokens:100});
+    });
+    const mutableConfig={
+      apiKey:serverKey,model:mutablePolicy.modelKey,
+      policy:mutablePolicy,reservedHeadroomTokens:64,
+      fetchImpl:countFetch,
+    };
+    const counter=createSeyeonOpenAiInputTokenCountAdmissionV1(mutableConfig);
+    // These are caller-owned mutable objects. They must not affect an
+    // already approved token-count policy or its outbound authorization.
+    Object.assign(mutablePolicy,{
+      modelKey:'forged-after-assembly',maximumInputTokens:1,
+      maximumOutputTokens:1,
+    });
+    (mutablePolicy.allowedPurposes as string[]).push('event_extraction');
+    Object.assign(mutablePolicy.priceQuote,{outputMicroUsdPerMillion:1});
+    Object.assign(mutableConfig,{
+      apiKey:'sk-forged-after-assembly',
+      model:'forged-after-assembly',
+      reservedHeadroomTokens:1000,
+    });
+    expect(Object.isFrozen(counter.policy)).toBe(true);
+    expect(Object.isFrozen(counter.policy.priceQuote)).toBe(true);
+    expect(Object.isFrozen(counter.policy.allowedPurposes)).toBe(true);
+    expect(counter.policy.modelKey).toBe('synthetic-model');
+    expect(counter.policy.maximumOutputTokens).toBe(800);
+    expect(counter.policy.priceQuote.outputMicroUsdPerMillion).toBe(4000000);
+    expect(counter.policy.allowedPurposes).toEqual(['dialogue_render']);
+    const body=JSON.stringify({
+      model:'synthetic-model',store:false,max_output_tokens:800,
+      instructions:'W115 synthetic input',
+      input:[{role:'user',content:[{type:'input_text',text:'offline'}]}],
+      text:{format:{type:'json_schema',schema:request.responseSchema}},
+    });
+    const info=vi.spyOn(console,'info').mockImplementation(()=>undefined);
+    try{
+      await expect(counter.certifiedInputTokenUpperBound(
+        request,new TextEncoder().encode(body).byteLength,body,
+      )).resolves.toBe(164);
+      expect(countFetch).toHaveBeenCalledOnce();
+      expect(JSON.stringify(info.mock.calls)).not.toContain(
+        'sk-forged-after-assembly',
+      );
+    }finally{
+      info.mockRestore();
+    }
+  });
+
   it('distinguishes provider rejection from transport failure without logging reflected secrets or input',async()=>{
     const logger=vi.spyOn(console,'info').mockImplementation(()=>undefined);
     const frame=JSON.stringify({model:policy.modelKey,store:false,max_output_tokens:800,

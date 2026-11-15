@@ -1,0 +1,182 @@
+{
+  "schemaVersion": "ops-common-migration-single-statement-fingerprint-triage-v1",
+  "observedKstDate": "2026-11-13",
+  "sourceBackupRunId": 43174606843,
+  "isolatedRestoreRunId": 43372543611,
+  "exactRepositoryCommitSha": "ccf52e1132f9afb6b956ebb399dc380154719d74",
+  "parityProofPath": "docs/operations/POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_REAL_PROOF_20261113.json",
+  "originalParityJsonSha256": "42be852ab426edc70e89cc0b018e88594bfa341b29f323ebb4816a7a1c05b005",
+  "localDiagnosticJsonSha256": "58f8f7d1883dc46fa5de78bf196c92a6faff438802a0f073a3b4788f938431b7",
+  "method": "Using only the original sealed source statement SHA-256 and byte count from the sanitized parity report, verify each exact repository migration blob SHA-256. For each of 21 SINGLE_STATEMENT_BYTES_DIFFER versions compare tested exact repository byte variants to the source SHA-256 and byte length; never decrypt source outside the protected runner. For nine, the SHA-256 of the first sourceStatementBytes of the exact repository file matches sourceStatementSha256, and the remaining repository bytes are exactly hex 3b0a (semicolon + LF).",
+  "counts": {
+    "singleStatementByteDifferences": 21,
+    "sourcePrefixHashMatchesWithExtraSemicolonNewline": 9,
+    "unresolvedWithBoundedChecks": 12,
+    "repositoryWholeFileByteExactPromotions": 0,
+    "sqlSemanticEquivalenceProven": 0
+  },
+  "exactSourcePrefixHashMatches": [
+    {
+      "version": "0130",
+      "sourceEqualsRepositoryFilePrefixSha256": true,
+      "repositoryExtraBytesHex": "3b0a",
+      "repoFileOriginalByteExact": false,
+      "sqlSemanticEquivalenceProven": false
+    },
+    {
+      "version": "0160",
+      "sourceEqualsRepositoryFilePrefixSha256": true,
+      "repositoryExtraBytesHex": "3b0a",
+      "repoFileOriginalByteExact": false,
+      "sqlSemanticEquivalenceProven": false
+    },
+    {
+      "version": "0195",
+      "sourceEqualsRepositoryFilePrefixSha256": true,
+      "repositoryExtraBytesHex": "3b0a",
+      "repoFileOriginalByteExact": false,
+      "sqlSemanticEquivalenceProven": false
+    },
+    {
+      "version": "0221",
+      "sourceEqualsRepositoryFilePrefixSha256": true,
+      "repositoryExtraBytesHex": "3b0a",
+      "repoFileOriginalByteExact": false,
+      "sqlSemanticEquivalenceProven": false
+    },
+    {
+      "version": "0271",
+      "sourceEqualsRepositoryFilePrefixSha256": true,
+      "repositoryExtraBytesHex": "3b0a",
+      "repoFileOriginalByteExact": false,
+      "sqlSemanticEquivalenceProven": false
+    },
+    {
+      "version": "0800",
+      "sourceEqualsRepositoryFilePrefixSha256": true,
+      "repositoryExtraBytesHex": "3b0a",
+      "repoFileOriginalByteExact": false,
+      "sqlSemanticEquivalenceProven": false
+    },
+    {
+      "version": "0961",
+      "sourceEqualsRepositoryFilePrefixSha256": true,
+      "repositoryExtraBytesHex": "3b0a",
+      "repoFileOriginalByteExact": false,
+      "sqlSemanticEquivalenceProven": false
+    },
+    {
+      "version": "0981",
+      "sourceEqualsRepositoryFilePrefixSha256": true,
+      "repositoryExtraBytesHex": "3b0a",
+      "repoFileOriginalByteExact": false,
+      "sqlSemanticEquivalenceProven": false
+    },
+    {
+      "version": "1380",
+      "sourceEqualsRepositoryFilePrefixSha256": true,
+      "repositoryExtraBytesHex": "3b0a",
+      "repoFileOriginalByteExact": false,
+      "sqlSemanticEquivalenceProven": false
+    }
+  ],
+  "unresolvedSingleStatementDifferences": [
+    {
+      "version": "1580",
+      "repositoryMinusSourceBytes": -106,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    },
+    {
+      "version": "1590",
+      "repositoryMinusSourceBytes": -16,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    },
+    {
+      "version": "1600",
+      "repositoryMinusSourceBytes": -76,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    },
+    {
+      "version": "1610",
+      "repositoryMinusSourceBytes": -16,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    },
+    {
+      "version": "1620",
+      "repositoryMinusSourceBytes": -16,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    },
+    {
+      "version": "1630",
+      "repositoryMinusSourceBytes": -76,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    },
+    {
+      "version": "1640",
+      "repositoryMinusSourceBytes": -156,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    },
+    {
+      "version": "1650",
+      "repositoryMinusSourceBytes": 16,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    },
+    {
+      "version": "1670",
+      "repositoryMinusSourceBytes": 16,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    },
+    {
+      "version": "1680",
+      "repositoryMinusSourceBytes": 16,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    },
+    {
+      "version": "1690",
+      "repositoryMinusSourceBytes": 0,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    },
+    {
+      "version": "1710",
+      "repositoryMinusSourceBytes": -16,
+      "boundedFormatFingerprintMatch": false,
+      "sqlSemanticDifferenceProven": false
+    }
+  ],
+  "testedFormatCandidates": [
+    "exact_repository_prefix",
+    "exact_repository_suffix",
+    "trim_trailing_whitespace",
+    "trim_leading_whitespace",
+    "CRLF_to_LF",
+    "LF_to_CRLF",
+    "append_newline",
+    "append_two_newlines"
+  ],
+  "limitations": [
+    "SHA-256 match of a source statement and a repository prefix does not prove original repository file bytes or historical executor identity.",
+    "A semicolon/newline suffix could be statement framing; it does not prove application of any SQL or equivalent current object/role/ACL/RLS state.",
+    "Unmatched candidates do not establish actual SQL semantic disagreement.",
+    "Multi-statement framing groups (154) and source-absent rows (12) remain separately unresolved."
+  ],
+  "sourceSqlPublished": false,
+  "createdByMetadataPublished": false,
+  "productionSqlModified": false,
+  "migrationHistoryReplayed": false,
+  "migrationHistoryRepaired": false,
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "roadmapComplete": false,
+  "verdict": "NINE_PREFIX_HASH_MATCH__TWELVE_SINGLE_DIFFERENCES_UNRESOLVED__DR_HOLD"
+}

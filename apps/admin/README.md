@@ -1,5 +1,21 @@
 # @myeongha/admin
 
+> **2026-11-14 최신 로드맵:** [관리자 A0–A7 구현·종료 경계 정본](../../docs/ADMIN_IMPLEMENTATION_ROADMAP_V1.md). 기존 단계 외의 신규 기능을 추가하지 않으며, 어드민 자체 기능과 Saju·Commerce·분석 원천·운영 배포의 의존성을 분리합니다.
+>
+> **A0–A3 실제 수용:** 2026-11-08 Owner 브라우저의 회원/Reading/결제 조회 및 감사 발생이 확인됐습니다. 브라우저 요청 ID와 감사 ID의 직접 문자열 대조는 미실증입니다. 비Owner 앱 수준 거부 로그인 **추가 재현은 Owner 결정으로 생략**됐으며, 통과로 표시하지 않습니다. [작업 로그](../../docs/operations/ADMIN_READONLY_ACTIVATION_WORKLOG_20261105.md).
+>
+> **A4 최신 상태:** Saju #2739·#2781–#2792 및 명하 #3228·#3301의 관련 구현·증거 기록은 병합됐습니다. 명하의 사전 승인 증명 보존·삭제 정책(최대 30일)과 운영 저장소/29일 정리 작업은 적용·실측됐습니다. 별개인 Saju Source 기록 보존 정책, 실제 Saju 서비스 결속·Production 해석 권한, 공급사 호출 전수·청구·환율 검증은 미충족입니다. 비용 수집 OFF / `completeCostCoverage=false` / `invoiceReconciled=false`. [A4 운영 증거](../../docs/operations/ADMIN_A4_OPERATIONAL_READINESS_EVIDENCE_20261112.md).
+
+## Owner 사용자 관리 개선 — 2026-11-07 데이터 확인 / PR #3100
+
+- Production MyengHa DB를 **SELECT-only**로 확인했습니다. `subjects` 총 105행 중 현재 활성 `member` 3행, 활성 `guest` 95행, 삭제 완료 `member` 6행, 삭제 대기 `member` 1행입니다. 내부 Subject 수는 사람 수 또는 가입자 수가 아닙니다.
+- `guest_sessions` 98행 중 95행은 활성 Guest에 연결되고, 3행은 활성 Member로 승격된 계정의 소비·claim 기록입니다. 이 시점의 merge job/action 및 `merged_into_subject_id`는 0건입니다. 95행이 서로 다른 실사용자를 의미한다거나 한 사람의 반복 방문이라고 단정하지 않습니다.
+- `profiles`는 0행입니다. 활성 회원 3명은 인증 계정에 연결됐지만 그중 저장된 이메일이 있는 계정은 2개뿐입니다. 현재 Admin Reader에는 `auth.users`, `profiles`, `guest_sessions` 원본 테이블 직접 조회 권한이 없습니다. 관리자 UI에서 닉네임·이메일을 임의 추정하거나 클라이언트에서 관리자 신분으로 일반 사용자 API를 우회 호출하지 않습니다.
+- 첫 개편은 기존 승인된 관리자 목록 조회 API의 `subjectKind` / `subjectStatus` 필터를 재사용합니다. **활성 회원만 기본 표시**하고 게스트·탈퇴·삭제 및 전체 기록은 별도의 명시적 화면 선택으로 제공합니다. 운영 개요의 `members_active` 수치를 별도 재조회하며 세부 목록의 20행 페이지 수를 전체 회원 수로 오해하지 않습니다.
+- 목록에는 계정 종류·한국어 상태·Asia/Seoul 시간·일부 숨긴 내부 ID·상세 진입을 표시합니다. 상세 화면은 기존 검증 영수증·Reading·권한·크레딧 관측 메타데이터만 보여줍니다. 실명/이메일 검색은 별도 권한 있는 최소 필드 projection이 실제로 승인·구축될 때까지 **제공하지 않습니다**.
+- 사용자·세션 레코드 수정, 자동 병합, 게스트 삭제, DB 역할 확장, Production DDL/배포, 운영 쓰기 기능 활성화는 이 PR에서 수행하지 않습니다. 실사용자 이메일을 보고서·테스트 로그·CSV에 기록하지 않습니다.
+
+
 ## Latest verified production state — 2026-11-06 (supersedes older dated deployment notes)
 
 The Admin Console is now deployed as an isolated, **Owner-only read-only** Worker. Do not interpret older statements below saying the Worker/Hyperdrive is absent or that the private runtime is still disabled as current state; those are historical snapshots.
@@ -104,7 +120,7 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 
 로딩, 데이터 없음, 접근 거부, 오류에 공통 StatusPanel을 사용합니다. 뒤로 가기/앞으로 가기와 키보드 내비게이션을 지원합니다.
 
-기존 `docs/ADMIN_IMPLEMENTATION_ROADMAP_V1.md` 참조는 현재 브랜치와 조회한 Git 이력에서 파일을 찾을 수 없습니다. 아래 기존 A0–A7 구현 기록과 `docs/operations/ADMIN_OPERATING_POLICY_20261027_V1.md`의 확정 범위를 따르며 새 단계를 만들지 않습니다.
+기존 A0–A7의 현재 종료 경계는 [관리자 구현 로드맵](../../docs/ADMIN_IMPLEMENTATION_ROADMAP_V1.md)에 정리했습니다. 아래 2026-10-27 구현 기록과 이후 날짜별 작업 로그는 당시 상태의 증거로 보존하며, 최신 수용·승인 상태는 로드맵과 운영 정책을 우선합니다.
 
 ## 연속 구현 현황 (2026-10-27)
 

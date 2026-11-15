@@ -561,6 +561,7 @@ async function loadExistingSaju() {
   }
 
   const { token } = activeBearer;
+  let profile = null;
   setState('loading', '현재 세션의 명식을 확인하는 중입니다…');
 
   let profile = null;

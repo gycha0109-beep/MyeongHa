@@ -19,6 +19,8 @@ version_num="$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num')"
 seeded_defaults="$(psql -X -qAt --set ON_ERROR_STOP=1 <<'SQL'
 ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO service_role;
 CREATE FUNCTION public.seyeon_restore_default_acl_probe() RETURNS integer
   LANGUAGE sql AS 'SELECT 1';
 SELECT has_function_privilege(
@@ -37,6 +39,8 @@ seeded_table_defaults="$(psql -X -qAt --set ON_ERROR_STOP=1 <<'SQL'
 ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO service_role;
 CREATE TABLE public.seyeon_restore_default_acl_table_probe(id integer);
 SELECT has_table_privilege(
   'anon', 'public.seyeon_restore_default_acl_table_probe'::regclass,
@@ -59,7 +63,15 @@ CREATE FUNCTION public.seyeon_restore_default_acl_probe() RETURNS integer
 SELECT NOT has_function_privilege(
   'anon', 'public.seyeon_restore_default_acl_probe()'::regprocedure, 'EXECUTE')
   AND NOT has_function_privilege(
-  'authenticated', 'public.seyeon_restore_default_acl_probe()'::regprocedure, 'EXECUTE');
+  'authenticated', 'public.seyeon_restore_default_acl_probe()'::regprocedure, 'EXECUTE')
+  AND NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_proc p
+    CROSS JOIN LATERAL pg_catalog.aclexplode(p.proacl) a
+    WHERE p.oid = 'public.seyeon_restore_default_acl_probe()'::regprocedure
+      AND a.grantee = 'service_role'::regrole::oid
+      AND a.privilege_type = 'EXECUTE'
+  );
 DROP FUNCTION public.seyeon_restore_default_acl_probe();
 SQL
 )"
@@ -75,7 +87,14 @@ SELECT NOT has_table_privilege(
   'SELECT,INSERT,UPDATE,DELETE')
 AND NOT has_table_privilege(
   'authenticated', 'public.seyeon_restore_default_acl_table_probe'::regclass,
-  'SELECT,INSERT,UPDATE,DELETE');
+  'SELECT,INSERT,UPDATE,DELETE')
+AND NOT EXISTS (
+  SELECT 1
+  FROM pg_catalog.pg_class c
+  CROSS JOIN LATERAL pg_catalog.aclexplode(c.relacl) a
+  WHERE c.oid = 'public.seyeon_restore_default_acl_table_probe'::regclass
+    AND a.grantee = 'service_role'::regrole::oid
+);
 DROP TABLE public.seyeon_restore_default_acl_table_probe;
 SQL
 )"

@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "ops-provider-migration-ledger-absence-observation-v1",
+  "roadmapGate": "Gate 1 / Phase 8-A and 8-B",
+  "recordDateKst": "2026-11-12",
+  "sourceBackup": {
+    "workflowRunId": 42752268638,
+    "artifactId": 13734401337,
+    "sourceSha": "4de4e050e1e9393850a34eb68f8fa60973dc9f63",
+    "encryptedArchiveSha256": "5396ceec4eca37f23c519c7e006fe0d8af27ad7f53ae7f54938fd9fc14f3a2d1",
+    "migrationCount": 242,
+    "migrationFrontier": "20261109071019",
+    "migrationCatalogSha256": "91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47",
+    "migrationCatalogCapturedAsMetadataOnly": true,
+    "completeMigrationLedgerExcludedFromEncryptedSqlDump": true,
+    "archiveCoverageAuthority": "docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md (2026-11-01 catalog capture)"
+  },
+  "implementation": {
+    "pr": 3239,
+    "mergedSha": "515ee5badae659c3c5bc64045499dbdf1d7ea28f",
+    "prIntegrationRunId": 43157525886,
+    "prIntegrationConclusion": "success"
+  },
+  "measurement": {
+    "workflowRunId": 43158737963,
+    "workflowUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/43158737963",
+    "executedMainSha": "515ee5badae659c3c5bc64045499dbdf1d7ea28f",
+    "conclusion": "success",
+    "target": "disposable-supabase-cli-3.1.0-postgresql17",
+    "artifactId": 13917530822,
+    "artifactFilename": "myeongha-provider-migration-ledger-parity.json",
+    "artifactInnerFileSha256": "4ceb5cf97f01c000828755834783b2dc3d23445e8b22bc27ce50db34d536e256",
+    "artifactZipSha256": "a7df6561cde5886f4d2d01779063febd956a3d7129a37759797d543fdaddeb2f",
+    "localMigrationTablePresent": false,
+    "localMigrationRequiredColumnsPresent": false,
+    "localMigrationTotalCount": null,
+    "localMigrationNumericCount": null,
+    "localMigrationFrontier": null,
+    "localMigrationCatalogSha256": null,
+    "allMetadataFingerprintsMatch": false,
+    "verdict": "HOLD_DISPOSABLE_PROVIDER_MIGRATION_LEDGER_TABLE_ABSENT"
+  },
+  "crossEvidence": {
+    "recoveredProviderCopyRows": 93,
+    "providerReplayArtifactId": 13916562984,
+    "localAuthReferenceIntegrityObserved": true,
+    "authIntegrityArtifactId": 13917480949,
+    "sourceMigrationInventory": "docs/operations/POSTGRES_MIGRATION_FRONTIER_OBSERVATION_20261111.json",
+    "productionVersionInventoryReadOnly": {
+      "observedOn": "2026-11-11",
+      "remoteApplied": 242,
+      "repositoryFiles": 276,
+      "exactCommonVersions": 200,
+      "remoteOnlyVersions": 42,
+      "repositoryOnlyVersions": 76
+    }
+  },
+  "boundaries": {
+    "nullIsNotZero": true,
+    "tableAbsentRootCauseEstablished": false,
+    "hostedMigrationLedgerRecovered": false,
+    "migrationMetadataEquivalenceProven": false,
+    "applicationSchemaAndPermissionsParityProven": false,
+    "hostedAuthLoginRefreshRevocationProven": false,
+    "storageObjectBytesRecovered": false,
+    "currentFrontierFullRestoreProven": false,
+    "independentPrivacyContinuityProven": false,
+    "wholeServiceRpoRtoProven": false,
+    "productionMutationPerformed": false,
+    "migrationRepairPerformed": false,
+    "paidHostedTargetCreated": false,
+    "privacyCanaryExecuted": false,
+    "sourceStatementsAndAppliedLedgerRowsRecoveredFromBackup": false,
+    "localCliInitializationRootCauseEstablished": false
+  },
+  "acceptance": {
+    "decision": "NOT_ACCEPTED",
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "p0Issue": 1887,
+    "p0State": "OPEN",
+    "roadmapComplete": false
+  },
+  "next": "The sealed archive excludes the Provider migration history rows; identify an authorized independent ledger source and establish ownership/version/statement and schema/ACL equality with read-only evidence before any isolated recovery attempt. Do not fabricate or repair history."
+}

@@ -7,9 +7,10 @@ import { setTimeout as sleep } from 'node:timers/promises';
 const localOrigin = /^http:\/\/127\.0\.0\.1:[1-9]\d{0,4}$/u;
 const wranglerVersion = '4.152.0';
 
-export async function startIsolatedWorkerdProduct({ repoRoot, wranglerEntry, authOrigin, sajuOrigin, pgPort }) {
+export async function startIsolatedWorkerdProduct({ repoRoot, wranglerEntry, authOrigin, sajuOrigin, pgPort, dbPoolMode='separate' }) {
   if (process.platform !== 'linux' || !localOrigin.test(authOrigin) || !localOrigin.test(sajuOrigin) ||
-      !Number.isInteger(pgPort) || pgPort < 1 || pgPort > 65535) {
+      !Number.isInteger(pgPort) || pgPort < 1 || pgPort > 65535 ||
+      !['separate','bounded'].includes(dbPoolMode)) {
     throw Error('Only the disposable Linux loopback fixture is supported');
   }
   const config = JSON.parse(await readFile(join(repoRoot, 'wrangler.jsonc'), 'utf8'));
@@ -53,7 +54,8 @@ export async function startIsolatedWorkerdProduct({ repoRoot, wranglerEntry, aut
       main: join(repoRoot, 'test/ops/fixtures/workerd-product-entry.mjs'),
       compatibility_date: config.compatibility_date,
       compatibility_flags: config.compatibility_flags,
-      vars: { MH_OPS_WORKERD_AUTH_ORIGIN: authOrigin, MH_OPS_WORKERD_SAJU_ORIGIN: sajuOrigin },
+      vars: { MH_OPS_WORKERD_AUTH_ORIGIN: authOrigin, MH_OPS_WORKERD_SAJU_ORIGIN: sajuOrigin,
+        MH_OPS_WORKERD_DB_POOL_MODE: dbPoolMode },
       hyperdrive: [{ binding: 'HYPERDRIVE', id: '00000000000000000000000000000000',
         localConnectionString: 'postgres://myeongha_ops_phase11_login:local-only@127.0.0.1:' + pgPort + '/postgres' }],
     }), { mode: 0o600 });

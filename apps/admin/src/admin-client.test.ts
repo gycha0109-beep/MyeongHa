@@ -112,6 +112,18 @@ describe('admin browser API client', () => {
     }
     expect(requests).toHaveLength(3);
   });
+  it('exposes only a validated server request ID for exact audit correlation', async () => {
+    const requestId = '123e4567-e89b-42d3-a456-426614174001';
+    const payload = { kind: 'users', rows: [], nextCursor: null };
+    const accepted = (async () => Response.json(payload, { headers: { 'X-Request-Id': requestId.toUpperCase() } })) as typeof fetch;
+    expect((await fetchAdminReadV1('/api/admin/users', ADMIN_SESSION_MARKER_V1, accepted)).requestId).toBe(requestId);
+    for (const header of ['invalid', '123e4567-e89b-42d3-a456-426614174001-extra']) {
+      const spoof = (async () => Response.json(payload, { headers: { 'X-Request-Id': header } })) as typeof fetch;
+      expect((await fetchAdminReadV1('/api/admin/users', ADMIN_SESSION_MARKER_V1, spoof)).requestId).toBeNull();
+    }
+    const missing = (async () => Response.json(payload)) as typeof fetch;
+    expect((await fetchAdminReadV1('/api/admin/users', ADMIN_SESSION_MARKER_V1, missing)).requestId).toBeNull();
+  });
   it('accepts only primitive projected rows', async () => {
     const fake = (async () => Response.json({
       kind: 'users', rows: [{ subjectId: 'safe', kind: 'member' }], nextCursor: null,

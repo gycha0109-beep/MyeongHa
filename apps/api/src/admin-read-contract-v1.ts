@@ -11,6 +11,8 @@ export interface AdminListFiltersV1 {
   readonly limit: number;
   readonly cursor: string | null;
   readonly subjectId: string | null;
+  /** Case-insensitive substring across the allowlisted projected fields of the selected list. */
+  readonly search?: string | null;
   readonly recordId?: string | null;
   readonly receiptId?: string | null;
   readonly providerEventStatus?: 'received' | 'verified' | 'unresolved' | 'processed' | 'rejected' | 'failed' | null;

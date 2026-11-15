@@ -4,9 +4,29 @@ Watchtower-Track: security
 
 > **상태: PROPOSED / SECURITY-SAFE DEFAULT 검증 중.**
 > 본 문서는 S2 개발/검증에 적용할 **거부 우선 기본 계약**을 명시한다. Security, DB Authority, Character의 공동 승인 및 운영 서비스의 동시 트랜잭션/HTTP 연결 증거가 없으므로 **G0 APPROVED, G2/G3 PASS, public/paid ON으로 표시하지 않는다**.
-> 기준: [AI 보안 로드맵 v2](../operations/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md), [G0~G6 원장](SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md), [#1843](https://github.com/gycha0109-beep/MyeongHa/issues/1843), [#1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866).
+> 기준: [AI 보안 실행 로드맵 v3](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md), [G0~G6 원장](SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md), [#1843](https://github.com/gycha0109-beep/MyeongHa/issues/1843), [#1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866).
 
 > **2026-10-18 Product Owner 선택 승인:** 기억 저장/캐릭터별 공유는 사용자 선택권 유지, 철회 후 새로운 사용·미송출 공개 차단, 이미 실제 송출된 바이트 회수 불가, 과거 대화 보존과 개인기억 재사용·재공개/삭제를 분리하는 제품 방향은 [결정문](SEYEON_PRODUCT_OWNER_MEMORY_REVOKE_HISTORY_DECISION_20261018.md)으로 승인되었습니다. **이 문서의 G0-D1~D5 기술 계약 및 Security/DB/Character/API Owner 서명은 여전히 미완료**이며 G0 상태는 PROPOSED, 양수 개인기록 Reveal은 HOLD입니다.
+
+## S0 실행 범위 기술 계약 — v3 기준 보완 제안 (2026-11-07)
+
+> **판정: G0 S0 기술 계약 초안 / 사용자 기술 확정 대기.** 아래는 [현재 실행 로드맵 v3](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md)의 S0에만 적용할 검토 대상입니다. 기존 S2·과거 대화·Replay 전체 범위의 승인이나 G0 PASS가 아닙니다. 단일 개발 프로젝트의 최종 내부 승인권자는 사용자 1인이며, 아래 D1~D5를 별도 조직·담당자에게 회람하거나 서명을 요구하지 않습니다. 본 초안 병합은 운영 DB/ACL/Role/Secret 설치·출처 활성화·유료 Provider 호출·트래픽 배포 승인이 아닙니다.
+
+**입력·출력 경계:** 현재 인증 Member의 단일 Thread/Turn/Attempt에서 승인된 **원본 `memory / conversation_recall / v1` 1건**과 **그 요청의 원본 User 메시지 1건**만 사용해 최초 비스트리밍 응답 1회 생성. User 메시지는 별도 장기 Memory 또는 새 Grant가 아닙니다. 다중 Memory, Life Fact, 과거 User/Assistant 본문, Relationship, Reader, History, Replay, 재생성, 후속 Worker 재공개, Streaming 및 0건 우회는 S0에서 **OUT_OF_SCOPE + FAIL_CLOSED**입니다. 제외된 출처가 실제 모델 입력에 섞이면 전체 요청을 HOLD하며 일부만 제거해 진행하지 않습니다.
+
+| G0 기술 결정 | 이번 S0에서 확인할 정확한 규칙 | 완료를 증명할 자료 / 남은 판정 |
+| --- | --- | --- |
+| **D1 원본 사용 권한·재동의** | 서버가 Subject/Character/Thread/Turn/Attempt, 원본 Record ID·Grant ID·type/schema, 원본 DB digest·투영 digest·최종 모델 선택 집합, DB에 저장된 현재 User 메시지 ID·본문 digest를 **Provider 전에 하나의 불변 Attempt Pin**으로 결속. 철회/변경된 기존 Grant는 재동의 뒤에도 재사용 금지; 새 Grant라면 새 Attempt. | 기존 `16-g1-model-recent-source-pin.sql` → `17-g1-positive-combined-model-source-pin.sql`, 원본 Pin/Commit 코드와 정확한 DB 설치·권한·양수 Pin 실행 증거 필요. |
+| **D2 Commit·최초 공개 경계** | G2는 정확한 원본 Grant/Record와 현재 상태·digest를 잠근 **같은 DB 트랜잭션**에서만 Commit. G3는 권한 재검사 후 정확한 최초 JSON 응답에 결속된 256-bit 수신 증명의 해시 및 issuance를 **먼저 DB 확정**하고, 그 뒤에만 비스트리밍 HTTP 본문을 반환. DB Commit 실패·불명·철회 선행은 보호 본문 공개 0바이트. | 동일 원본 G1 Pin → G2 Commit → G3 issuer/실제 Cloudflare Worker 송출·receipt/ACK, 독립 PG 세션에서 revoke 경쟁 검증. Node/Fetch 생성 사실만으로 실제 네트워크 전달 PASS 금지. |
+| **D3 파생·이력 차단** | 현재 User 메시지 외의 과거 Assistant/User 텍스트·관계·Reader·인용/캐시·재생 본문은 S0 모델 입력과 공개 경로 모두 제외. 파생 출처가 확인되지 않으면 `NO_PERSONAL`로 간주하거나 모델을 호출하지 않음. | 기존 입력 선택·최종 모델 Context seal·History/Replay HOLD 확인. 광범위한 파생 lineage 구현은 **S0 종료 선행 작업이 아님**. |
+| **D4 철회 완료의 의미** | 미확정 수신(issued but not received)이면 철회 의도를 기록하고 새 사용을 즉시 차단하되 **HTTP 202 pending**; 완료 ACK가 아님. 정확한 응답 전체 수신에 결속된 증명으로 원본 Attempt의 receipt가 확인되고 나서 철회 확정하면 **HTTP 200 committed**. 이미 송출된 바이트 회수 약속 금지. 응답/receipt 영구 유실 시 철회가 pending 상태로 남을 수 있으며 timeout을 완료로 취급하지 않음. | [기존 S0 수신 장벽 계약](SEYEON_S0_HTTP_RECEIPT_BARRIER_V1_20261025.md) 재사용. 다른 Grant·Attempt의 ACK, 불명확한 COMMIT, HTTP/Worker 장애·취소 경쟁을 실제 대상으로 확인해야 함. |
+| **D5 재시도·정산 분리** | receipt 증명은 **원본 수신 확인만 허가**하며 새 출처 사용·모델 호출·Replay·철회 생성 권한이 아님. ACK 중복/유실 및 Commerce 장애로 기존 수신 확정을 되돌리거나 정산 성공을 추정하지 않음. 일반 고객은 원본 G1 Pin 이후 모델 전에 크레딧 예약, 실제 receipt 이후에만 멱등 정산. | 기존 G4/G5 전용 Commerce 연결 및 receipt 정산 재사용; 실제 별도 LOGIN/Hyperdrive/권한과 실패 복구 증거 필요. |
+
+**현행 설치 격차(읽기 전용 증거, 활성화 아님):** 운영 DB에 원본 양수 Memory Pin·Commit·issuer·receipt/철회 함수는 존재하지만, 결합 Pin 전제인 `seyeon_recent_source_pin_jsonb` 컬럼과 위 `16`·`17`의 private 함수는 미설치로 확인되었습니다. 정확한 Source Registry 행은 등록돼 있으나 `enabled=false, writable_enabled=false`. G5 Commerce 전용 LOGIN/Hyperdrive도 미구성입니다. `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED`를 유지합니다. 변경 전 [증거 원장 #1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866)의 최신 운영 대조를 다시 사용합니다.
+
+**종료 판정 분리:** D1~D5의 기술 선택을 사용자가 명시적으로 확정해야만 G0 계약 승인 후보를 닫을 수 있습니다. **그 기술 승인조차 G1 운영 SQL 적용이나 일반 유료/공개 서비스의 실행 승인은 아닙니다.** G1/G4/G2/G3의 실제 환경 동작, G5 동일 Scope 통합 검증, G6 제한 smoke·복구·운영 승인 증거는 각각 별도로 완료해야 합니다. 기술 계약 미승인 또는 증거 부족 시 G0~G6는 HOLD이며 `ROADMAP_COMPLETE` 선언 금지입니다.
+
+---
 
 ## 1. 누가 무엇을 사용할 수 있는가
 

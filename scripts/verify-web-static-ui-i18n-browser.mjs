@@ -320,11 +320,11 @@ try{
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   await navigate('my.html','.my-page-shell');
   const expectedMy={
-    'ko-KR':['마이페이지','계정 정보','캐릭터 메모리','구매 내역 · 내 이용권','설정 및 지원'],
-    'ja-JP':['マイページ','アカウント情報','キャラクターのメモリー','購入履歴・利用券','設定・サポート'],
-    'zh-TW':['我的頁面','帳號資訊','角色記憶','購買紀錄・我的使用券','設定與支援'],
-    'en-US':['My Page','Account information','Character memory','Purchases and passes','Settings and support'],
-    'zh-CN':['我的页面','账号信息','角色记忆','购买记录与我的使用券','设置与支持'],
+    'ko-KR':['마이페이지','계정 정보','공통 메모리','구매 내역 · 내 이용권','설정 및 지원'],
+    'ja-JP':['マイページ','アカウント情報','共通メモリー','購入履歴・利用券','設定・サポート'],
+    'zh-TW':['我的頁面','帳號資訊','共用記憶','購買紀錄・我的使用券','設定與支援'],
+    'en-US':['My Page','Account information','Shared memory','Purchases and passes','Settings and support'],
+    'zh-CN':['我的页面','账号信息','共享记忆','购买记录与我的使用券','设置与支持'],
   };
   const captureMy=()=>evaluate('(()=>({lang:document.documentElement.lang,stored:localStorage.getItem("myeongha.ui.locale.v1"),pending:document.documentElement.dataset.uiPending??null,headings:[document.querySelector(".my-title")?.textContent.trim(),document.querySelector(".my-account-copy strong")?.textContent.trim(),document.querySelector(".my-memory-copy h2")?.textContent.trim(),document.querySelector(".my-commerce-section h2")?.textContent.trim(),document.querySelector(".my-settings-section h2")?.textContent.trim()],account:document.querySelector(".my-account-meta")?.textContent.trim(),choices:[...document.querySelectorAll(".my-choice-copy strong")].map(x=>x.textContent.trim()),overflow:document.documentElement.scrollWidth-innerWidth,reactOwned:document.getElementById("my-react-root")?.hasAttribute("data-ui-react-owned")}))()');
   for(const locale of ['ja-JP','zh-TW','en-US','zh-CN','ko-KR','en-US']){

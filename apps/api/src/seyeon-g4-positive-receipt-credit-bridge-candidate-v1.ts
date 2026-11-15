@@ -1,6 +1,7 @@
 // Watchtower-Track: security
 // S0 browser-issued receipt -> original DB receipt ACK -> G4 private ledger ACK.
-// Explicitly unmounted. Requires an actual separate Commerce credential pool.
+// Worker selects this bridge only when server-owned creditBilling.productionMounted is true.
+// The production mount remains false until the dedicated Commerce authority is provisioned.
 import type {PostgresSubjectPoolV1} from './postgres-subject-execution.js';
 import {executePostgresCommerceInternalTransactionV1}
   from './postgres-commerce-internal-execution.js';

@@ -101,6 +101,10 @@ export function createAdminHostedHttpV1(input: {
         return secure(result);
       }
       if (!['GET','HEAD'].includes(request.method)) return secure(reply(405, 'METHOD_NOT_ALLOWED'));
+      // The canonical Owner console entry is /admin/. Root bookmarks and shared
+      // links must redirect only after the existing exact-Owner Access gate.
+      // Drop query strings (including tracking parameters); never redirect to input URLs.
+      if (url.pathname === '/') return secure(Response.redirect(origin + '/admin/', 302));
       if (!url.pathname.startsWith('/admin')) return secure(reply(404, 'NOT_FOUND'));
       const path = url.pathname.replace(/^\/admin\/?/u, '/');
       const assetUrl = new URL(request.url); assetUrl.pathname = path; assetUrl.search = '';

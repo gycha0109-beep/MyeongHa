@@ -5,10 +5,10 @@ import {
 } from './commerce-portone-verified-reader-full-cancellation.js';
 import type {
   PortOneV2FullCancellationVerifierV1,
-  PortOneV2PaymentHttpFetchV1,
   VerifiedPortOneV2FullCancellationV1,
 } from './portone-v2-payment-verification-adapter.js';
-import {recoverExactPortOneFullCancellationIdV1} from './commerce-portone-reader-refund-recovery-v1.js';
+import {recoverExactPortOneFullCancellationIdV1,type PortOneRefundReadbackFetchV1}
+  from './commerce-portone-reader-refund-recovery-v1.js';
 
 /**
  * A private, durable, owner-adjudicated refund command. No HTTP route mounts
@@ -226,7 +226,7 @@ export async function executePrivatelyAuthorizedReaderFullRefundV1(input: Readon
   apiSecret: string;
   verifier: PortOneV2FullCancellationVerifierV1;
   fetchImpl?: ReaderPrivateRefundFetchV1;
-  lookupFetchImpl?: PortOneV2PaymentHttpFetchV1;
+  lookupFetchImpl?: PortOneRefundReadbackFetchV1;
   timeoutMs?: number;
 }>): Promise<ReaderPrivateRefundOutcomeV1> {
   const id=AUTH_ID(input.authorizationId);

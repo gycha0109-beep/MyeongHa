@@ -10,6 +10,11 @@ set -euo pipefail
   echo HOLD_S0_REQUIRES_POSTGRES17 >&2; exit 1;
 }
 node scripts/operations/seyeon-security-s0/install-isolated.mjs
+# G4 cost admission and dedicated PostgreSQL/Cloudflare checkout boundaries.
+./node_modules/.bin/vitest run test/seyeon-cost-governor-04c-adapter-v1.test.ts --maxWorkers=1
+./node_modules/.bin/vitest run test/seyeon-openai-input-token-count-port-v1.test.ts --maxWorkers=1
+./node_modules/.bin/vitest run apps/api/src/seyeon-governed-postgres-pool-v1.test.ts --maxWorkers=1
+./node_modules/.bin/vitest run test/cloudflare-seyeon-governed-hyperdrive.test.mjs --maxWorkers=1
 SEYEON_SECURITY_S0_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-security-s0-postgres.e2e.test.ts --maxWorkers=1
 SEYEON_SECURITY_S0_REAL_PG=1 ./node_modules/.bin/vitest run \

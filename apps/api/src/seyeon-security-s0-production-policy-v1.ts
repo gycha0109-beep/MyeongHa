@@ -8,7 +8,12 @@ export const SEYEON_SECURITY_S0_PRODUCTION_V1=Object.freeze({
   contractVersion:'seyeon-positive-http-receipt-barrier-v1',
   receiptAndWithdrawalEnabled:true,
   modelUseEnabled:true,
-  zeroSourceFirstReplyApproved:true,
+  // S0 now requires exactly one owner-authorized conversation_recall/v1 Memory
+  // plus the current User message. Keep the positive projector closed until
+  // G0/G1 source registration and the remaining production proof are complete.
+  positiveMemoryFirstReplyApproved:false,
+  // The previous zero-source Owner-only path is not the S0 product contract.
+  zeroSourceFirstReplyApproved:false,
   // Trusted server code permits the GLM spoken-reply cutover only when a
   // server-side OpenRouter secret is installed. No browser or env flag enables it.
   glmRendererApproved:true,
@@ -24,8 +29,9 @@ export const SEYEON_SECURITY_S0_PRODUCTION_V1=Object.freeze({
   model:'gpt-5.6-terra',
   recordType:'conversation_recall',schemaVersion:'v1',
   projectorVersion:'seyeon-conversation-recall-projector-v1',
-  memoryCount:1,historyEnabled:false,replayEnabled:false,
-  promptCachingEnabled:false,
+  memoryCount:1,historyEnabled:false,pastConversationContextEnabled:false,
+  multiMemoryEnabled:false,readerEnabled:false,replayEnabled:false,
+  firstReplyOnly:true,streamingEnabled:false,promptCachingEnabled:false,
 });
 const policy=(allowedPurposes:SeyeonCostGovernorModelPolicyV1['allowedPurposes']):SeyeonCostGovernorModelPolicyV1=>Object.freeze({
   policyVersion:'seyeon-s0-receipt-production-20261025',

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "ops-disposable-provider-role-replay-observed-evidence-v1",
+  "observedKstDate": "2026-11-13",
+  "upstreamSourceBackupRunId": 43174606843,
+  "upstreamSourceBackupCommit": "05ee24d45ff4c99a7615449a51384222f7ca4247",
+  "sourceEncryptedLedgerArtifactId": 13923871638,
+  "sourceLogicalBackupArtifactId": 13923088346,
+  "isolatedRestoreRunId": 43343813577,
+  "isolatedRestoreRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/43343813577",
+  "isolatedRestoreRunResult": "success",
+  "isolatedRestoreWorkflowCommit": "ad1dd4de42f5cb36318c6cd4acc96c61c3b84490",
+  "isolatedRestoreEvidenceArtifactId": 14000940857,
+  "isolatedRestoreEvidenceZipDigestSha256": "009f41101fd0fa388266141ffb181c587a6c3e1e93a6232bc5e985e20f5f8654",
+  "pairedLedger": {
+    "encryptedSourceDecryptionVerified": true,
+    "originalHistoryPayloadIntegrityVerified": true,
+    "migrationCount": 242,
+    "migrationFrontier": 20261109071019,
+    "migrationCatalogSha256": "91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47",
+    "sourceStatementBodiesMissingCount": 12,
+    "providerMigrationLedgerRestored": false
+  },
+  "roleReplay": {
+    "target": "disposable-postgres17-only",
+    "sourceCrossBoundaryMembershipCount": 48,
+    "replayedCrossBoundaryMembershipCount": 48,
+    "observedRestoredCrossBoundaryMembershipCount": 48,
+    "observedMembershipOptionsMatch": true,
+    "observedGrantorAttributionMatch": true,
+    "replayExecutedInDisposableTarget": true,
+    "directRoleMembershipTargetRehearsalProven": true,
+    "sourcePairsExcludedFromPortableRolesDump": 48,
+    "recipientBoundaryProviderOwnedOnlyProven": false,
+    "inheritedEffectiveAccessProven": false,
+    "sourceWitnessSameMvccSnapshotProven": false,
+    "fullProviderCompatibleRestoreProven": false,
+    "verdict": "DISPOSABLE_ROLE_REPLAY_OBSERVED__HOSTED_PROVIDER_PARITY_HOLD"
+  },
+  "applicationSchemaVerifiedEquivalent": false,
+  "hostedAuthStorageEquivalent": false,
+  "fullServiceRecoveryProven": false,
+  "servingAdmission": "BLOCKED",
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "roadmapComplete": false,
+  "limitations": [
+    "Only observed sealed-source-to-disposable-target role GRANT replay, never actual Hosted Provider recovery",
+    "Source migration ledger has 12 NULL statement bodies; target migration ledger was not restored",
+    "The filtered portable roles.sql excludes all 48 observed cross-boundary role memberships",
+    "Provider ownership and inherited privileges, same-source/dump MVCC snapshot, full schema parity and Hosted Auth/Storage are not proven",
+    "No Production write, paid Hosted DR target, privacy canary, or Service RPO/RTO acceptance occurred"
+  ]
+}
