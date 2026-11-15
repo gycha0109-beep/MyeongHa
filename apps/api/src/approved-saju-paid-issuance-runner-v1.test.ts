@@ -58,6 +58,22 @@ describe('paid receipt → signed official Saju issuer runner', () => {
     expect(mock.self).not.toHaveBeenCalled();
   });
 
+  it('stops scheduling after a DB or signed-source error instead of continuing unattended', async () => {
+    mock.self.mockRejectedValueOnce(new Error('issuer database unavailable'));
+    let errorReceived!: (error: unknown) => void;
+    const failed = new Promise<unknown>(resolve => { errorReceived = resolve; });
+    const onError = vi.fn((error: unknown) => errorReceived(error));
+    const runner = createApprovedSajuPaidIssuanceRunnerV1({
+      ...config(), intervalMs: 1_000, onError,
+    } as never);
+    runner.start();
+    const error = await failed;
+    expect(error).toBeInstanceOf(Error);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(mock.self).toHaveBeenCalledTimes(1);
+    await runner.close();
+  });
+
   it('limits each drain to a bounded set of jobs and cannot restart once closed', async () => {
     mock.self.mockResolvedValue({ state: 'issued' });
     const runner = createApprovedSajuPaidIssuanceRunnerV1({

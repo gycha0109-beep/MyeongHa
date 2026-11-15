@@ -85,7 +85,10 @@ export function createApprovedSajuPaidIssuanceRunnerV1(input: Readonly<{
     if (!started || closed) return;
     timer = setTimeout(async () => {
       try {
-        input.onCycle?.(await runOnce());
+        // Processing must not depend on whether an optional telemetry
+        // callback is installed; optional-call short-circuit skips arguments.
+        const outcome = await runOnce();
+        input.onCycle?.(outcome);
       } catch (error) {
         input.onError?.(error);
         // A database, source-proof or trust error must stop the worker.
