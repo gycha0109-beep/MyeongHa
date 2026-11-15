@@ -17,6 +17,7 @@ const ARCHIVE_PATH = '/api/readings';
 const BIRTH_CREATE_PATH = '/api/birth-profiles';
 const BIRTH_CURRENT_PATH = '/api/me/birth-profile';
 const SAJU_CALCULATION_PATH = '/api/me/saju/calculation';
+const TEST_REFUND_RECONCILE_PATH = '/api/me/saju/checkout-test/reconcile-cancellation';
 const MAX_BIRTH_BODY_BYTES = 4096;
 const TARGETS_PATH = '/api/target-persons';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -73,6 +74,8 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
   ownerBirth?: Readonly<{ create: OwnerReadHandler; current: OwnerReadHandler; calculate?: OwnerReadHandler }>;
   /** Dedicated read-only, signed T10 archive. Never an issue/write authority. */
   signedPairReader?: Readonly<{ handleRequest: (request: Request) => Promise<Response | null> }>;
+  /** Verified PortOne TEST full-cancellation readback; no refund POST authority. */
+  refundReconciler?: Readonly<{ reconcile: (purchaseIntentId: string) => Promise<Response> }>;
 }>) {
   const url = new URL(input.origin);
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1'
@@ -241,6 +244,54 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
           reply(503); return;
         }
         reply(response.status, output, 'application/json; charset=utf-8');
+      } catch { reply(503); }
+      return;
+    }
+
+    if (requestUrl.pathname === TEST_REFUND_RECONCILE_PATH) {
+      if (input.refundReconciler === undefined) { req.resume(); reply(404); return; }
+      if (req.method !== 'POST') { req.resume(); reply(405); return; }
+      if (requestUrl.search !== '' || req.headers.origin !== input.origin ||
+        req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
+        req.resume(); reply(403); return;
+      }
+      const authorization = req.headers.authorization;
+      if (typeof authorization !== 'string') { req.resume(); reply(404); return; }
+      try {
+        const owner = await input.runtime.handleRequest(new Request(
+          input.origin + APPROVED_SAJU_SANDBOX_ROUTES_V1.access,
+          { headers: { Authorization: authorization } },
+        ));
+        if (owner?.status !== 200) { req.resume(); reply(404); return; }
+        const length = Number(req.headers['content-length'] ?? 0);
+        if (!Number.isSafeInteger(length) || length > MAX_REQUEST_BYTES) {
+          req.resume(); reply(413); return;
+        }
+        const chunks: Buffer[] = [];
+        let size = 0;
+        for await (const chunk of req) {
+          const part = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+          size += part.byteLength;
+          if (size > MAX_REQUEST_BYTES) { reply(413); return; }
+          chunks.push(part);
+        }
+        const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
+          || Object.keys(parsed).length !== 1 || !('purchaseIntentId' in parsed)
+          || typeof parsed.purchaseIntentId !== 'string' || !UUID.test(parsed.purchaseIntentId)) {
+          reply(400); return;
+        }
+        const result = await input.refundReconciler.reconcile(parsed.purchaseIntentId);
+        if (!(result instanceof Response) || result.status >= 300 && result.status < 400 ||
+          result.headers.has('set-cookie') || result.headers.has('location')) {
+          reply(503); return;
+        }
+        const body = new Uint8Array(await result.arrayBuffer());
+        if (body.byteLength > MAX_REQUEST_BYTES ||
+          !result.headers.get('content-type')?.startsWith('application/json')) {
+          reply(503); return;
+        }
+        reply(result.status, body, 'application/json; charset=utf-8');
       } catch { reply(503); }
       return;
     }

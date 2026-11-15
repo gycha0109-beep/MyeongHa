@@ -129,6 +129,10 @@ try {
           bearerToken: process.env.MYEONGHA_SAJU_SOURCE_TOKEN,
         } } : {}),
     memberPool, commercePool, verificationAdapter,
+    testRefund: {
+      apiSecret: process.env.MYEONGHA_SAJU_TEST_PORTONE_API_SECRET,
+      evidenceHmacSecret: process.env.MYEONGHA_SAJU_TEST_EVIDENCE_HMAC_SECRET,
+    },
     pairReader: { pool: pairReaderPool, trust: {
       issuer: process.env.MYEONGHA_SAJU_PAIR_PROOF_ISSUER,
       audience: process.env.MYEONGHA_SAJU_PAIR_PROOF_AUDIENCE,

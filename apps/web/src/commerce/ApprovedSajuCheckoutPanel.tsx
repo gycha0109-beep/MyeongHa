@@ -32,6 +32,7 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
   const [verifyOnly, setVerifyOnly] = useState(false);
   const [archive, setArchive] = useState<readonly ApprovedSajuPurchaseReadingV1[]>([]);
   const [signedPair, setSignedPair] = useState<ApprovedSajuSignedPairArchiveV1 | null>(null);
+  const [refunded, setRefunded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const inFlight = useRef(false);
@@ -137,8 +138,30 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
     }
   }
 
+  async function reconcileExistingRefund() {
+    if (!binding || !verified || !ports.reconcileRefund || inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    try {
+      const response = await ports.reconcileRefund(binding.purchaseIntentId);
+      if (response.state === 'refund_reconciled') {
+        setRefunded(true);
+        setArchive([]);
+        setSignedPair(null);
+        setMessage('포트원 TEST 전체 취소 확인. 구매한 풀이의 열람 권한을 회수했습니다.');
+      } else {
+        setMessage('포트원에서 전체 취소가 완료되지 않았습니다. 취소 완료 후 다시 확인해 주세요.');
+      }
+    } catch {
+      setMessage('포트원 TEST 취소를 확인하지 못했습니다. 결제 정보가 변경되지는 않았습니다.');
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+
   async function continueCheckout() {
-    if (!offer || inFlight.current || (needsTarget && !targetId)) return;
+    if (!offer || refunded || inFlight.current || (needsTarget && !targetId)) return;
     inFlight.current = true;
     setBusy(true);
     try {
@@ -184,6 +207,7 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
     setVerifyOnly(false);
     setArchive([]);
     setSignedPair(null);
+    setRefunded(false);
     setMessage('');
     retryKey.current = null;
   }
@@ -222,9 +246,14 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
             </select>
           </div>
         )}
-        {(!verified || ports.readArchive !== undefined) && (
+        {(!refunded && (!verified || ports.readArchive !== undefined)) && (
           <button className="saju-primary-button" type="submit" disabled={busy || !offer || (needsTarget && !targetId)}>
             {busy ? '확인 중…' : verified ? '보관함 상태 다시 확인' : verifyOnly ? '결제 확인 다시 시도' : '결제창 열기'}
+          </button>
+        )}
+        {verified && !refunded && ports.reconcileRefund && (
+          <button type="button" disabled={busy} onClick={() => { void reconcileExistingRefund(); }}>
+            포트원 TEST 전체 취소 확인 · 열람 권한 회수
           </button>
         )}
         {verified && <button type="button" disabled={busy} onClick={chooseAnotherOffer}>다른 상품 선택</button>}
