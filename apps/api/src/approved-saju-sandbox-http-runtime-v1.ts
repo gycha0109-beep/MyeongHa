@@ -90,6 +90,7 @@ export function createApprovedSajuSandboxHttpRuntimeV1(input: {
             return await handlePaymentAttemptServerVerificationRequestV1({
               ...common, approvedSajuSandbox: true, commercePool: input.commercePool,
               verificationAdapter: input.verificationAdapter,
+              privateApprovedSajuReceiptFulfillmentEnabled: true,
             });
           default:
             return unavailable(404);

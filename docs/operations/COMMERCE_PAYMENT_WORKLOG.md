@@ -1253,3 +1253,9 @@ Watchtower-Track: commerce
 - 격리 읽기 페이지에 빠져 있던 출생 프로필 생성·현재 프로필 조회 및 Saju 계산 HTTP 경로를 기존 회원 권한 처리기에 연결했다. 출생 입력 HMAC은 매 실행마다 임시 생성되며 운영 DB/개인정보는 복제하지 않는다.
 - 회원 로그인/로그아웃이나 다른 탭의 로그인 상태가 변경되면 14상품 Owner 결제 화면 권한을 재확인해 갱신하도록 수정했다. Provider TEST·공식 Source 키 없이 운영 판매는 열지 않는다.
 - 남은 실거래 과제: 승인 후보 SQL의 production-only 영수증 발급 근거와 PortOne sandbox 검증을 분리한 테스트 발급 흐름, 실제 공식 Source 서명 및 구매→환불 최종 경로.
+
+### 2026-11-15 — verified PortOne TEST 영수증을 격리 사주 발급 큐에 연결
+- 보호된 Owner TEST 결제의 서버 검증 영수증이 저장된 뒤 기존 승인 사주 영수증→구성요소 권한→발급 Outbox로 처리되도록 연결했다. 브라우저 응답이나 임의 테스트 값은 발급 근거가 아니다.
+- `production` 전용 승인 SQL 원본은 그대로 두고, **폐기형 로컬 PostgreSQL 17의 소유자 한 계정·구매 시작 전 DB에만** `sandbox` 영수증을 인식하는 격리 DB 함수 오버레이를 설치한다. 설치 대상 DB·함수 목록·사용자 권한이 어긋나면 결제 시작 자체를 거부한다.
+- 별도 격리 PG17에 위 SQL을 실제 설치하고 `SAJU14_VERIFIED_SANDBOX_ONLY_ISSUANCE_READY` 확인, 임시 DB 삭제. 운영 DB와 실제 상품 판매 플래그는 변경하지 않았다.
+- 외부 PortOne TEST 자격증명과 Saju 공식 서명 Source가 현재 미설정이라 실제 결제→공식 서명→환불 종단 완료를 뜻하지 않는다.

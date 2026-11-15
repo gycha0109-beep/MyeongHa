@@ -101,7 +101,10 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
   });
 
   const sajuFulfillment = input.privateApprovedSajuReceiptFulfillmentEnabled === true
-    ? await fulfillVerifiedApprovedSajuReceiptV1({ pool: commercePool, receiptId: persisted.receiptId, evidence })
+    ? await fulfillVerifiedApprovedSajuReceiptV1({
+        pool: commercePool, receiptId: persisted.receiptId, evidence,
+        ...(input.approvedSajuSandbox === true ? { isolatedOwnerSandbox: true } : {}),
+      })
     : undefined;
   const readerFulfillment = input.privateReaderReceiptFulfillmentEnabled === true
     && (sajuFulfillment === undefined || sajuFulfillment === 'not_approved_saju')
