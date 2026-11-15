@@ -1275,3 +1275,7 @@ Watchtower-Track: commerce
 - 병합 후 saju-hub.js에 중복 선언된 프로필 변수를 제거했다.
 - PostgreSQL Subject 트랜잭션을 공용 실행 역할 처리기로 분리한 실제 구조에 맞춰 Chat Open 정적 경계 검사와 고정 증거 해시를 갱신했다. 기본 회원 역할 적용, Subject 결속, 롤백 검사는 유지한다.
 - 관련 경계 검사 11건과 웹 빌드를 통과했다. 운영 DB·결제·판매 설정 변경 없음.
+### 2026-11-16 — 통합 DB 스키마 기준값 갱신
+- main 통합으로 추가된 Reader Context·Shared Memory 마이그레이션 6개와 기존 Saju Commerce 마이그레이션을 함께 적용한 PostgreSQL 15 결과를 기준으로 카탈로그 해시를 갱신했다.
+- effective-entitlements-v2 기능 테스트 11개는 통과했고, 실패 원인은 이전 스키마 기준 해시 불일치로 확인했다.
+- 새 기준값: 180424a123a656bf750c80c9178b4ecfd07bc93482a72ba0c583d922d0b671bc. 운영 DB·결제·판매 설정은 변경하지 않았다.
