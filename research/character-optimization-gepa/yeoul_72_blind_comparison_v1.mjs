@@ -50,9 +50,11 @@ export function buildBlindReview({original,candidate,actual},chooseSide=()=>rand
    ||!legacy.reply||typeof legacy.reply!=='string')fail('unmatched_response');
   const side=chooseSide();
   if(side!==0&&side!==1)fail('invalid_random_side');
-  pairs.push({id:task.legacyKey,questionId:task.id,question:task.input,
-   left:side===0?legacy.reply:fresh.reply,right:side===0?fresh.reply:legacy.reply});
-  key.push({id:task.legacyKey,questionId:task.id,legacySide:side===0?'A':'B'});
+  const left=side===0?legacy.reply:fresh.reply;
+  const right=side===0?fresh.reply:legacy.reply;
+  pairs.push({id:task.legacyKey,questionId:task.id,question:task.input,left,right});
+  key.push({id:task.legacyKey,questionId:task.id,legacySide:side===0?'A':'B',
+   displayedPairSha256:sha(JSON.stringify([task.legacyKey,task.id,left,right]))});
  }
  const keyFile={schemaVersion:'yeoul-72-private-blind-key-v1',
   candidateSha256:plan.candidateSha256,sourceProtocolSha256:plan.sourceProtocolSha256,
