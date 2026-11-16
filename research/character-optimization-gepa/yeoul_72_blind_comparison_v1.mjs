@@ -7,9 +7,15 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import {resolve,relative,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildPairedPlan} from './yeoul_288_paid_pair_preflight_v1.mjs';
+import {DIMENSIONS} from '../../scripts/character-optimization/evaluation-v1.mjs';
 
 const REPO=fileURLToPath(new URL('../../',import.meta.url));
 const MODEL='deepseek/deepseek-v4.1-flash-1017';
+const AXIS_LABELS=Object.freeze({
+ korean_naturalness:'한국어 표현', response_relevance:'질문 적합성', agency:'주도성',
+ persona_fidelity:'여울 성격', relationship_fit:'관계 적절성', continuity:'맥락 유지',
+ repetition:'반복성', efficiency:'답변 간결성',
+});
 const fail=s=>{throw Error('YEOUL_BLIND_PAIR_HOLD:'+s)};
 const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const sha=x=>createHash('sha256').update(x).digest('hex');
@@ -64,6 +70,7 @@ export function buildBlindReview({original,candidate,actual},chooseSide=()=>rand
 }
 
 function renderHtml(pairs,fingerprint){
+ const issueOptions=DIMENSIONS.map(axis=>`<option value="${axis}">${AXIS_LABELS[axis]}</option>`).join('');
  const entries=pairs.map((p,i)=>`<article data-id="${escapeHtml(p.id)}"><h3>${i+1}/72 · ${escapeHtml(p.questionId)}</h3>
  <p class="question">${escapeHtml(p.question)}</p>
  <div class="answers"><section><b>답변 A</b><p>${escapeHtml(p.left)}</p></section>
@@ -73,7 +80,8 @@ function renderHtml(pairs,fingerprint){
  <label><input type="radio" name="pick${i}" value="B">B</label>
  <label><input type="radio" name="pick${i}" value="tie">동점</label>
  <label><input type="radio" name="pick${i}" value="uncertain">판단 보류</label>
- </fieldset><label>근거(선택, 로컬에만 저장)<textarea maxlength="500"></textarea></label></article>`).join('\n');
+ </fieldset><label>상대적으로 부족한 답변의 주요 문제(선택)<select><option value="">선택하지 않음</option>${issueOptions}</select></label>
+ <label>근거(선택, 로컬에만 저장)<textarea maxlength="500"></textarea></label></article>`).join('\n');
  return `<!doctype html><html lang="ko"><head><meta charset="utf-8">
  <meta name="viewport" content="width=device-width,initial-scale=1">
  <title>여울 GEPA · 과거/새 응답 블라인드 비교</title>
@@ -92,9 +100,12 @@ function renderHtml(pairs,fingerprint){
  const nodes=[...document.querySelectorAll('article[data-id]')];
  const fp=${JSON.stringify(fingerprint)};
  function save(){
- const reviews=nodes.map(n=>({id:n.dataset.id,
- vote:n.querySelector('input:checked')?.value??null,
- note:n.querySelector('textarea').value.slice(0,500)}));
+ const reviews=nodes.map(n=>{
+ const vote=n.querySelector('input:checked')?.value??null;
+ return {id:n.dataset.id,vote,
+ issueAxis:['A','B'].includes(vote)?(n.querySelector('select').value||null):null,
+ note:n.querySelector('textarea').value.slice(0,500)};
+ });
  const result={schemaVersion:'yeoul-72-blind-review-draft-v1',keyFingerprint:fp,reviews};
  const blob=new Blob([JSON.stringify(result,null,2)],{type:'application/json'});
  const a=document.createElement('a');const url=URL.createObjectURL(blob);a.href=url;
@@ -117,23 +128,39 @@ export function summarizeBlindReview(keyFile,draft){
  const map=new Map(keyFile.pairs.map(x=>[x.id,x]));
  if(map.size!==72||new Set(keyFile.pairs.map(x=>x.questionId)).size!==12)fail('key_duplicates');
  let reviewed=0,candidateWins=0,legacyWins=0,ties=0,uncertain=0;
- const byQuestion={};const seen=new Set();
+ const candidateRegressionAxes={},legacyRegressionAxes={};
+ const byQuestion=Object.create(null);const seen=new Set();
  for(const r of draft.reviews){
   if(!obj(r)||typeof r.id!=='string'||seen.has(r.id)||!map.has(r.id)
    ||![null,'A','B','tie','uncertain'].includes(r.vote)
-   ||typeof r.note!=='string'||r.note.length>500)fail('invalid_review');
+   ||typeof r.note!=='string'||r.note.length>500
+   ||!([null,...DIMENSIONS].includes(r.issueAxis??null))
+   ||(r.issueAxis!=null&&!['A','B'].includes(r.vote)))fail('invalid_review');
   seen.add(r.id);
   const pair=map.get(r.id);
-  const group=byQuestion[pair.questionId]??={reviewed:0,candidateWins:0,legacyWins:0,ties:0,uncertain:0};
+  const group=byQuestion[pair.questionId]??={reviewed:0,candidateWins:0,legacyWins:0,ties:0,uncertain:0,
+   candidateRegressionAxes:{},legacyRegressionAxes:{}};
   if(r.vote===null)continue;
   reviewed++;group.reviewed++;
   if(r.vote==='tie'){ties++;group.ties++;}
   else if(r.vote==='uncertain'){uncertain++;group.uncertain++;}
-  else if(r.vote===pair.legacySide){legacyWins++;group.legacyWins++;}
-  else{candidateWins++;group.candidateWins++;}
+  else if(r.vote===pair.legacySide){
+   legacyWins++;group.legacyWins++;
+   if(r.issueAxis){
+    candidateRegressionAxes[r.issueAxis]=(candidateRegressionAxes[r.issueAxis]??0)+1;
+    group.candidateRegressionAxes[r.issueAxis]=(group.candidateRegressionAxes[r.issueAxis]??0)+1;
+   }
+  }else{
+   candidateWins++;group.candidateWins++;
+   if(r.issueAxis){
+    legacyRegressionAxes[r.issueAxis]=(legacyRegressionAxes[r.issueAxis]??0)+1;
+    group.legacyRegressionAxes[r.issueAxis]=(group.legacyRegressionAxes[r.issueAxis]??0)+1;
+   }
+  }
  }
  return {schemaVersion:'yeoul-72-blind-comparison-summary-v1',total:72,
   reviewed,unreviewed:72-reviewed,candidateWins,legacyWins,ties,uncertain,
+  candidateRegressionAxes,legacyRegressionAxes,
   byQuestion:Object.fromEntries(Object.entries(byQuestion).sort()),
   comparisonIsHistoricalDevelopmentOnly:true,oldAndNewGenerationDatesDiffer:true,
   independentHoldoutPassed:false,reviewerIdentityVerified:false,
