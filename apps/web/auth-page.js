@@ -693,6 +693,10 @@ function authErrorMessage(error) {
       return '비밀번호 안전성 확인 서비스를 사용할 수 없습니다. 잠시 뒤 다시 시도해 주세요.';
     case 'RATE_LIMITED':
       return '요청이 너무 많습니다. 잠시 뒤 다시 시도해 주세요.';
+    case 'WEB_AUTH_LOCAL_UNAVAILABLE':
+      return '현재 로컬 명하 서버에는 회원 인증 기능이 연결되지 않았습니다. 입력 오류가 아니며, 인증 환경을 구성해야 로그인할 수 있습니다.';
+    case 'WEB_SOCIAL_AUTH_ORIGIN_UNAPPROVED':
+      return '현재 로컬 주소에서는 소셜 로그인을 사용할 수 없습니다. 승인된 서비스 주소에서 로그인해 주세요.';
     case 'WEB_AUTH_NETWORK_FAILED':
     case 'AUTH_UPSTREAM_UNAVAILABLE':
       return '인증 서버에 연결할 수 없습니다. 잠시 뒤 다시 시도해 주세요.';

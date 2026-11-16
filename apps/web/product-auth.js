@@ -668,6 +668,16 @@ async function postJson(endpoint, body, authorization = null, options = undefine
     throw new ProductAuthError('WEB_AUTH_NETWORK_FAILED', '인증 서버에 연결할 수 없습니다.', error);
   }
 
+  if (response.status === 404 &&
+      (endpoint.startsWith('/api/auth/') || endpoint === '/api/session/bootstrap') &&
+      typeof location !== 'undefined' &&
+      ['127.0.0.1', 'localhost'].includes(location.hostname)) {
+    throw new ProductAuthError(
+      'WEB_AUTH_LOCAL_UNAVAILABLE',
+      '이 로컬 명하 서버에는 회원 인증 기능이 연결되지 않았습니다.',
+    );
+  }
+
   if (response.status === 429 && options?.rateLimitCode) {
     throw new ProductAuthError(
       options.rateLimitCode,
