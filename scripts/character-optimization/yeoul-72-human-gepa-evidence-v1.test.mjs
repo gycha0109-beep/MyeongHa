@@ -72,3 +72,18 @@ test('candidate/model/response mismatch, duplicate pairing or inconsistent draft
  const f=fixture();f.actual.rows[0].promptSha256='a'.repeat(64);
  assert.throws(()=>buildYeoulHumanGepaEvidence(f),/actual_prompt_binding/);
 });
+
+test('GEPA feedback retains named human regression axes without inventing model-quality proof',()=>{
+ const f=fixture();
+ f.review.reviews[0]={...f.review.reviews[0],vote:'A',issueAxis:'relationship_fit',note:'private user note'};
+ f.review.reviews[1]={...f.review.reviews[1],vote:'A',issueAxis:'korean_naturalness',note:''};
+ f.review.reviews[2]={...f.review.reviews[2],vote:'A',issueAxis:'relationship_fit',note:''};
+ const result=buildYeoulHumanGepaEvidence(f);
+ assert.deepEqual(result.candidateRegressionAxes,{relationship_fit:2,korean_naturalness:1});
+ assert.equal(result.reviewedCandidateRegressionAxisRanking[0].axis,'relationship_fit');
+ assert.equal(result.reviewedCandidateRegressionAxisRanking[0].count,2);
+ assert.equal(result.familyEvidence[0].candidateRegressionAxes.relationship_fit,2);
+ assert.equal(result.feedbackAxisAttribution,'human_selected_on_definite_preference_only');
+ assert.equal(result.qualityGainEstablished,false);
+ assert.doesNotMatch(JSON.stringify(result),/private user note/);
+});
