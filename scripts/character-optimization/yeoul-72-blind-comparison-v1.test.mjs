@@ -66,3 +66,22 @@ test('mismatched candidate, missing reply, duplicate rows, forged blind key reje
  assert.throws(()=>summarizeBlindReview(fake,draft),/review_binding/);
  assert.throws(()=>summarizeBlindReview(r.keyFile,{...draft,reviews:[...reviews.slice(1),reviews[1]]}),/invalid_review/);
 });
+
+test('human-selected loss reasons are counted only for definite preference, never guessed from notes',()=>{
+ const r=buildBlindReview(data(),()=>0);
+ const reviews=r.keyFile.pairs.map(p=>({id:p.id,vote:null,note:''}));
+ reviews[0]={...reviews[0],vote:'A',issueAxis:'korean_naturalness',note:'only local'};
+ reviews[1]={...reviews[1],vote:'B',issueAxis:'persona_fidelity',note:'only local'};
+ const draft={schemaVersion:'yeoul-72-blind-review-draft-v1',
+  keyFingerprint:sha(JSON.stringify(r.keyFile)),reviews};
+ const s=summarizeBlindReview(r.keyFile,draft);
+ assert.deepEqual(s.candidateRegressionAxes,{korean_naturalness:1});
+ assert.deepEqual(s.legacyRegressionAxes,{persona_fidelity:1});
+ assert.equal(s.byQuestion.Y01.candidateRegressionAxes.korean_naturalness,1);
+ assert.equal(s.byQuestion.Y01.legacyRegressionAxes.persona_fidelity,1);
+ assert.doesNotMatch(JSON.stringify(s),/only local/);
+ reviews[0]={...reviews[0],vote:'tie'};
+ assert.throws(()=>summarizeBlindReview(r.keyFile,draft),/invalid_review/);
+ reviews[0]={...reviews[0],vote:'B',issueAxis:'not_real_axis'};
+ assert.throws(()=>summarizeBlindReview(r.keyFile,draft),/invalid_review/);
+});
