@@ -138,12 +138,15 @@ export function createPwnedPasswordCompromiseGuardV1(input?: {
               'User-Agent': 'MyeongHa-Password-Compromise-Guard/1.0',
             },
             cache: 'no-store',
-            redirect: 'error',
+            // Workers throws before sending when redirect: "error" is used.
+            // Manual mode keeps the no-redirect policy and works in Cloudflare.
+            redirect: 'manual',
             signal: controller.signal,
           },
         );
 
-        if (!response.ok) {
+        if (!response.ok || response.redirected ||
+            (response.status >= 300 && response.status < 400)) {
           try {
             await response.body?.cancel();
           } catch {}

@@ -20,6 +20,17 @@ import {
 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import { PostgresMemberAuthRateLimitAdmissionPortV1 } from '../apps/api/src/postgres-member-auth-rate-limit.ts';
 import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
+import {
+  createLocalAuthSubjectPoolV1,
+  isIsolatedLocalAuthRequestV1,
+  localGoTrueMemberFetchV1,
+  parseLocalAuthRuntimeConfigV1,
+  syncLocalAuthIdentityV1,
+} from '../apps/api/src/local-auth-dev-runtime.ts';
+import { handleGuestBootstrapRequestV1 } from '../apps/api/src/guest-bootstrap-http.ts';
+import { createProductionGuestBootstrapCredentialIssuerPortV1 } from '../apps/api/src/production-guest-bootstrap-credential-issuer.ts';
+import { createProductionGuestBootstrapRuntimePortsV1 } from '../apps/api/src/production-guest-bootstrap-runtime.ts';
+import { handleMemberAuthRateLimitHttpV1 } from '../apps/api/src/member-auth-rate-limit-http.ts';
 
 const EXACT_MODE = 'approved-auth-db-v1';
 const EXACT_DB_TLS_RLS_APPROVAL = 'approved-isolated-tls-rls-v1';
@@ -270,6 +281,7 @@ export function approvedCloudflareAuthHostnameV1(hostname) {
 }
 
 export function approvedCloudflareAuthOriginV1(request, bindings) {
+  if (isIsolatedLocalAuthRequestV1(request, bindings)) return 'http://127.0.0.1:8787';
   if (bindings?.MYEONGHA_CLOUDFLARE_AUTH_DB_MODE !== EXACT_MODE) return null;
   const raw = bindings.MYEONGHA_CLOUDFLARE_AUTH_ORIGIN;
   if (typeof raw !== 'string') return null;
@@ -318,6 +330,13 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       !isGuestPromotion && !isCurrentBirth && !isSocialStart && naverAction === null) return null;
   const origin = approvedCloudflareAuthOriginV1(request, bindings);
   if (origin === null) return null;
+  const localAuth = isIsolatedLocalAuthRequestV1(request, bindings);
+  let localConfig;
+  try {
+    if (localAuth) localConfig = parseLocalAuthRuntimeConfigV1(bindings);
+  } catch {
+    return unavailable();
+  }
   const url = new URL(request.url);
   // Only the verified social-complete exchange and the provider's Naver
   // endpoints may carry query parameters. No other rewrite marker is trusted.
@@ -332,7 +351,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   if (url.search !== '' && naverAction === null && !isSocialComplete) return denied();
   // Provider callback registration and Worker→DB TLS/RLS acceptance are
   // separately signed, not inferred from the Auth host or provider flags.
-  if (!approvedCloudflareStage5HandoffV1(
+  if (!localAuth && !approvedCloudflareStage5HandoffV1(
     bindings, origin, isSocialStart || isSocialComplete || naverAction !== null,
   )) return null;
   const expectedMethod = (isMemberProfile || isBirthRead || isCurrentBirth ||
@@ -350,6 +369,9 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
 
   let approvedDbConfig;
   try {
+    if (localAuth) {
+      approvedDbConfig = localConfig.userData;
+    } else {
     // This shared DB preflight must not require the Member sign-in rate-limit
     // secret for Guest bootstrap, OAuth start, profile reads or Birth routes.
     // The rate-limit runtime below validates its own independent secret.
@@ -366,6 +388,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       return unavailable();
     }
     approvedDbConfig = config;
+    }
   } catch (error) {
     // Temporary owner-only tail diagnostics: class name, never the exception
     // message, connection URL, certificate, request or authentication token.
@@ -381,21 +404,41 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   // pool injection. A Worker HTTP fetch owns a max-one-connection pool;
   // legacy Vercel calls without the option keep their unchanged defaults.
   function createSubjectPool() {
-    subjectPool = createCloudflareSubjectPoolV1(
-      approvedDbConfig, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
-    );
+    subjectPool = localAuth
+      ? createLocalAuthSubjectPoolV1(localConfig, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1)
+      : createCloudflareSubjectPoolV1(
+        approvedDbConfig, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+      );
     return subjectPool;
   }
   try {
     if (isGuestBootstrap) {
-      runtime = createProductionGuestBootstrapHttpRuntimeV1({
-        env: bindings, pool: createSubjectPool(),
-      });
-      result = await runtime.handleRequest({
-        request,
-        requestId: crypto.randomUUID(),
-        serverTime: new Date().toISOString(),
-      });
+      if (localAuth) {
+        const localPool = createSubjectPool();
+        const verifierFetch = localGoTrueMemberFetchV1(localConfig);
+        const runtimePorts = createProductionGuestBootstrapRuntimePortsV1({
+          request, config: localConfig.userData, pool: localPool, memberFetchImpl: verifierFetch,
+        });
+        const issuer = createProductionGuestBootstrapCredentialIssuerPortV1({
+          config: { guestSessionTtlSeconds: localConfig.guestSessionTtlSeconds },
+        });
+        result = await handleGuestBootstrapRequestV1({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+          identityResolverPort: runtimePorts.identityResolverPort,
+          tokenFingerprintPort: runtimePorts.tokenFingerprintPort,
+          authorityPort: runtimePorts.authorityPort,
+          credentialIssuerPort: issuer,
+        });
+      } else {
+        runtime = createProductionGuestBootstrapHttpRuntimeV1({
+          env: bindings, pool: createSubjectPool(),
+        });
+        result = await runtime.handleRequest({
+          request,
+          requestId: crypto.randomUUID(),
+          serverTime: new Date().toISOString(),
+        });
+      }
     } else if (isMemberProfile) {
       runtime = createProductionCurrentSubjectProfileRuntimeV1({
         env: bindings, pool: createSubjectPool(),
@@ -427,7 +470,12 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       });
     } else if (isGuestPromotion) {
       runtime = createProductionGuestPromotionRuntimeV1({
-        env: bindings, pool: createSubjectPool(),
+        env: bindings,
+        ...(localAuth ? {
+          config: localConfig.userData,
+          pool: createSubjectPool(),
+          memberFetchImpl: localGoTrueMemberFetchV1(localConfig),
+        } : {}),
       });
       result = await runtime.handleRequest({
         request,
@@ -465,21 +513,38 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       // The Vercel source defaults to max=4 and must remain unchanged.
       // Cloudflare injects a distinct request-owned pool with max=1, then
       // closes it on every success/error path after the Auth runtime settles.
-      const rateLimitConfig = parseProductionMemberAuthRateLimitConfigV1(bindings);
-      memberRateLimitPool = createCloudflareSubjectPoolV1(
-        rateLimitConfig, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
-      );
-      runtime = createProductionMemberAuthHttpRuntimeV1({
-        env: bindings,
-        admissionPort: new PostgresMemberAuthRateLimitAdmissionPortV1(memberRateLimitPool),
-        authHandler: (input) => handleSupabaseAuthRequestV1({
-          ...input,
-          webOrigin: origin,
-        }),
-      });
-      result = await runtime.handleRequest(isSocialComplete
-        ? { request, action: 'refresh', authAction: 'social-complete' }
-        : { request, action });
+      if (localAuth) {
+        memberRateLimitPool = createSubjectPool();
+        const next = () => handleSupabaseAuthRequestV1({
+          request, env: bindings, action: isSocialComplete ? 'social-complete' : action,
+          approvedWebOrigin: origin,
+        });
+        result = action === 'sign-out'
+          ? await next()
+          : await handleMemberAuthRateLimitHttpV1({
+            request,
+            action: isSocialComplete ? 'refresh' : action,
+            secret: localConfig.rateLimitSecret,
+            admissionPort: new PostgresMemberAuthRateLimitAdmissionPortV1(memberRateLimitPool),
+            next,
+          });
+      } else {
+        const rateLimitConfig = parseProductionMemberAuthRateLimitConfigV1(bindings);
+        memberRateLimitPool = createCloudflareSubjectPoolV1(
+          rateLimitConfig, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+        );
+        runtime = createProductionMemberAuthHttpRuntimeV1({
+          env: bindings,
+          admissionPort: new PostgresMemberAuthRateLimitAdmissionPortV1(memberRateLimitPool),
+          authHandler: (input) => handleSupabaseAuthRequestV1({
+            ...input,
+            approvedWebOrigin: origin,
+          }),
+        });
+        result = await runtime.handleRequest(isSocialComplete
+          ? { request, action: 'refresh', authAction: 'social-complete' }
+          : { request, action });
+      }
     }
   } catch (error) {
     if (isMemberProfile) {

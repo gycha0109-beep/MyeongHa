@@ -156,11 +156,13 @@ async function startSocialAuth(provider) {
     }
 
     const authorizationUrl = new URL(data.authorizationUrl);
-    if (
-      authorizationUrl.protocol !== 'https:' ||
-      authorizationUrl.origin !== 'https://cnsfpcdiyofqvhpcegfc.supabase.co' ||
-      authorizationUrl.pathname !== '/auth/v1/authorize'
-    ) {
+    const localAuthorization = location.origin === 'http://127.0.0.1:8787' &&
+      authorizationUrl.origin === 'http://127.0.0.1:15432' &&
+      authorizationUrl.pathname === '/authorize';
+    const productionAuthorization = authorizationUrl.protocol === 'https:' &&
+      authorizationUrl.origin === 'https://cnsfpcdiyofqvhpcegfc.supabase.co' &&
+      authorizationUrl.pathname === '/auth/v1/authorize';
+    if (!localAuthorization && !productionAuthorization) {
       throw new ProductAuthError(
         'WEB_SOCIAL_AUTH_START_INVALID',
         '소셜 로그인 주소가 허용된 인증 경계를 벗어났습니다.',

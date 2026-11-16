@@ -37,7 +37,7 @@ for (const fragment of [
   "'Add-Padding': 'true'",
   "'User-Agent': 'MyeongHa-Password-Compromise-Guard/1.0'",
   "cache: 'no-store'",
-  "redirect: 'error'",
+  "redirect: 'manual'",
   ".update(password, 'utf8')",
   '.slice(0, HIBP_RANGE_PREFIX_LENGTH)',
   '.slice(HIBP_RANGE_PREFIX_LENGTH)',

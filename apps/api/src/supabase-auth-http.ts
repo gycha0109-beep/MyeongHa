@@ -54,8 +54,9 @@ export type SupabaseAuthActionV1 =
   | 'sign-out';
 
 interface AuthProxyConfigV1 {
-  readonly supabaseOrigin: typeof MYEONGHA_PRODUCTION_SUPABASE_ORIGIN;
+  readonly supabaseOrigin: string;
   readonly supabaseApiKey: string;
+  readonly localGoTrue: boolean;
 }
 
 interface AuthSessionV1 {
@@ -122,6 +123,14 @@ function errorResponse(code: string, status: number): Response {
 }
 
 function parseConfig(env: ProductionUserDataRuntimeEnvV1): AuthProxyConfigV1 {
+  if (env.MYEONGHA_LOCAL_AUTH_MODE === 'isolated-v1') {
+    const origin = env.MYEONGHA_LOCAL_SUPABASE_URL?.trim();
+    const apiKey = env.MYEONGHA_LOCAL_SUPABASE_API_KEY?.trim();
+    if (origin !== 'http://127.0.0.1:15432' || typeof apiKey !== 'string' || apiKey.length < 20) {
+      throw new Error('Local Auth requires the fixed isolated GoTrue service and local API key.');
+    }
+    return Object.freeze({ supabaseOrigin: origin, supabaseApiKey: apiKey, localGoTrue: true });
+  }
   const rawUrl = env[PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseUrl];
   const rawKey = env[PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseApiKey];
   if (typeof rawUrl !== 'string' || rawUrl.trim() !== MYEONGHA_PRODUCTION_SUPABASE_ORIGIN) {
@@ -133,7 +142,14 @@ function parseConfig(env: ProductionUserDataRuntimeEnvV1): AuthProxyConfigV1 {
   return Object.freeze({
     supabaseOrigin: MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
     supabaseApiKey: rawKey.trim(),
+    localGoTrue: false,
   });
+}
+
+function authEndpoint(config: AuthProxyConfigV1, supabasePath: string): string {
+  if (!config.localGoTrue) return `${config.supabaseOrigin}${supabasePath}`;
+  const localPath = supabasePath.replace(/^\/auth\/v1/u, '');
+  return `${config.supabaseOrigin}${localPath}`;
 }
 
 async function readObjectBody(request: Request): Promise<Record<string, unknown> | null> {
@@ -219,20 +235,21 @@ function normalizeAuthNext(value: unknown, authOrigin: string = MYEONGHA_PRODUCT
   }
 }
 
-function signupRedirectPath(body: Record<string, unknown>, request: Request, approvedWebOrigin?: string): string {
+function signupRedirectPath(body: Record<string, unknown>, request: Request, approvedWebOrigin?: string, localAuth = false): string {
   const requestOrigin = new URL(request.url).origin;
   // Only a server-admitted same-origin Cloudflare host may override the
   // legacy Vercel callback. An arbitrary client redirect is never authority.
   const exactApproved = approvedWebOrigin === requestOrigin &&
-    requestOrigin.startsWith('https://') &&
-    new URL(requestOrigin).port === '';
+    ((requestOrigin.startsWith('https://') && new URL(requestOrigin).port === '') ||
+      (localAuth && (requestOrigin === 'http://127.0.0.1:8787' || requestOrigin === 'http://localhost:8787')));
   const authOrigin = MYEONGHA_AUTH_WEB_ORIGINS.has(requestOrigin) ||
     (approvedWebOrigin !== undefined && exactApproved)
     ? requestOrigin : MYEONGHA_PRODUCTION_WEB_ORIGIN;
   const redirect = new URL('/auth.html', authOrigin);
   redirect.searchParams.set('confirmed', '1');
   redirect.searchParams.set('next', normalizeAuthNext(body.next, authOrigin));
-  return `/auth/v1/signup?redirect_to=${encodeURIComponent(redirect.toString())}`;
+  const path = `/auth/v1/signup?redirect_to=${encodeURIComponent(redirect.toString())}`;
+  return path;
 }
 
 function readUser(value: unknown): { id: string | null; email: string | null } {
@@ -295,7 +312,7 @@ async function callSupabase(
 ): Promise<{ response: Response; payload: unknown }> {
   const deadline = await fetchSupabaseAuthWithDeadlineV1(
     globalThis.fetch,
-    `${config.supabaseOrigin}${path}`,
+    authEndpoint(config, path),
     {
       ...init,
       headers: {
@@ -475,7 +492,7 @@ export async function handleSupabaseAuthRequestV1(input: {
 
     const path = input.action === 'sign-in'
       ? '/auth/v1/token?grant_type=password'
-      : signupRedirectPath(body, input.request, input.approvedWebOrigin);
+      : signupRedirectPath(body, input.request, input.approvedWebOrigin, config.localGoTrue);
     const upstream = await callSupabase(config, path, {
       method: 'POST',
       body: JSON.stringify({ email, password }),

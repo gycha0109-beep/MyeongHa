@@ -4,6 +4,7 @@ const CANONICAL_WORKER_ORIGINS = new Set([
   'https://myeongha.gycha0109.workers.dev',
   'https://myeongha-web.gycha0109.workers.dev',
 ]);
+const LOCAL_AUTH_ORIGINS = new Set(['http://127.0.0.1:8787']);
 
 export function isCloudflareHostedAuthOriginV1(currentOrigin) {
   let url;
@@ -21,6 +22,8 @@ export function isCloudflareHostedAuthOriginV1(currentOrigin) {
 }
 
 export function resolveWebSocialAuthCallbackUriV1(currentOrigin) {
-  return isCloudflareHostedAuthOriginV1(currentOrigin)
+  return LOCAL_AUTH_ORIGINS.has(currentOrigin)
+    ? currentOrigin + '/auth.html?social=callback'
+    : isCloudflareHostedAuthOriginV1(currentOrigin)
     ? currentOrigin + '/auth.html?social=callback' : null;
 }
