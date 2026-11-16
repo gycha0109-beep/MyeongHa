@@ -5,6 +5,7 @@ import type { ApprovedSajuCheckoutPanelPorts } from '../commerce/approved-saju-s
 import type { ApprovedSajuOfferV1 } from './approved-saju-catalog.js';
 import { APPROVED_SAJU_CATALOG_GROUPS_V1, APPROVED_SAJU_CATALOG_V1, getApprovedSajuOfferV1 } from './approved-saju-catalog.js';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
+import { LocalSajuResearchPanel } from './LocalSajuResearchPanel.js';
 
 const hrefByOfferId: Readonly<Record<string, string>> = Object.freeze({
   career: 'reading-detail.html?topic=career',
@@ -24,9 +25,14 @@ export function ReadingPage({ approvedCheckout }: { approvedCheckout?: ApprovedS
   // retired general-natal product through the present Home/Saju catalogs.
   const resumedVisibleTopic = resumedPreview && Object.values(hrefByOfferId).includes(resumedPreview)
     ? resumedPreview : null;
+  const localResearchEnabled = typeof window !== 'undefined' && window.location.origin === 'http://127.0.0.1:8787';
+  const [localResearchOfferId, setLocalResearchOfferId] = useState<ApprovedSajuOfferV1['id'] | null>(null);
   const [chartTab, setChartTab] = useState<'pillars' | 'elements'>('pillars');
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [checkoutSelection, setCheckoutSelection] = useState<{ offerId: ApprovedSajuOfferV1['id']; sequence: number } | null>(null);
+  useEffect(() => {
+    if (localResearchOfferId) document.getElementById('saju-local-research')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [localResearchOfferId]);
   useEffect(() => {
     if (!checkoutSelection || approvedCheckout === undefined) return;
     document.getElementById('approved-checkout-title')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -196,6 +202,8 @@ export function ReadingPage({ approvedCheckout }: { approvedCheckout?: ApprovedS
                         : approvedCheckout === undefined
                           ? <><span className="reading-topic-availability is-unavailable">정식 풀이 연결 준비 중</span><p className="saju-design-product-scope">공식 풀이와 구매한 상품의 전달 경로를 연결 중입니다.</p></>
                           : <span className="reading-topic-availability is-unavailable">정식 판매 전 테스트 전용</span>}
+                      {localResearchEnabled && <button type="button" className="saju-local-research-button"
+                        onClick={() => setLocalResearchOfferId(offer.id)}>로컬 결과 열기</button>}
                       {approvedCheckout !== undefined && (
                         <button type="button" className="saju-design-product-test-button"
                           aria-label={`${offer.title} 테스트 결제 진행`}
@@ -211,6 +219,10 @@ export function ReadingPage({ approvedCheckout }: { approvedCheckout?: ApprovedS
               </div>
             </section>
           ))}
+          {localResearchEnabled && localResearchOfferId && (
+            <LocalSajuResearchPanel key={localResearchOfferId} offer={getApprovedSajuOfferV1(localResearchOfferId)!}
+              onClose={() => setLocalResearchOfferId(null)} />
+          )}
         </section>
 
         <section className="saju-design-example" aria-labelledby="saju-design-example-title">

@@ -5,9 +5,11 @@ import {
   fenceCloudflareSeyeonBeforeFetchReturnV1,
 } from './cloudflare-seyeon-security.mjs';
 import { tryHandleCloudflareApprovedAuthV1 } from './cloudflare-auth-db-api.mjs';
+import { isIsolatedLocalAuthRequestV1 } from '../apps/api/src/local-auth-dev-runtime.ts';
 import { tryHandleCloudflareContactInquiryV1 } from './cloudflare-contact-inquiry.mjs';
 import { tryHandleCloudflareApprovedSajuCalculationV1 } from './cloudflare-saju-calculation.mjs';
 import { tryHandleCloudflareApprovedSajuPreviewReadingV1 } from './cloudflare-saju-preview-reading.mjs';
+import { tryHandleLocalSajuResearchV1 } from './cloudflare-local-saju-research.mjs';
 import { tryHandleCloudflareApprovedRecordsV1 } from './cloudflare-records-api.mjs';
 import { tryHandleCloudflareApprovedTargetPersonReadV1 } from './cloudflare-target-person-read.mjs';
 import { tryHandleCloudflareApprovedDeviceInstallationsV1 } from './cloudflare-device-installations.mjs';
@@ -162,6 +164,8 @@ const cloudflareRuntime = {
       if (contactResponse !== null) return contactResponse;
       const approvedAuthResponse = await tryHandleCloudflareApprovedAuthV1(request, bindings, route);
       if (approvedAuthResponse !== null) return approvedAuthResponse;
+      const localSajuResearchResponse = await tryHandleLocalSajuResearchV1(request, bindings, route);
+      if (localSajuResearchResponse !== null) return localSajuResearchResponse;
       const approvedCalculationResponse = await tryHandleCloudflareApprovedSajuCalculationV1(request, bindings, route);
       if (approvedCalculationResponse !== null) return approvedCalculationResponse;
       const approvedPreviewReadingResponse = await tryHandleCloudflareApprovedSajuPreviewReadingV1(request, bindings, route);
@@ -191,7 +195,10 @@ const cloudflareRuntime = {
 
 export default {
   fetch(request, bindings) {
-    const route = matchCloudflareApiRoute(new URL(request.url).pathname);
+    const pathname = new URL(request.url).pathname;
+    const route = pathname === '/api/me/saju/local-research' && isIsolatedLocalAuthRequestV1(request, bindings)
+      ? Object.freeze({ id: 'api.me.saju.local-research', kind: 'direct', params: Object.freeze({}) })
+      : matchCloudflareApiRoute(pathname);
     if (route === null) return cloudflareRuntime.fetch(request, bindings, route);
     return executeSecurityObservedRequestV1({
       request,

@@ -11,6 +11,13 @@ import {
   CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1,
 } from './cloudflare-auth-db-api.mjs';
 import { createProductionCurrentSubjectSajuPreviewReadingRuntimeV1 } from '../apps/api/src/production-current-subject-saju-preview-reading-runtime.ts';
+import {
+  createLocalAuthSubjectPoolV1, isIsolatedLocalAuthRequestV1, localGoTrueMemberFetchV1,
+  parseLocalAuthRuntimeConfigV1,
+} from '../apps/api/src/local-auth-dev-runtime.ts';
+import { handleCurrentSubjectSajuPreviewReadingRequestV1 } from '../apps/api/src/current-subject-saju-preview-reading-http.ts';
+import { createProductionRequestIdentityVerifierV1 } from '../apps/api/src/production-request-identity-verifier.ts';
+import { createSajuPreviewReadingHttpAdapterV1 } from '../apps/api/src/saju-production-reading-http-adapter.ts';
 import { isSajuAbuseAdmissionEnabledV1 } from '../apps/api/src/saju-abuse-admission-activation.ts';
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import { parseProductionSajuRuntimeConfigV1 } from '../apps/api/src/production-saju-runtime-config.ts';
@@ -71,10 +78,10 @@ export async function tryHandleCloudflareApprovedSajuPreviewReadingV1(request, b
   // any Saju request body processing. Both modes share one operator switch.
   if (isCloudflareSajuKilledV1(bindings)) return null;
   const origin = approvedCloudflareAuthOriginV1(request, bindings);
-  if (origin === null || bindings?.MYEONGHA_CLOUDFLARE_SAJU_PREVIEW_MODE !== APPROVED_MODE) {
-    return null;
-  }
-  if (!approvedCloudflareStage5HandoffV1(bindings, origin, false)) return null;
+  if (origin === null) return null;
+  const localAuth = isIsolatedLocalAuthRequestV1(request, bindings);
+  if (!localAuth && (bindings?.MYEONGHA_CLOUDFLARE_SAJU_PREVIEW_MODE !== APPROVED_MODE ||
+      !approvedCloudflareStage5HandoffV1(bindings, origin, false))) return null;
   if (new URL(request.url).search !== '') return denied();
   if (request.method !== 'POST') {
     return new Response(null, { status: 405, headers: { ...SECURITY_HEADERS, Allow: 'POST' } });
@@ -82,15 +89,23 @@ export async function tryHandleCloudflareApprovedSajuPreviewReadingV1(request, b
   if (!approvedCloudflareSameOriginPostV1(request, origin)) return denied();
 
   let config;
+  let localConfig;
   try {
-    config = parseProductionUserDataRuntimeConfigV1(bindings);
-    parseProductionSajuRuntimeConfigV1(bindings);
-    if (!approvedCloudflarePostgresTargetV1(config, bindings)) return unavailable();
-    const tls = buildProductionNodePostgresPoolConfigV1(
-      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
-    );
-    if (tls.max !== 1 || !tls.ssl || typeof tls.ssl !== 'object' ||
-        tls.ssl.rejectUnauthorized !== true) return unavailable();
+    if (localAuth) {
+      localConfig = parseLocalAuthRuntimeConfigV1(bindings);
+      if (bindings.MYEONGHA_LOCAL_SAJU_SERVICE_ORIGIN !== 'http://127.0.0.1:15434' ||
+          typeof bindings.MYEONGHA_LOCAL_SAJU_SERVICE_BEARER !== 'string' ||
+          bindings.MYEONGHA_LOCAL_SAJU_SERVICE_BEARER.length < 32) return unavailable();
+    } else {
+      config = parseProductionUserDataRuntimeConfigV1(bindings);
+      parseProductionSajuRuntimeConfigV1(bindings);
+      if (!approvedCloudflarePostgresTargetV1(config, bindings)) return unavailable();
+      const tls = buildProductionNodePostgresPoolConfigV1(
+        config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+      );
+      if (tls.max !== 1 || !tls.ssl || typeof tls.ssl !== 'object' ||
+          tls.ssl.rejectUnauthorized !== true) return unavailable();
+    }
   } catch {
     return unavailable();
   }
@@ -99,18 +114,30 @@ export async function tryHandleCloudflareApprovedSajuPreviewReadingV1(request, b
   let subjectPool;
   let result;
   try {
-    subjectPool = createCloudflareSubjectPoolV1(
-      config, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
-    );
-    runtime = createProductionCurrentSubjectSajuPreviewReadingRuntimeV1({
-      env: bindings, pool: subjectPool,
-      sajuAbuseAdmissionEnabled: isSajuAbuseAdmissionEnabledV1(bindings),
-    });
-    result = await runtime.handleRequest({
-      request,
-      requestId: crypto.randomUUID(),
-      serverTime: new Date().toISOString(),
-    });
+    subjectPool = localAuth
+      ? createLocalAuthSubjectPoolV1(localConfig, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1)
+      : createCloudflareSubjectPoolV1(config, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
+    if (localAuth) {
+      result = await handleCurrentSubjectSajuPreviewReadingRequestV1({
+        request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+        identityEvidenceVerifier: createProductionRequestIdentityVerifierV1({
+          config: localConfig.userData, memberFetchImpl: localGoTrueMemberFetchV1(localConfig),
+        }),
+        pool: subjectPool,
+        sajuAdapter: createSajuPreviewReadingHttpAdapterV1({
+          baseUrl: bindings.MYEONGHA_LOCAL_SAJU_SERVICE_ORIGIN,
+          bearerToken: bindings.MYEONGHA_LOCAL_SAJU_SERVICE_BEARER,
+        }),
+      });
+    } else {
+      runtime = createProductionCurrentSubjectSajuPreviewReadingRuntimeV1({
+        env: bindings, pool: subjectPool,
+        sajuAbuseAdmissionEnabled: isSajuAbuseAdmissionEnabledV1(bindings),
+      });
+      result = await runtime.handleRequest({
+        request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+      });
+    }
   } catch {
     result = unavailable();
   }

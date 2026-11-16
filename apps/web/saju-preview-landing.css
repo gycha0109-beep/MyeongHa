@@ -504,3 +504,38 @@ html[data-theme="dark"] .saju-design-pillars .saju-pillar-hanja.is-element-match
     grid-column: 1 / -1;
   }
 }
+
+/* Disposable local Saju source evaluation; never presented as a purchased report. */
+.saju-design-product-card .saju-local-research-button {
+  width:100%; margin-top:auto; padding:9px 10px; background:#fff9f5;
+  border:1px solid #a96776; border-radius:8px; color:#743c4d; font-weight:700; cursor:pointer;
+}
+.saju-design-product-card .saju-local-research-button:hover { background:#fbeceb; }
+.saju-design-product-card .saju-local-research-button:focus-visible { outline:2px solid #704656; outline-offset:2px; }
+.saju-local-research {
+  margin:24px 0; padding:25px; border:1px solid #d7bbb5; border-radius:14px;
+  background:#fffdf9; color:#403640; scroll-margin-top:110px;
+}
+.saju-local-research-head { display:flex; justify-content:space-between; align-items:center; gap:15px; }
+.saju-local-research-head h3 { margin:5px 0 12px; font-size:23px; }
+.saju-local-research-head small { color:#786570; letter-spacing:.06em; }
+.saju-local-research button { background:#fff8f4; color:#763e4d; border:1px solid #b88b92; border-radius:8px; padding:9px 15px; cursor:pointer; }
+.saju-local-research button:disabled { cursor:default; opacity:.55; }
+.saju-local-research-warning { margin:10px 0; padding:12px; border-left:3px solid #9e6d77; background:#faf0ee; line-height:1.65; }
+.saju-local-research-status { min-height:20px; color:#6f5260; }
+.saju-local-research-sections { display:grid; gap:14px; }
+.saju-local-research-slice { border:1px solid #ebdfd8; border-radius:10px; padding:15px; background:#fffcf9; }
+.saju-local-research-slice h4 { margin:0 0 13px; font-size:18px; }
+.saju-local-research-slice h4 small { margin-left:10px; font-size:11px; color:#845e6b; }
+.saju-local-research-slice h5 { margin:15px 0 6px; font-size:15px; }
+.saju-local-research-slice p { white-space:pre-line; margin:0; font-size:14px; line-height:1.8; }
+.saju-local-research-pair { margin-top:20px; padding:15px; border:1px solid #e3cfc8; border-radius:10px; }
+.saju-local-research-pair h4 { margin:0 0 6px; }
+.saju-local-research-pair-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:12px 0; }
+.saju-local-research-pair-fields label { display:grid; gap:6px; font-size:13px; }
+.saju-local-research-pair-fields input,.saju-local-research-pair-fields select { width:100%; border:1px solid #cbb7ae; border-radius:8px; padding:8px; background:#fff; color:#333; }
+.saju-local-research-consent { display:flex; align-items:center; gap:6px; margin-bottom:12px; font-size:13px; }
+.saju-local-research-actions { margin-top:15px; display:flex; gap:10px; flex-wrap:wrap; }
+html[data-theme="dark"] .saju-local-research,html[data-theme="dark"] .saju-local-research-slice { background:#393038; color:#f3e6e8; border-color:#75575f; }
+html[data-theme="dark"] .saju-local-research-warning { background:#513d46; }
+@media(max-width:670px){.saju-local-research { padding:14px; }.saju-local-research-pair-fields {grid-template-columns:1fr;} }

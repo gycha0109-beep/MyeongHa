@@ -167,6 +167,19 @@ function setupBirthDateSegment(input, length, nextInput = null, previousInput = 
   });
 }
 
+function normalizeBirthTime(value) {
+  const digits = String(value ?? '').replace(/\D/gu, '');
+  return digits.length === 4 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
+}
+
+function setupBirthTimeInput() {
+  const input = byId('saju-birth-time');
+  input.addEventListener('input', () => {
+    const normalized = normalizeBirthTime(input.value).slice(0, 5);
+    if (input.value !== normalized) input.value = normalized;
+  });
+}
+
 function setupBirthDateInputs() {
   const year = byId('saju-birth-year');
   const month = byId('saju-birth-month');
@@ -221,7 +234,7 @@ function buildBirthRequest() {
   const calendarType = selectedCalendarType();
   const birthDate = buildBirthDate(calendarType);
   const timeKnown = !byId('saju-time-unknown').checked;
-  const birthTime = timeKnown ? byId('saju-birth-time').value : null;
+  const birthTime = timeKnown ? normalizeBirthTime(byId('saju-birth-time').value) : null;
   const sexValue = byId('saju-birth-sex').value;
 
   if (timeKnown && !/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/u.test(birthTime ?? '')) throw new Error('출생시간을 HH:mm 형식(00:00~23:59)으로 입력해 주세요.');
@@ -657,6 +670,7 @@ async function submitBirthProfile(event) {
 
 
 setupBirthDateInputs();
+setupBirthTimeInput();
 byId('saju-time-unknown').addEventListener('change', syncBirthControls);
 for (const input of document.querySelectorAll('input[name="saju-calendar"]')) {
   input.addEventListener('change', syncBirthControls);

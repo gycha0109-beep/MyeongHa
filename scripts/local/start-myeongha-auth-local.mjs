@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { startLocalSajuResearchService } from './myeongha-local-saju-research.mjs';
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const localDir = resolve(root, 'scripts/local');
@@ -14,10 +15,11 @@ const composeFile = resolve(localDir, 'myeongha-auth-local.compose.yml');
 const wranglerConfig = resolve(localDir, 'wrangler.local-auth.jsonc');
 const devVars = resolve(localDir, '.dev.vars');
 const projectName = 'myeongha-local-auth-' + randomBytes(6).toString('hex');
-const requiredPorts = [8787, 15432, 15433, 15434];
+const requiredPorts = [8787, 15432, 15433, 15434, 15435];
 const pinnedSajuPath = resolve(root, '..', 'MyeongHa-Saju-Pinned-Local');
 const expectedSajuSha = '2bb797f0ca05775ccaaa36814c041ae4262ac872';
 let sajuServer;
+let researchServer;
 let wrangler;
 let composeStarted = false;
 let stopping = false;
@@ -116,6 +118,10 @@ async function waitForWeb() {
 async function cleanup() {
   if (stopping) return;
   stopping = true;
+  if (researchServer) {
+    researchServer.closeAllConnections();
+    await new Promise(resolveClose => researchServer.close(resolveClose));
+  }
   if (sajuServer) {
     sajuServer.closeAllConnections();
     await new Promise(resolveClose => sajuServer.close(resolveClose));
@@ -183,6 +189,10 @@ try {
   await runCompose('wait bootstrap-subject');
   const sajuBearer = secret(48);
   const sajuAvailable = await startPinnedSajuService(sajuBearer);
+  const researchBearer = secret(48);
+  if (sajuAvailable) researchServer = await startLocalSajuResearchService({
+    sajuPath: pinnedSajuPath, bearer: researchBearer,
+  });
 
   const vars = {
     MYEONGHA_LOCAL_AUTH_MODE: 'isolated-v1',
@@ -199,6 +209,8 @@ try {
     ...(sajuAvailable ? {
       MYEONGHA_LOCAL_SAJU_SERVICE_ORIGIN: 'http://127.0.0.1:15434',
       MYEONGHA_LOCAL_SAJU_SERVICE_BEARER: sajuBearer,
+      MYEONGHA_LOCAL_SAJU_RESEARCH_ORIGIN: 'http://127.0.0.1:15435',
+      MYEONGHA_LOCAL_SAJU_RESEARCH_BEARER: researchBearer,
     } : {}),
     MYEONGHA_LOCAL_AUTH_RATE_LIMIT_SECRET: rateLimitSecret,
     MYEONGHA_AUTH_RATE_LIMIT_SECRET: rateLimitSecret,
