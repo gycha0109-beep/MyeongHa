@@ -42,7 +42,7 @@ export function inspectPrivateYeoulHoldoutDraft(draft, {historicalOriginal=null,
   if (!exact(draft,['schemaVersion','characterId','datasetRole','sourceClass','families']) ||
       draft.schemaVersion!=='yeoul-private-holdout-draft-v1' ||
       draft.characterId!=='yeoul' || draft.datasetRole!=='sealed_holdout' ||
-      draft.sourceClass!=='owner_new_unexposed_unverified' ||
+      !['owner_new_unexposed_unverified','assistant_new_unexposed_unverified'].includes(draft.sourceClass) ||
       !Array.isArray(draft.families) || draft.families.length<1 || draft.families.length>32 ||
       typeof knownOriginalAutoFields!=='boolean' ||
       (historicalOriginal===null && knownOriginalAutoFields))
@@ -88,6 +88,8 @@ export function inspectPrivateYeoulHoldoutDraft(draft, {historicalOriginal=null,
   return Object.freeze({
     schemaVersion:'yeoul-private-holdout-preflight-v1',characterId:'yeoul',
     privateFamiliesInspected:familyTurns.length,
+    assistantAuthoredUnreviewed:draft.sourceClass==='assistant_new_unexposed_unverified',
+    ownerAuthoredSourceVerified:false,
     privateTurnsInspected:familyTurns.reduce((n,arr)=>n+arr.length,0),
     publishedComparisonGroupsChecked:18,
     possiblePublishedOverlapFamilies:publishedFlagged,
