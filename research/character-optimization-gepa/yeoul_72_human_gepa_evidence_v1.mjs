@@ -69,6 +69,8 @@ export function buildYeoulHumanGepaEvidence({original,candidate,actual,key,revie
   const decided=candidateWins+legacyWins+ties;
   return {questionId:id,pairs:6,reviewed,unreviewed:6-reviewed,
    candidateWins,legacyWins,ties,uncertain,decided,
+   candidateRegressionAxes:{...(s.candidateRegressionAxes??{})},
+   legacyRegressionAxes:{...(s.legacyRegressionAxes??{})},
    observedCandidateShare:decided?Number(((candidateWins+ties*0.5)/decided).toFixed(6)):null};
  });
  const allReviewed=summary.reviewed===72;
@@ -85,6 +87,8 @@ export function buildYeoulHumanGepaEvidence({original,candidate,actual,key,revie
   reviewed:summary.reviewed,unreviewed:summary.unreviewed,
   candidateWins:summary.candidateWins,legacyWins:summary.legacyWins,
   ties:summary.ties,uncertain:summary.uncertain,
+  candidateRegressionAxes:{...summary.candidateRegressionAxes},
+  legacyRegressionAxes:{...summary.legacyRegressionAxes},
   historicalModelGenerationsSeparatedInTime:true,
   familyEvidence:families,
   allHumanVotesRecorded:allReviewed,
@@ -92,6 +96,9 @@ export function buildYeoulHumanGepaEvidence({original,candidate,actual,key,revie
   anyObservedFamilyPreferenceRegression:anyObservedRegression,
   developmentDiagnosticsComplete:allReviewed&&everyFamilyScorable,
   feedbackBoundToSingleCandidate:true,
+  feedbackAxisAttribution:'human_selected_on_definite_preference_only',
+  reviewedCandidateRegressionAxisRanking:Object.entries(summary.candidateRegressionAxes)
+   .sort(([a,n],[b,m])=>m-n||a.localeCompare(b)).map(([axis,count])=>({axis,count})),
   scoresUsableToJudgeUnseenGepaMutations:false,
   reviewerIdentityAuthenticated:false,
   providerReceiptsAuthenticated:false,
