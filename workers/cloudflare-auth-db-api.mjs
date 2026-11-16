@@ -31,6 +31,13 @@ import { handleGuestBootstrapRequestV1 } from '../apps/api/src/guest-bootstrap-h
 import { createProductionGuestBootstrapCredentialIssuerPortV1 } from '../apps/api/src/production-guest-bootstrap-credential-issuer.ts';
 import { createProductionGuestBootstrapRuntimePortsV1 } from '../apps/api/src/production-guest-bootstrap-runtime.ts';
 import { handleMemberAuthRateLimitHttpV1 } from '../apps/api/src/member-auth-rate-limit-http.ts';
+import { handleBirthProfileCreateRequestV1 } from '../apps/api/src/birth-profile-create-http.ts';
+import { handleCurrentSubjectBirthProfileRequestV1 } from '../apps/api/src/current-subject-birth-profile-http.ts';
+import { handleBirthProfileReadRequestV1 } from '../apps/api/src/birth-profile-read-http.ts';
+import { createProductionRequestIdentityVerifierV1 } from '../apps/api/src/production-request-identity-verifier.ts';
+import { createProductionBirthInputFingerprintPortV1 } from '../apps/api/src/production-birth-input-fingerprint.ts';
+import { handleCurrentSubjectSajuCalculationRequestV1 } from '../apps/api/src/current-subject-saju-calculation-http.ts';
+import { createSajuProductionCalculationHttpAdapterV1 } from '../apps/api/src/saju-production-calculation-http-adapter.ts';
 
 const EXACT_MODE = 'approved-auth-db-v1';
 const EXACT_DB_TLS_RLS_APPROVAL = 'approved-isolated-tls-rls-v1';
@@ -324,13 +331,16 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   const isBirthRead = route?.id === 'rewrite.birth-profile.id';
   const isGuestPromotion = route?.id === 'api.auth.promote-guest';
   const isCurrentBirth = route?.id === 'api.me.birth-profile';
+  const isSajuCalculation = route?.id === 'api.me.saju.calculation';
   const isSocialStart = route?.id === 'rewrite.social.start';
   const naverAction = Object.hasOwn(NAVER_ACTIONS, route?.id) ? NAVER_ACTIONS[route.id] : null;
   if (action === null && !isGuestBootstrap && !isMemberProfile && !isBirthCreate && !isBirthRead &&
-      !isGuestPromotion && !isCurrentBirth && !isSocialStart && naverAction === null) return null;
+      !isGuestPromotion && !isCurrentBirth && !isSajuCalculation && !isSocialStart && naverAction === null) return null;
   const origin = approvedCloudflareAuthOriginV1(request, bindings);
   if (origin === null) return null;
   const localAuth = isIsolatedLocalAuthRequestV1(request, bindings);
+  // Calculation ingress remains closed on every production origin.
+  if (isSajuCalculation && !localAuth) return null;
   let localConfig;
   try {
     if (localAuth) localConfig = parseLocalAuthRuntimeConfigV1(bindings);
@@ -449,25 +459,42 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
         serverTime: new Date().toISOString(),
       });
     } else if (isBirthCreate) {
-      runtime = createProductionBirthProfileCreateRuntimeV1({
-        env: bindings, pool: createSubjectPool(),
-      });
-      result = await runtime.handleRequest({
-        request,
-        requestId: crypto.randomUUID(),
-        serverTime: new Date().toISOString(),
-      });
+      if (localAuth) {
+        const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({
+          config: localConfig.userData, memberFetchImpl: localGoTrueMemberFetchV1(localConfig),
+        });
+        result = await handleBirthProfileCreateRequestV1({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+          identityEvidenceVerifier, pool: createSubjectPool(),
+          idPort: { nextBirthProfileId: () => crypto.randomUUID(), nextBirthRevisionId: () => crypto.randomUUID() },
+          fingerprintPort: createProductionBirthInputFingerprintPortV1(bindings.MYEONGHA_LOCAL_BIRTH_INPUT_HMAC_K1_SECRET),
+        });
+      } else {
+        runtime = createProductionBirthProfileCreateRuntimeV1({
+          env: bindings, pool: createSubjectPool(),
+        });
+        result = await runtime.handleRequest({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+        });
+      }
     } else if (isBirthRead) {
-      // Existing HTTP handler accepts the public /api/birth-profiles/:id
-      // path directly; do not translate or trust Vercel rewrite markers.
-      runtime = createProductionBirthProfileReadRuntimeV1({
-        env: bindings, pool: createSubjectPool(),
-      });
-      result = await runtime.handleRequest({
-        request,
-        requestId: crypto.randomUUID(),
-        serverTime: new Date().toISOString(),
-      });
+      if (localAuth) {
+        result = await handleBirthProfileReadRequestV1({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+          identityEvidenceVerifier: createProductionRequestIdentityVerifierV1({
+            config: localConfig.userData, memberFetchImpl: localGoTrueMemberFetchV1(localConfig),
+          }),
+          pool: createSubjectPool(),
+        });
+      } else {
+        // Existing handler accepts the public /api/birth-profiles/:id path.
+        runtime = createProductionBirthProfileReadRuntimeV1({
+          env: bindings, pool: createSubjectPool(),
+        });
+        result = await runtime.handleRequest({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+        });
+      }
     } else if (isGuestPromotion) {
       runtime = createProductionGuestPromotionRuntimeV1({
         env: bindings,
@@ -482,15 +509,41 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
         requestId: crypto.randomUUID(),
         serverTime: new Date().toISOString(),
       });
+    } else if (isSajuCalculation) {
+      if (!localAuth || bindings.MYEONGHA_LOCAL_SAJU_SERVICE_ORIGIN !== 'http://127.0.0.1:15434' ||
+          typeof bindings.MYEONGHA_LOCAL_SAJU_SERVICE_BEARER !== 'string' ||
+          bindings.MYEONGHA_LOCAL_SAJU_SERVICE_BEARER.length < 32) {
+        result = unavailable();
+      } else {
+        result = await handleCurrentSubjectSajuCalculationRequestV1({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+          identityEvidenceVerifier: createProductionRequestIdentityVerifierV1({
+            config: localConfig.userData, memberFetchImpl: localGoTrueMemberFetchV1(localConfig),
+          }),
+          pool: createSubjectPool(),
+          sajuAdapter: createSajuProductionCalculationHttpAdapterV1({
+            baseUrl: bindings.MYEONGHA_LOCAL_SAJU_SERVICE_ORIGIN,
+            bearerToken: bindings.MYEONGHA_LOCAL_SAJU_SERVICE_BEARER,
+          }),
+        });
+      }
     } else if (isCurrentBirth) {
-      runtime = createProductionCurrentSubjectBirthProfileRuntimeV1({
-        env: bindings, pool: createSubjectPool(),
-      });
-      result = await runtime.handleRequest({
-        request,
-        requestId: crypto.randomUUID(),
-        serverTime: new Date().toISOString(),
-      });
+      if (localAuth) {
+        result = await handleCurrentSubjectBirthProfileRequestV1({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+          identityEvidenceVerifier: createProductionRequestIdentityVerifierV1({
+            config: localConfig.userData, memberFetchImpl: localGoTrueMemberFetchV1(localConfig),
+          }),
+          pool: createSubjectPool(),
+        });
+      } else {
+        runtime = createProductionCurrentSubjectBirthProfileRuntimeV1({
+          env: bindings, pool: createSubjectPool(),
+        });
+        result = await runtime.handleRequest({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+        });
+      }
     } else if (isSocialStart) {
       result = await handleSocialAuthStartRequestV1({
         request,
@@ -547,6 +600,11 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       }
     }
   } catch (error) {
+    if (localAuth && (isBirthCreate || isSajuCalculation)) {
+      const kind = error instanceof Error ? error.name : 'Unknown';
+      const code = typeof error?.code === 'string' && /^[A-Za-z0-9_]{2,20}$/.test(error.code) ? error.code : 'NO_CODE';
+      console.warn('LOCAL_SAJU_ROUTE_FAILURE', route.id, kind, code);
+    }
     if (isMemberProfile) {
       // Bounded categories only. Never log SQL, credentials, request, user data,
       // arbitrary error messages, stacks, hostname, or provider response bodies.

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { mkdtemp, rm, writeFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const localDir = resolve(root, 'scripts/local');
@@ -14,7 +14,10 @@ const composeFile = resolve(localDir, 'myeongha-auth-local.compose.yml');
 const wranglerConfig = resolve(localDir, 'wrangler.local-auth.jsonc');
 const devVars = resolve(localDir, '.dev.vars');
 const projectName = 'myeongha-local-auth-' + randomBytes(6).toString('hex');
-const requiredPorts = [8787, 15432, 15433];
+const requiredPorts = [8787, 15432, 15433, 15434];
+const pinnedSajuPath = resolve(root, '..', 'MyeongHa-Saju-Pinned-Local');
+const expectedSajuSha = '2bb797f0ca05775ccaaa36814c041ae4262ac872';
+let sajuServer;
 let wrangler;
 let composeStarted = false;
 let stopping = false;
@@ -80,6 +83,25 @@ async function startWrangler() {
     setTimeout(() => fail(new Error('Local Worker did not become ready within 90 seconds.')), 90_000).unref();
   });
 }
+async function startPinnedSajuService(bearer) {
+  const engineFile = resolve(pinnedSajuPath, 'dist', 'production-calculation-process.js');
+  if (!(await access(engineFile).then(() => true, () => false))) {
+    console.warn('Pinned local Saju engine not installed; starting Auth-only local server.');
+    return false;
+  }
+  const sha = execFileSync('git', ['-C', pinnedSajuPath, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const dirty = execFileSync('git', ['-C', pinnedSajuPath, 'status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim();
+  if (sha !== expectedSajuSha || dirty) throw new Error('Local Saju engine is not the clean approved pinned revision.');
+  const { createMyeonghwaProductionCalculationProcessV1 } = await import(pathToFileURL(engineFile).href);
+  sajuServer = createMyeonghwaProductionCalculationProcessV1({
+    SAJU_PRODUCTION_SERVICE_BEARER: bearer, SAJU_PRODUCTION_HOST: '127.0.0.1', PORT: '15434',
+  }).server;
+  await new Promise((ok, fail) => {
+    sajuServer.once('error', fail);
+    sajuServer.listen(15434, '127.0.0.1', ok);
+  });
+  return true;
+}
 async function waitForWeb() {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     try {
@@ -94,6 +116,10 @@ async function waitForWeb() {
 async function cleanup() {
   if (stopping) return;
   stopping = true;
+  if (sajuServer) {
+    sajuServer.closeAllConnections();
+    await new Promise(resolveClose => sajuServer.close(resolveClose));
+  }
   if (wrangler?.pid && process.platform === 'win32') {
     await new Promise(resolveKill => {
       const killer = spawn('taskkill.exe', ['/PID', String(wrangler.pid), '/T', '/F'], {
@@ -155,6 +181,8 @@ try {
   composeStarted = true;
   await runCompose('up --detach --wait --wait-timeout 240');
   await runCompose('wait bootstrap-subject');
+  const sajuBearer = secret(48);
+  const sajuAvailable = await startPinnedSajuService(sajuBearer);
 
   const vars = {
     MYEONGHA_LOCAL_AUTH_MODE: 'isolated-v1',
@@ -167,6 +195,11 @@ try {
     MYEONGHA_LOCAL_DATABASE_URL: `postgres://myeongha_runtime:${subjectLoginPassword}@127.0.0.1:15433/myeongha_saju_subject_local_verify?sslmode=disable`,
     MYEONGHA_LOCAL_IDENTITY_SYNC_DATABASE_URL: `postgres://myeongha_local_auth_sync:${identitySyncPassword}@127.0.0.1:15433/myeongha_saju_subject_local_verify?sslmode=disable`,
     MYEONGHA_LOCAL_GUEST_FINGERPRINT_SECRET: fingerprintSecret,
+    MYEONGHA_LOCAL_BIRTH_INPUT_HMAC_K1_SECRET: secret(48),
+    ...(sajuAvailable ? {
+      MYEONGHA_LOCAL_SAJU_SERVICE_ORIGIN: 'http://127.0.0.1:15434',
+      MYEONGHA_LOCAL_SAJU_SERVICE_BEARER: sajuBearer,
+    } : {}),
     MYEONGHA_LOCAL_AUTH_RATE_LIMIT_SECRET: rateLimitSecret,
     MYEONGHA_AUTH_RATE_LIMIT_SECRET: rateLimitSecret,
     MYEONGHA_LOCAL_GUEST_SESSION_TTL_SECONDS: '86400',

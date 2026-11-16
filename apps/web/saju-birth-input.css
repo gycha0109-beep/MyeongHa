@@ -12,8 +12,15 @@
 }
 
 .saju-date-fields:focus-within {
-  border-color: var(--mh-brass-strong);
-  box-shadow: 0 0 0 3px rgba(169, 130, 80, .1);
+  border-color: var(--mh-line-strong);
+  box-shadow: none;
+}
+
+body.saju-hub-page .saju-field .saju-date-part:focus,
+body.saju-hub-page .saju-field .saju-date-part:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: 0;
 }
 
 .saju-field .saju-date-part {

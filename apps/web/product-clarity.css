@@ -4,6 +4,17 @@ html[data-theme="dark"] { --mh-copy-muted: #d8cac3; --mh-copy-soft: #bfb0aa; --m
 body.product-page { font-family: var(--mh-sans); font-size: 1rem; font-weight: 500; line-height: 1.7; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
 body.product-page :is(button,input,select,textarea) { font-family: var(--mh-sans); }
 body.product-page :is(a,button,input,select,textarea):focus-visible { outline: 2px solid var(--mh-brass-strong); outline-offset: 3px; }
+/* Saju birth inputs retain their normal border without a focus highlight. */
+body.saju-hub-page .saju-birth-form :is(#saju-birth-time, #saju-birth-sex):is(:focus, :focus-visible) {
+  outline: none;
+  outline-offset: 0;
+  border-color: var(--mh-line-strong);
+  box-shadow: none;
+}
+html[data-theme="dark"] body.saju-hub-page .saju-birth-form :is(#saju-birth-time, #saju-birth-sex):is(:focus, :focus-visible) {
+  border-color: #79664e;
+  box-shadow: none;
+}
 /* Only actual copy is enlarged; decorative symbols and fixed-size art are untouched. */
 body.product-page :is(.gm-lede, .gm-section-support, .gm-product-card small, .gm-saju-reading-card small, .gm-recent-copy p, .gm-recent-time, .gm-flow-copy p, .gm-question-copy small, .gm-month-copy p, .mhx-topic-copy small, .mhx-hero-actions p small, .mhx-characters-intro p, .mhx-character-footer p, .chat-continuation-copy p, .chat-recent-time, .chat-person-line, .chat-hub-intro > p, .conversation-thread-note, .character-compose-status, .records-lead, .records-status, .records-panel-head p, .records-reading-period, .records-reading-date, .records-reading-chip, .records-report-count, .records-tab, .my-lead, .my-account-meta, .my-detail-hint, .face-hero-copy > p, .face-description, .face-reader-copy p, .reading-authority-note, .reading-chart-caption, .saju-design-hero p, .saju-design-birth-fields > div, .saju-design-source-note, .saju-design-chart-foot, .saju-design-pillars .saju-pillar-meta, .saju-design-product-card ul, .saju-design-product-card .saju-design-product-scope) { font-size: max(14px, .875rem); line-height: 1.7; }
 body.product-page :is(.gm-section-support, .gm-month-copy p, .mhx-topic-copy small, .mhx-characters-intro p, .mhx-character-footer p, .records-lead, .records-status, .records-panel-head p, .records-reading-period, .records-reading-date, .records-reading-chip, .my-lead, .my-account-meta, .my-detail-hint, .saju-design-source-note, .saju-design-chart-foot, .saju-design-pillars .saju-pillar-meta) { color: var(--mh-copy-muted); }
