@@ -7,6 +7,7 @@ import {
   YEOUL_MANUAL_DRAFT_EVIDENCE,
   prepareManualYeoulPilot,
   prepareFrozenGepaYeoulPilot,
+  prepareBehaviorGepaYeoulPilot,
   inspectActualYeoulPair,
 } from './yeoul-real-response-pilot-v1.mjs';
 
@@ -124,4 +125,36 @@ test('synthetic pair shape may be summarized but never certifies actual quality 
   assert.equal(result.gepaQualityGainEstablished,false);
   assert.equal(result.productionEligible,false);
   assert.equal(result.totalProviderReportedCostUsd,0.00002);
+});
+
+test('GEPA-selected behavior-first expression is connected to the real-response research prompt only',()=>{
+  const candidateText = '여울은 행동이 말보다 먼저인 사람입니다. [첫 반응] 감정 표현에는 감정을 먼저 받고, 직접 질문에는 자신의 입장을 먼저 답하세요.';
+  const packet = {
+    schemaVersion:'yeoul-gepa-behavior-expression-v2',
+    optimizer:'real_pinned_gepa_offline',
+    candidateOrigin:'gepa_in_process_behavior_reflector',
+    mutableSlot:'character_expression',
+    status:'research_candidate_not_released',
+    optimizerExecuted:true,actualStudentRepliesGenerated:0,
+    realResponseQualityMeasured:false,independentHoldoutPassed:false,
+    qualityGainEstablished:false,externalModelCalls:0,actualSpendKrw:0,
+    productionEligible:false,coveredBehaviors:['signal'],
+    candidateText,candidateSha256:digest(candidateText),
+  };
+  const plan=prepareBehaviorGepaYeoulPilot({...args(),packet});
+  assert.equal(plan.candidateOrigin,'gepa_behavior_proxy_unverified');
+  assert.match(plan.requests[1].system,/\[첫 반응\]/);
+  assert.doesNotMatch(plan.requests[0].system,/\[첫 반응\]/);
+  assert.equal(plan.providerCalls,0);
+  assert.equal(plan.qualityGainEstablished,false);
+  assert.equal(plan.productionEligible,false);
+  assert.equal(inspectActualYeoulPair({
+    plan,responses:pair(plan),reviews:review()
+  }).gepaQualityGainEstablished,false);
+  assert.throws(()=>prepareBehaviorGepaYeoulPilot({
+    ...args(),packet:{...packet,candidateSha256:h}
+  }),/untrusted_behavior_gepa_candidate/);
+  assert.throws(()=>prepareBehaviorGepaYeoulPilot({
+    ...args(),packet:{...packet,qualityGainEstablished:true}
+  }),/untrusted_behavior_gepa_candidate/);
 });

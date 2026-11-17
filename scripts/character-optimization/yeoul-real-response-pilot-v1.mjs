@@ -102,11 +102,45 @@ export function prepareFrozenGepaYeoulPilot({manifest, packet, baselineCore, con
     candidate:admitted.candidate, origin:'gepa_frozen_synthetic_unverified'});
 }
 
+/** Admit a locally selected, behavior-first GEPA v2 research candidate to the
+ * existing real-response prompt path; this NEVER means quality or approval.
+ * No artifact can self-authenticate its optimizer provenance.
+ */
+export function prepareBehaviorGepaYeoulPilot({manifest, packet, baselineCore, context, settings}) {
+  checkInputs({manifest, baselineCore, context, settings});
+  if (!plain(packet) ||
+      packet.schemaVersion !== 'yeoul-gepa-behavior-expression-v2' ||
+      packet.optimizer !== 'real_pinned_gepa_offline' ||
+      packet.candidateOrigin !== 'gepa_in_process_behavior_reflector' ||
+      packet.mutableSlot !== 'character_expression' ||
+      packet.status !== 'research_candidate_not_released' ||
+      packet.optimizerExecuted !== true ||
+      packet.actualStudentRepliesGenerated !== 0 ||
+      packet.realResponseQualityMeasured !== false ||
+      packet.independentHoldoutPassed !== false ||
+      packet.qualityGainEstablished !== false ||
+      packet.externalModelCalls !== 0 ||
+      packet.actualSpendKrw !== 0 ||
+      packet.productionEligible !== false ||
+      !Array.isArray(packet.coveredBehaviors) ||
+      !packet.coveredBehaviors.includes('signal') ||
+      !nonempty(packet.candidateText) ||
+      !packet.candidateText.includes('[첫 반응]') ||
+      !sha(packet.candidateSha256) ||
+      digest(packet.candidateText) !== packet.candidateSha256) fail('untrusted_behavior_gepa_candidate');
+  const candidate = validateCandidate(
+    {character_expression:packet.candidateText},
+    {slot:'character_expression',pinnedContextSha256:manifest.immutableSourcesSha256},
+  );
+  return assemble({manifest, baselineCore, context, settings, candidate,
+    origin:'gepa_behavior_proxy_unverified'});
+}
+
 /** Post-run, local-only intake. Does not authenticate a provider receipt or human reviewer. */
 export function inspectActualYeoulPair({plan, responses, reviews}) {
   if (!plain(plan) || plan.schemaVersion !== 'yeoul-real-response-pilot-v1' ||
       !Array.isArray(plan.requests) || plan.requests.length !== 2 ||
-      !['manual_research','gepa_frozen_synthetic_unverified'].includes(plan.candidateOrigin) ||
+      !['manual_research','gepa_frozen_synthetic_unverified','gepa_behavior_proxy_unverified'].includes(plan.candidateOrigin) ||
       !Array.isArray(responses) || responses.length !== 2 ||
       !Array.isArray(reviews) || reviews.length !== 2) fail('pair_shape');
   const expected = new Map(plan.requests.map(x => [x.variant, x]));
