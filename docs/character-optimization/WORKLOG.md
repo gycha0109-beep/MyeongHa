@@ -445,3 +445,8 @@
 
 - Based on the newest parent branch containing the behavior-first GEPA v2 offline candidate, not the older merged 72-pair branch.
 - Added `prepareBehaviorGepaYeoulLunaABC` via the existing strict candidate gate and pinned Runtime Draft SHA-256. All plan outputs remain research-only; no real provider I/O or promotion.
+## 2026-11-17 — Windows/Linux 원본문서 해시 불일치 수정
+
+- PR #3344와 연결된 GEPA pinned-source-offline CI에서 이번에 추가한 6개 테스트 모두 여울 Runtime Draft 줄바꿈(CRLF/LF) 차이로 원본 해시 검사에 실패함을 확인했다. 다른 원인으로 추정하지 않는다.
+- Runtime 원문을 LF로 정규화한 SHA-256을 기준값으로 고정하고, 줄바꿈 외 내용이 달라지면 계속 거부한다. Windows와 Linux 표현을 함께 비교하는 회귀 테스트를 추가했다.
+- 실모델 호출·지출·운영 영향 없음.
