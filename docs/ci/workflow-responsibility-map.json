@@ -703,6 +703,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "character-runtime-lab"
+    },
+    "yeoul-luna-run-audit-pr-v1.yml": {
+      "responsibility": "read-only-existing-yeoul-luna-run-result-audit-no-credentials",
+      "prMode": "narrow",
+      "mainMode": "none",
+      "workTrackAttribution": "character-runtime-lab"
     }
   }
 }
