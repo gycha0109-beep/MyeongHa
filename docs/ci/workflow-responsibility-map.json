@@ -697,6 +697,12 @@
       "prMode": "none",
       "mainMode": "manual-one-shot",
       "workTrackAttribution": "character-runtime-lab"
+    },
+    "yeoul-luna-openrouter-live-once-v1.yml": {
+      "responsibility": "character-runtime-lab-once-openrouter-luna-synthetic-live-recovery-under-existing-owner-cap",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "character-runtime-lab"
     }
   }
 }
