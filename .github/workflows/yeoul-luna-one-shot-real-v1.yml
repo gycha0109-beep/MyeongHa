@@ -5,7 +5,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: yeoul-gpt6-luna-20261117-paid-once

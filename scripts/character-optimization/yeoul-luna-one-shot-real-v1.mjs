@@ -84,28 +84,35 @@ async function modelGet(key){
   assert(data?.id===MODEL&&data?.object==='model','MODEL_ID');
 }
 async function reserve(token,amount){
-  let all=[];
-  for(let n=1;n<=5;n++){
-    const res=await fetch(api+'?per_page=100&page='+n,{headers:headers(token),redirect:'error',
-      signal:AbortSignal.timeout(12000)});
-    assert(res.status===200,'LEDGER_READ');
-    const page=await getJson(res);
-    assert(Array.isArray(page)&&page.every(x=>typeof x.body==='string'),'LEDGER_DATA');
-    all.push(...page);
-    if(page.length<100)break;
-    assert(n<5,'LEDGER_TOO_LARGE');
-  }
-  assert(!all.some(x=>x.body.includes(MARKER)),'ALREADY_RESERVED');
-  const note=MARKER+'\nRun ID: '+process.env.GITHUB_RUN_ID+
+  const expected=MARKER+'\nRun ID: '+process.env.GITHUB_RUN_ID+
     '\nTotal pilot cap: KRW 500 reserved in full; remaining authorized paid calls: zero.'+
     '\nThis one-shot ceiling: KRW '+amount+' conservative estimate; no retries. Unknown billing: HOLD.';
-  // Reserve BEFORE the first paid request. If the write outcome is uncertain, stop.
-  const res=await fetch(api,{method:'POST',redirect:'error',headers:{...headers(token),'Content-Type':'application/json'},
-    body:JSON.stringify({body:note}),signal:AbortSignal.timeout(12000)});
-  assert(res.status===201,'LEDGER_RESERVATION_UNKNOWN_DO_NOT_RETRY');
-  const created=await getJson(res);
-  assert(Number.isSafeInteger(created?.id),'LEDGER_RESERVATION_RECEIPT');
-  return created.id;
+  // The read-only workflow cannot create reservations: the owner must issue the
+  // immutable GitHub comment for THIS run ID. Re-runs and other run IDs fail closed.
+  for(let attempt=0;attempt<45;attempt++){
+    const all=[];
+    for(let pageNumber=1;pageNumber<=5;pageNumber++){
+      const response=await fetch(api+'?per_page=100&page='+pageNumber,{
+        headers:headers(token),redirect:'error',signal:AbortSignal.timeout(10000)});
+      assert(response.status===200,'LEDGER_READ');
+      const page=await getJson(response);
+      assert(Array.isArray(page)&&page.every(x=>typeof x.body==='string'),'LEDGER_DATA');
+      all.push(...page);
+      if(page.length<100)break;
+      assert(pageNumber<5,'LEDGER_TOO_LARGE');
+    }
+    const reserved=all.filter(x=>x.body.includes(MARKER));
+    assert(reserved.length<=1,'DUPLICATE_RESERVATION');
+    if(reserved.length===1){
+      const item=reserved[0];
+      assert(item.user?.login==='gycha0109-beep'&&item.body.trim()===expected.trim(),
+        'RESERVATION_WRONG_OWNER_OR_RUN');
+      assert(Number.isSafeInteger(item.id),'RESERVATION_ID');
+      return item.id;
+    }
+    await new Promise(ok=>setTimeout(ok,2000));
+  }
+  assert(false,'OWNER_RESERVATION_NOT_FOUND_NO_BILLING');
 }
 function parseResponse(body,item,elapsed){
   assert(body?.model===MODEL&&body.status==='completed','MODEL_RESPONSE_IDENTITY');
