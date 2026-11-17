@@ -691,6 +691,12 @@
       "prMode": "required-router",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
+    },
+    "yeoul-luna-one-shot-real-v1.yml": {
+      "responsibility": "character-runtime-lab-owner-manual-gpt6-luna-synthetic-paid-abc-with-encrypted-results",
+      "prMode": "none",
+      "mainMode": "manual-one-shot",
+      "workTrackAttribution": "character-runtime-lab"
     }
   }
 }
