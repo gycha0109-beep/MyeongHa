@@ -19,7 +19,7 @@ export function validateCharacterProfile(profile) {
   if (!isObj(profile.source) || !nonempty(profile.source.canonRef) || !nonempty(profile.source.runtimeRef)
       || !sha(profile.source.contentBundleSha256) || !nonempty(profile.source.authorityVersion)
       || !['DRAFT', 'APPROVED', 'OTHER_VERIFIED'].includes(profile.source.authorityState)) fail('source_authority');
-  if (!isObj(profile.student) || profile.student.provider !== 'openrouter'
+  if (!isObj(profile.student) || !['openrouter', 'openai'].includes(profile.student.provider)
       || !nonempty(profile.student.modelId) || !sha(profile.student.parametersSha256)
       || !sha(profile.student.routingPolicySha256)) fail('student_model');
   if (!isObj(profile.evalSuite) || !nonempty(profile.evalSuite.developmentRef)

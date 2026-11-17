@@ -433,3 +433,15 @@
 - 집 PC의 비공개 과거 평가 288건을 집계로 변환한 뒤, 고정된 실제 GEPA를 네트워크 차단 Docker에서 실행했다. 기존의 단순 부정 표현 나열 대신 감정 표현·직접 질문에 **먼저 어떤 행동으로 응답할지** 정하는 여울의 표현 후보를 탐색했다.
 - 최초 시도에서는 GEPA가 개선 후보를 선택하지 않았다. 반응 우선순위를 조정한 다음 실제 GEPA 10회 평가·1회 반사 제안을 실행하여 기본 후보와 다른 행동 우선 규칙을 선택했다. 평가 점수는 과거 실패에 대한 **프롬프트 행동 규칙 포함 여부를 확인하는 대리지표**로, 답변의 개선률이 아니다.
 - 선택 문구는 집 PC 비공개 폴더에 보존하고 새 입력 경로에서 연구용 프롬프트로 사용 가능하게 연결했다. 신규 모델 출력 0, 실제 답변 품질 측정 0, 외부 호출 및 추가 지출 0원. OpenRouter 인증 401 및 독립 품질 검증 차단은 유지한다. 생산 배포·Canon·관계·메모리 변경 없음.
+
+
+## 2026-11-17 — GPT-6 Luna research prompt compiler
+
+- Confirmed official model ID `gpt-6-luna`; corrected prior `gpt-5.6-luna` offline settings, and removed incompatible temperature from low-reasoning preview.
+- Implemented deterministic Runtime Draft excerpt selection and A/B/C offline Responses API payload previews; only frozen GEPA packets can enter the C-arm via the pilot adapter. Kept all existing legacy and user worktree files.
+- No provider requests, no paid credit use, no release/promotion. Refer to YEOUL_GPT6_LUNA_RUNTIME_ABC_V1.md.
+
+## 2026-11-17 — GPT-6 Luna branch integration on latest Yeoul GEPA source
+
+- Based on the newest parent branch containing the behavior-first GEPA v2 offline candidate, not the older merged 72-pair branch.
+- Added `prepareBehaviorGepaYeoulLunaABC` via the existing strict candidate gate and pinned Runtime Draft SHA-256. All plan outputs remain research-only; no real provider I/O or promotion.

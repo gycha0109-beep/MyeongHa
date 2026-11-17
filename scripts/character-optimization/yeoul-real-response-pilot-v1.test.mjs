@@ -18,7 +18,7 @@ const profile = {
   source:{canonRef:'docs/character/YEOUL_CHARACTER_BIBLE_DRAFT_V0_3.md',
     runtimeRef:'docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md',
     contentBundleSha256:h, authorityVersion:'draft-v0.3', authorityState:'DRAFT'},
-  student:{provider:'openrouter',modelId:'deepseek/deepseek-v4.1-flash-1017',
+  student:{provider:'openai',modelId:'gpt-6-luna',
     parametersSha256:h,routingPolicySha256:h},
   evalSuite:{developmentRef:'legacy-Y01-Y12',validationRef:'new-review-pending',
     holdoutRef:'unavailable',rubricVersion:'8-dimension-v1',splitManifestSha256:h},
@@ -33,8 +33,8 @@ const context = {
   relationshipStage:'no_history',historyAvailable:false,approvedFacts:[],
 };
 const settings = {
-  modelId:'deepseek/deepseek-v4.1-flash-1017',provider:'openrouter',
-  subprovider:'synthetic-provider-not-approved',temperature:0.7,
+  modelId:'gpt-6-luna',provider:'openai',
+  subprovider:'openai-direct',temperature:null,
   maxTokens:1200,reasoningEffort:'low',allowFallbacks:false,
   requireParameters:true,dataCollection:'deny',zdr:true,
 };
