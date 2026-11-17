@@ -3,6 +3,7 @@ import { digest, validateCandidate } from './contracts-v1.mjs';
 import { sanitizeGepaFeedback, DIMENSIONS, HARD_GATES } from './evaluation-v1.mjs';
 import { intakeFrozenGepaResult } from './gepa-result-intake-v1.mjs';
 import { buildResearchPromptPlan } from '../character-runtime-lab/yeoul-quality-offline-v1.mjs';
+import { compileYeoulLunaABCPromptPlan } from './yeoul-luna-runtime-plan-v1.mjs';
 
 export const YEOUL_MANUAL_EXPRESSION_DRAFT_V1 = [
   '여울은 빠르게 반응하고 약간 새침하지만, 상대를 일부러 냉담하게 밀어내는 사람이 아닙니다. 먼저 상대가 실제로 한 말의 핵심에 반응하세요.',
@@ -23,7 +24,7 @@ export const YEOUL_MANUAL_DRAFT_EVIDENCE = Object.freeze({
   legacyRepliesIncluded: false,
 });
 
-const MODEL = 'deepseek/deepseek-v4.1-flash-1017';
+const MODEL = 'gpt-6-luna';
 const sha = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const nonempty = value => typeof value === 'string' && value.trim().length > 0;
@@ -48,8 +49,8 @@ function checkInputs({ manifest, baselineCore, context, settings }) {
       !Array.isArray(context.approvedFacts) || context.approvedFacts.length) fail('legacy_development_context_only');
   if (!exact(settings, ['modelId', 'provider', 'subprovider', 'temperature', 'maxTokens', 'reasoningEffort',
                         'allowFallbacks', 'requireParameters', 'dataCollection', 'zdr']) ||
-      settings.modelId !== MODEL || settings.provider !== 'openrouter' || !nonempty(settings.subprovider) ||
-      !finiteNonnegative(settings.temperature) || settings.temperature > 2 ||
+      settings.modelId !== MODEL || settings.provider !== 'openai' || settings.subprovider !== 'openai-direct' ||
+      settings.temperature !== null ||
       !Number.isSafeInteger(settings.maxTokens) || settings.maxTokens < 1 || settings.maxTokens > 4096 ||
       !['low', 'medium', 'high'].includes(settings.reasoningEffort) ||
       settings.allowFallbacks !== false || settings.requireParameters !== true ||
@@ -192,4 +193,28 @@ export function inspectActualYeoulPair({plan, responses, reviews}) {
     productionEligible:false, recommendation:'hold_pending_authenticated_evidence_and_independent_blind_review',
     optimizerFeedbackCandidateOnly:b.side_info,
   });
+}
+
+/** Offline A/B: fixed Yeoul core vs source-selected Runtime JSON. */
+export function prepareYeoulLunaRuntimeAB({manifest,baselineCore,context,settings,runtimeMarkdown,runtimeSha256}) {
+  checkInputs({manifest,baselineCore,context,settings});
+  return compileYeoulLunaABCPromptPlan({manifest,baselineCore,context,settings,runtimeMarkdown,runtimeSha256});
+}
+
+/** Offline C from the original frozen GEPA packet boundary. */
+export function prepareFrozenGepaYeoulLunaABC({manifest,packet,baselineCore,context,settings,runtimeMarkdown,runtimeSha256}) {
+  checkInputs({manifest,baselineCore,context,settings});
+  const admitted = intakeFrozenGepaResult({manifest,packet});
+  if(admitted.characterIds.length !== 1 || admitted.characterIds[0] !== 'yeoul') fail('gepa_character');
+  return compileYeoulLunaABCPromptPlan({manifest,baselineCore,context,settings,runtimeMarkdown,runtimeSha256,
+    candidate:admitted.candidate});
+}
+
+/** Offline C from the currently selected behavior-first GEPA v2 candidate.
+ * Reuses the established admission checks; no provider or production permissions are inherited.
+ */
+export function prepareBehaviorGepaYeoulLunaABC({manifest,packet,baselineCore,context,settings,runtimeMarkdown,runtimeSha256}) {
+  const legacyPlan=prepareBehaviorGepaYeoulPilot({manifest,packet,baselineCore,context,settings});
+  return compileYeoulLunaABCPromptPlan({manifest,baselineCore,context,settings,runtimeMarkdown,runtimeSha256,
+    candidate:legacyPlan.candidate});
 }
