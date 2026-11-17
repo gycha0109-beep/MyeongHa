@@ -52,3 +52,10 @@ node scripts/character-optimization/yeoul-private-holdout-preflight-v1.mjs --pri
 - 추후 새 질문군의 의미적 독립성·출처 및 비공개 접근 격리·사람 블라인드 검토·모델/가격/승인 경계를 별도로 충족해야 한다. 500원 전체 한도와 실제 송신 금지는 유지한다.
 
 로컬 합성 테스트: node --test scripts/character-optimization/yeoul-private-holdout-preflight-v1.test.mjs
+
+## 2026-11-16 — 비공개 AI 작성 평가 초안 지원
+
+- sourceClass에 `assistant_new_unexposed_unverified`를 추가했다. AI가 작성한 초안을 소유자 직접 작성으로 오인하지 않고 `assistantAuthoredUnreviewed=true`, `ownerAuthoredSourceVerified=false`로 기록한다. 기존 소유자 초안의 검사 방식은 유지한다.
+- 소유자가 직접 평가자료를 작성하지 못한 상태에서도 연구용 신규 초안을 로컬 저장소 밖에 작성하고 기존 겹침 검사로 확인할 수 있다. 어떤 초안도 검사 결과만으로 승인된 독립 최종평가나 품질 증명이 되지 않는다.
+- Yeoul Bible/Runtime에 맞춘 AI 작성 10가족/10턴을 개인 PC 비공개 폴더에 신규 파일로 작성했다. 기존 평가 288건/Y01~Y12와 공개 H01~H10 및 개발·최적화 후보 8가족을 대상으로 검사해 문자 유사도 의심 0가족을 확인했다.
+- 신규 10개 원문·개별 가족 식별자·비공개 자료 해시는 GitHub/CI/워크로그에 반출하지 않는다. 의미상 독립성 검토, 사람 출처 확인, 평가자 승인 및 모델 실측은 계속 보류한다.

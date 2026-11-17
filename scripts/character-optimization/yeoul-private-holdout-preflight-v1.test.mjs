@@ -106,7 +106,27 @@ test('local private file produces minimal new summary; overwrite and repository 
   const repoRoot=resolve(fileURLToPath(new URL('../../',import.meta.url)));
   await assert.rejects(()=>runPrivateYeoulHoldoutPreflight({
     privateDraft:source,privateSummary:join(repoRoot,'bad.json')}),/private_output_inside_repository/);
-  const link=join(folder,'link.json'); await symlink(source,link);
-  await assert.rejects(()=>runPrivateYeoulHoldoutPreflight({privateDraft:link,privateSummary:join(folder,'new.json')}),/private_input_not_regular/);
+  const link=join(folder,'link.json');
+  let symlinkCreated=false;
+  try{await symlink(source,link);symlinkCreated=true;}
+  catch(error){if(process.platform!=='win32'||error.code!=='EPERM')throw error;}
+  if(symlinkCreated)await assert.rejects(()=>runPrivateYeoulHoldoutPreflight({
+    privateDraft:link,privateSummary:join(folder,'new.json')}),/private_input_not_regular/);
  }finally{await rm(folder,{recursive:true,force:true});}
+});
+
+test('assistant-authored new private drafts are inspectable but never misreported as owner-authored or authorized',()=>{
+ const a=draft();a.sourceClass='assistant_new_unexposed_unverified';
+ const result=inspectPrivateYeoulHoldoutDraft(a);
+ assert.equal(result.assistantAuthoredUnreviewed,true);
+ assert.equal(result.ownerAuthoredSourceVerified,false);
+ assert.equal(result.holdoutAdmitted,false);
+ assert.equal(result.independentSemanticReviewVerified,false);
+ assert.equal(result.blindEvaluatorReady,false);
+ assert.equal(result.externalCalls,0);
+ const owner=inspectPrivateYeoulHoldoutDraft(draft());
+ assert.equal(owner.assistantAuthoredUnreviewed,false);
+ assert.equal(owner.ownerAuthoredSourceVerified,false);
+ a.sourceClass='assistant_preapproved';
+ assert.throws(()=>inspectPrivateYeoulHoldoutDraft(a),/private_holdout_draft_shape/);
 });
