@@ -1,0 +1,70 @@
+name: "[WT:character-runtime-lab] Yeoul OpenRouter GPT-6 Luna actual 3 synthetic replies once"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/yeoul-luna-openrouter-live-once-v1.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: yeoul-gpt6-luna-20261117-openrouter-recovery-lifetime-once
+  cancel-in-progress: false
+
+jobs:
+  yeoul-live-synthetic:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout reviewed one-time runner from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout pinned Yeoul prompt authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: '386ff0d7b7727258fa1afcd1ff860f1ff39096a8'
+          path: yeoul-research-pinned
+
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Verify A B C plan without API calls
+        env:
+          YEOUL_PINNED_SOURCE_ROOT: ${{ github.workspace }}/yeoul-research-pinned
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/character-optimization/yeoul-luna-openrouter-live-once-v1.mjs
+          node scripts/character-optimization/yeoul-luna-openrouter-live-once-v1.mjs --plan-only
+
+      - name: Authenticate OpenRouter then generate three synthetic replies at most
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GH_API_TOKEN: ${{ github.token }}
+          YEOUL_PINNED_SOURCE_ROOT: ${{ github.workspace }}/yeoul-research-pinned
+          YEOUL_ENCRYPTED_ARTIFACT_PATH: ${{ runner.temp }}/yeoul-luna-openrouter-recovery.enc.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${OPENROUTER_API_KEY:-}"
+          node scripts/character-optimization/yeoul-luna-openrouter-live-once-v1.mjs
+
+      - name: Store encrypted response receipts for one day
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: yeoul-luna-openrouter-once-${{ github.run_id }}
+          path: ${{ runner.temp }}/yeoul-luna-openrouter-recovery.enc.json
+          if-no-files-found: ignore
+          retention-days: 1
