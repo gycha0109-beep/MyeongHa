@@ -51,5 +51,8 @@
 
 - 현재 상위 여울 브랜치(기존 PR #3343 반영)에 이미 존재하는 `prepareBehaviorGepaYeoulPilot`의 엄격한 입력 검사를 그대로 이용해, 행동 중심 GEPA v2 연구 후보를 GPT-6 A/B/C의 C군으로 연결했다.
 - `prepareBehaviorGepaYeoulLunaABC`는 후보의 원본·해시·불변 설정·아직 검증되지 않은 상태를 확인한 뒤 **요청 미리보기만 생성**한다. 실제 Luna 응답이나 품질 개선을 뜻하지 않는다.
-- 여울 Runtime Draft 바이트는 SHA-256 `5a5a483aa86190d8c20d3e43fe89dab9dd6ec2fd093135f9b02080e9c323cacc`로 고정했다. 다른 문서를 전달해 호출 규칙을 바꿀 수 없고 원문 변경은 명시적인 재고정 전 차단된다.
+- 여울 Runtime Draft는 줄바꿈을 LF로 통일한 내용의 SHA-256 `f4aba2d0b9df941176551e3433a8212ffe8c15920f46f35fc46adf25da543db8`로 고정했다. 다른 문서를 전달해 호출 규칙을 바꿀 수 없고 원문 변경은 명시적인 재고정 전 차단된다.
 - 이전 GPT-6 A/B/C 문서/코드는 상위 연구 상태에 맞춰 새 별도 브랜치에 보존한다. 실모델 호출·유료 사용·운영 권한 변경은 없다.
+## 추가 검증 — 줄바꿈 독립성
+
+- CI에서 확인한 Windows CRLF/Linux LF 차이를 제거하기 위해, Runtime Source SHA는 LF 정규화 후 계산한다. 고정된 내용이 달라진 경우에는 여전히 fail-closed다. 기존 실측·승격 상태를 변경하지 않는다.

@@ -2,7 +2,7 @@
 import { digest, validateCandidate } from './contracts-v1.mjs';
 export const YEOUL_LUNA_MODEL = 'gpt-6-luna';
 const SOURCE = 'docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md';
-export const YEOUL_RUNTIME_SOURCE_SHA256 = '5a5a483aa86190d8c20d3e43fe89dab9dd6ec2fd093135f9b02080e9c323cacc';
+export const YEOUL_RUNTIME_SOURCE_SHA256 = 'f4aba2d0b9df941176551e3433a8212ffe8c15920f46f35fc46adf25da543db8';
 const BASE_RULES = {
   'R2.1':['현재 관계 evidence가 없는','Bible / World authority에 없는'],
   'R7.2':['모든 답변을 질문으로','상대가 하지 않은 말을'],
@@ -46,7 +46,8 @@ export function selectYeoulRuntimeRules({runtimeMarkdown, runtimeSha256, userTex
   if (typeof runtimeMarkdown !== 'string' ||
       !runtimeMarkdown.startsWith('# 여울 Character Runtime Draft v0.1') ||
       !runtimeMarkdown.includes('Authority State: DRAFT / NOT YET PRODUCTION AUTHORITY') ||
-      !sha(runtimeSha256) || runtimeSha256 !== YEOUL_RUNTIME_SOURCE_SHA256 || digest(runtimeMarkdown) !== runtimeSha256)
+      !sha(runtimeSha256) || runtimeSha256 !== YEOUL_RUNTIME_SOURCE_SHA256 ||
+      digest(runtimeMarkdown.replace(/\r\n/g, '\n')) !== YEOUL_RUNTIME_SOURCE_SHA256)
     fail('source_not_pinned_draft');
   const situation = chooseYeoulRuntimeSituation(userText);
   const sections = readSections(runtimeMarkdown);

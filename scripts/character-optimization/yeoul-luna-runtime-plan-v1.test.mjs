@@ -11,7 +11,7 @@ import { chooseYeoulRuntimeSituation, selectYeoulRuntimeRules,
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..','..');
 const runtime = await readFile(resolve(root,
   'docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md'),'utf8');
-const runtimeSha256 = digest(runtime);
+const runtimeSha256 = digest(runtime.replace(/\r\n/g, '\n'));
 const hash = digest('offline-only fixture');
 const core = '여울의 검증 대기 핵심 성격 앵커 (합성 실험용).';
 const profile = {
@@ -39,6 +39,11 @@ const args = () => ({manifest,baselineCore:core,context,settings,runtimeMarkdown
 
 test('source-backed Runtime rules are exact excerpts; no history remains no history',()=>{
   const s = selectYeoulRuntimeRules({runtimeMarkdown:runtime,runtimeSha256,userText:context.userMove});
+  const lfRuntime=runtime.replace(/\r\n/g, '\n');
+  const winRuntime=lfRuntime.replace(/\n/g, '\r\n');
+  const fromLf=selectYeoulRuntimeRules({runtimeMarkdown:lfRuntime,runtimeSha256,userText:context.userMove});
+  const fromWindows=selectYeoulRuntimeRules({runtimeMarkdown:winRuntime,runtimeSha256,userText:context.userMove});
+  assert.deepEqual(fromLf,fromWindows);
   assert.equal(s.situation,'care');
   assert.equal(s.sourceAuthority,'DRAFT_NOT_PRODUCTION');
   assert.ok(s.rules.some(r=>r.sourceSection==='R8.1'));
