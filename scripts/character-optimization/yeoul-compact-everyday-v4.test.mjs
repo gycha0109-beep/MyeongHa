@@ -1,0 +1,38 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {join} from 'node:path';
+import {compileYeoulCompactEverydayV4,assessYeoulCompactEverydayV4,V4_EVERYDAY_CASES} from './yeoul-compact-everyday-v4.mjs';
+const root=fileURLToPath(new URL('../../',import.meta.url));
+const bible=readFileSync(join(root,'docs/character/YEOUL_CHARACTER_BIBLE_DRAFT_V0_3.md'),'utf8');
+const runtime=readFileSync(join(root,'docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md'),'utf8');
+const plan=()=>compileYeoulCompactEverydayV4({bibleMarkdown:bible,runtimeMarkdown:runtime});
+test('compact common Yeoul persona keeps ten distinct situations under 500 KRW',()=>{
+ const p=plan();
+ assert.equal(p.authority,'DRAFT_NOT_PRODUCTION');
+ assert.equal(p.questions.length,10);
+ assert.equal(p.questions[0],'오늘 기분이 좀 허전해요.');
+ assert.ok(p.inputBytes<=3300);
+ assert.equal(p.maxTokens,680);
+ assert.ok(p.messages[0].content.includes('여울이 그 말을 왜 신경 쓰는지'));
+ assert.ok(p.messages[0].content.includes('각각 서로 다른 사람과의 첫 대화'));
+ assert.ok(!p.messages[0].content.includes(p.questions[0]));
+ assert.equal(p.messages[1].content.split('\n').length,10);
+ const maxUsd=p.inputBytes*0.0000002+p.maxTokens*0.000001;
+ const quote=Math.ceil(maxUsd*3000*2)+10;
+ assert.ok(481+quote<=500,'conservative total must remain under cap');
+});
+test('source pin, question integrity and schema checks',()=>{
+ assert.throws(()=>compileYeoulCompactEverydayV4({bibleMarkdown:bible+'x',runtimeMarkdown:runtime}),/BIBLE_SOURCE/);
+ assert.throws(()=>compileYeoulCompactEverydayV4({bibleMarkdown:bible,runtimeMarkdown:runtime+'x'}),/RUNTIME_SOURCE/);
+ assert.throws(()=>compileYeoulCompactEverydayV4({bibleMarkdown:bible,runtimeMarkdown:runtime,questions:V4_EVERYDAY_CASES.slice(1)}),/QUESTION_SET/);
+ assert.deepEqual(assessYeoulCompactEverydayV4({replies:['hello']}),{valid:false,flags:['INVALID_BATCH_SCHEMA'],count:1});
+ const replies=Array.from({length:10},(_,i)=>i===0?'허전하다고요? 무슨 일 있었어요?':'왜요, 그런 생각이 들었어요?');
+ assert.equal(assessYeoulCompactEverydayV4({replies}).flags.length,0);
+ replies[0]='그랬군요. 괜찮아요.';
+ replies[1]='여울 씨는요?';
+ const x=assessYeoulCompactEverydayV4({replies});
+ assert.equal(x.valid,true);
+ assert.deepEqual(x.flags,['1:GENERIC_EMPATHY_OPENING','2:WRONG_SELF_ADDRESS']);
+});
