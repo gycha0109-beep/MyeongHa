@@ -1,4 +1,4 @@
-name: Yeoul GPT-6 Luna decision A/B one-shot
+name: Yeoul GPT-6 Luna decision A/B via OpenRouter
 on:
   workflow_dispatch:
 permissions:
@@ -16,7 +16,7 @@ jobs:
           node-version: '24'
       - name: Run 6 A/B pairs with GPT-6 Luna decision and dialogue
         env:
-          OPENAI_EVAL_API_KEY: ${{ secrets.OPENAI_EVAL_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: node scripts/character-optimization/yeoul-gpt6-luna-ab-live-once-v1.mjs
       - name: Store private unreviewed results
         if: always()

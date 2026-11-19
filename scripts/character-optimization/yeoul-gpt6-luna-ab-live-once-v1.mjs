@@ -2,7 +2,7 @@
 import {spawnSync} from 'node:child_process';
 import {writeFileSync} from 'node:fs';
 
-const MODEL='gpt-6-luna', RESULT='yeoul-gpt6-luna-ab-results.json';
+const MODEL='gpt-6-luna', ROUTED_MODEL='openai/gpt-6-luna', RESULT='yeoul-gpt6-luna-ab-results.json';
 const planProcess=spawnSync(process.execPath,['scripts/character-optimization/yeoul-gpt6-luna-ab-plan-v1.mjs'],{encoding:'utf8'});
 if(planProcess.status!==0)throw Error('YEOUL_PLAN_FAILED: '+String(planProcess.stderr).slice(0,250));
 const plan=JSON.parse(planProcess.stdout);
@@ -16,30 +16,43 @@ if(process.env.GITHUB_ACTIONS==='true' &&
  (process.env.GITHUB_ACTOR!=='gycha0109-beep'||process.env.GITHUB_REF!=='refs/heads/main'||
   process.env.GITHUB_EVENT_NAME!=='workflow_dispatch'||process.env.GITHUB_RUN_ATTEMPT!=='1'))
  throw Error('OWNER_MANUAL_MAIN_ONCE_ONLY');
-const key=process.env.OPENAI_EVAL_API_KEY;
-if(typeof key!=='string'||!key.startsWith('sk-'))throw Error('OPENAI_EVAL_API_KEY_UNAVAILABLE');
+const key=process.env.OPENROUTER_API_KEY;
+if(typeof key!=='string'||!key.startsWith('sk-or-v1-'))throw Error('OPENROUTER_API_KEY_UNAVAILABLE');
 
-const result={model:MODEL,sourceStatus:'DRAFT_NOT_PRODUCTION',syntheticOnly:true,
+const result={model:MODEL,transport:'OpenRouter',sourceStatus:'DRAFT_NOT_PRODUCTION',syntheticOnly:true,
  humanReviewed:false,qualityImprovementProven:false,
  plannedCases:6,plannedInferences:18,completedInferences:0,status:'STARTED',answers:[],error:null};
 function persist(){
  writeFileSync(RESULT,JSON.stringify(result,null,2)+'\n',{mode:0o600});
 }
+async function preflight(){
+ const headers={Authorization:'Bearer '+key,Accept:'application/json'};
+ const auth=await fetch('https://openrouter.ai/api/v1/auth/key',{headers,redirect:'error',signal:AbortSignal.timeout(20000)});
+ if(auth.status!==200)throw Error('OPENROUTER_AUTH_'+auth.status);
+ const listing=await fetch('https://openrouter.ai/api/v1/models',{headers,redirect:'error',signal:AbortSignal.timeout(20000)});
+ if(listing.status!==200)throw Error('OPENROUTER_CATALOG_'+listing.status);
+ const data=await listing.json();
+ if(!data.data?.some(x=>x.id===ROUTED_MODEL))throw Error('GPT6_LUNA_UNLISTED');
+}
 async function infer(request){
  if(request.model!==MODEL||request.store!==false||request.max_output_tokens>1000)
   throw Error('INVALID_MODEL_OR_OUTPUT_ENVELOPE');
+ const payload={model:ROUTED_MODEL,
+  messages:request.input.map(x=>({role:x.role,content:x.content})),
+  max_tokens:request.max_output_tokens,stream:false,
+  provider:{allow_fallbacks:false,data_collection:'deny'}};
  let res;
  try {
-  res=await fetch('https://api.openai.com/v1/responses',{
-   method:'POST',redirect:'error',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
-   body:JSON.stringify(request),signal:AbortSignal.timeout(60000)});
+  res=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+   method:'POST',redirect:'error',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json',
+      'HTTP-Referer':'https://github.com/gycha0109-beep/MyeongHa','X-Title':'Yeoul GPT-6 Luna A/B'},
+   body:JSON.stringify(payload),signal:AbortSignal.timeout(60000)});
  } catch {throw Error('MODEL_NETWORK_OR_TIMEOUT_NO_RETRY_BILLING_UNKNOWN');}
  if(!res.ok)throw Error('MODEL_HTTP_'+res.status+'_NO_RETRY');
  const data=await res.json();
- if(data.model!==MODEL||data.status!=='completed')throw Error('MODEL_ID_OR_STATUS');
- const text=(data.output||[]).flatMap(x=>x.content||[])
-  .filter(x=>x.type==='output_text').map(x=>x.text||'').join('').trim();
- if(!text)throw Error('EMPTY_MODEL_REPLY');
+ if(data.model!==ROUTED_MODEL&&data.model!==MODEL)throw Error('MODEL_ID_MISMATCH');
+ const text=data.choices?.[0]?.message?.content?.trim();
+ if(typeof text!=='string'||!text)throw Error('EMPTY_MODEL_REPLY');
  result.completedInferences++;
  return {text,usage:data.usage||null};
 }
@@ -54,7 +67,7 @@ function planningRequest(c){
  const core=baseline.input[0].content;
  return {model:MODEL,store:false,reasoning:{effort:'low'},max_output_tokens:900,
   text:{format:{type:'json_schema',name:'yeoul_turn_decision',strict:true,schema:decisionSchema}},
-  input:[{role:'system',content:core+'\n\n당신은 여울 본인입니다. 사용자에게 바로 답하지 말고, 이번 상황에서 여울이 무엇을 신경 쓰고, 어떤 입장을 취하고, 무엇을 하려 하고, 무엇을 사실로 볼 수 없는지 자기 기준으로 결정하세요. 정해진 감정이나 결과를 강요하지 않습니다. 관계 이력이 없으면 과거와 호감을 발명하지 않습니다. JSON 항목만 작성하세요.'},
+  input:[{role:'system',content:core+'\n\n당신은 여울 본인입니다. 사용자에게 바로 답하지 말고, 이번 상황에서 여울이 무엇을 신경 쓰고, 어떤 입장을 취하고, 무엇을 하려 하고, 무엇을 사실로 볼 수 없는지 자기 기준으로 결정하세요. 정해진 감정이나 결과를 강요하지 않습니다. 관계 이력이 없으면 과거와 호감을 발명하지 않습니다. JSON 객체 하나만 작성하세요. 키는 attention, stance, intent, emotionalState, evidenceLimit 다섯 가지이며 모든 값은 문자열입니다. 추가 설명과 코드펜스 없이 순수 JSON만 출력하세요.'},
    baseline.input[1]]};
 }
 function rendererRequest(c,decision){
@@ -66,12 +79,13 @@ function rendererRequest(c,decision){
    c.baseline.input[1]]};
 }
 persist();
+await preflight();
 for(const c of plan.cases){
  try {
   const baseline=await infer(c.baseline);
   const decisionResponse=await infer(planningRequest(c));
   let decision;
-  try{decision=JSON.parse(decisionResponse.text);}
+  try{decision=JSON.parse(decisionResponse.text.replace(/^\x60{3}(?:json)?\s*/i,'').replace(/\s*\x60{3}$/,'').trim());}
   catch{throw Error('INVALID_LUNA_DECISION_JSON');}
   if(Object.keys(decision).sort().join('|')!==Object.keys(decisionSchema.properties).sort().join('|'))
    throw Error('LUNA_DECISION_KEYS');

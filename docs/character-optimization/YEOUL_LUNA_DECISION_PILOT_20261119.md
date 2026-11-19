@@ -43,3 +43,10 @@
 - `yeoul-gpt6-luna-ab-live-once-v1.mjs`는 `gpt-6-luna`를 OpenAI Responses API로 6개 합성 질문 × 기존/판단우선 각 1회, 최대 12회 호출한다. 실패 시 재시도하지 않는다.
 - `.github/workflows/yeoul-gpt6-luna-ab-live-once-v1.yml`는 저장소 소유자만 main에서 수동 실행하고 비공개 검토 전 결과를 7일 보존하는 경로다. API 키는 GitHub Secret에서 읽는다.
 - 이 커밋에서는 **실제 실행 미확인**. GitHub Actions 수동 dispatch와 실행 결과 확인이 필요하며 품질 개선 주장은 금지한다.
+
+## 2026-11-19 실측 인증 실패 및 전송 경로 복구
+- 첫 실측 Actions [#44463650556](https://github.com/gycha0109-beep/MyeongHa/actions/runs/44463650556)은 OpenAI direct 인증 HTTP 401로 첫 요청에서 실패했다. 실제 대사는 0쌍이며 품질 평가는 미진행이다.
+- 유효했던 기존 117개 여울 테스트의 production `OPENROUTER_API_KEY`를 사용하도록 동일 `gpt-6-luna` 요청을 OpenRouter `openai/gpt-6-luna` 라우트로 전환한다. 모델 변경이 아니다.
+- 인증 GET 및 모델 목록 확인 후 합성 질문 6개에 기준선 1회, Luna 판단 1회, 판단을 받은 Luna 대사 1회를 실행한다. 개별 요청 오류에서는 자동 재시도하지 않고 확보한 결과를 보존한다.
+- 유료 한도 지연 사유는 사용자의 최신 실행 지시로 해제했다. 최초 500원 상한의 역사적 사용 기록을 변경하지 않는다.
+- 재실행 완료 및 실제 품질 향상은 아직 확인하지 않았다.
