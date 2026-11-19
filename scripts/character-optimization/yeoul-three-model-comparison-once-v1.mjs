@@ -50,7 +50,7 @@ function offlinePlan(){
   for(const c of groupedCases){must(!seen.has(c.id),'DUPLICATE');seen.add(c.id);}
   return {models:MODELS.map(x=>x.id),questions:20,multiTurns:10,repeats:9,
     perModel:39,totalMaxReplies:117,promptSha256:hash(PROMPT),
-    capKrw:TOTAL_CAP_KRW,newRunLimitKrw:NEW_RUN_CAP_KRW,paidCalls:0};
+    capKrw:TOTAL_CAP_KRW,newRunLimitKrw:NEW_RUN_CAP_KRW,plannedPaidCalls:0};
 }
 function environmentGuard(){
   const e=process.env;
@@ -124,7 +124,7 @@ async function run(){
   await oneShotGuard(process.env.GH_API_TOKEN);
   const models=await catalog(key);
   const output={...plan,runId:process.env.GITHUB_RUN_ID,
-    actualReplies:[],estimatedPaidUsd:0,reservedKrw:0,failures:[],status:'STARTED',
+    actualReplies:[],estimatedPaidUsd:0,reservedKrw:0,actualPaidCallAttempts:0,failures:[],status:'STARTED',
     ownerHumanScores:false,blindReviewComplete:false};
   const histories=Object.fromEntries(models.map(x=>[x.label,{M1:[],M2:[]}]));
   try{
@@ -144,6 +144,7 @@ async function run(){
         const record={caseId:item.id,area:item.area,modelLabel:p.model.label,
           modelId:p.model.id,promptSha256:plan.promptSha256,reservedKrw:p.reserved};
         try{
+          output.actualPaidCallAttempts++;
           const result=await infer(key,p.model,p.messages);
           Object.assign(record,result);
           output.estimatedPaidUsd+=result.costUsd;
@@ -169,7 +170,7 @@ async function run(){
     // Write only to runner private temp, never commit actual replies or secrets.
     await writeFile(process.env.YEOUL_RESULT_PATH,JSON.stringify(output,null,2)+'\n',{flag:'wx',mode:0o600});
     console.log('BENCH_SUMMARY',JSON.stringify({status:output.status,
-      completed:output.actualReplies.length,failures:output.failures.length,
+      completed:output.actualReplies.length,attemptedPaidCalls:output.actualPaidCallAttempts,failures:output.failures.length,
       conservativeReservedKrw:output.reservedKrw,estimatedPaidUsd:output.estimatedPaidUsd,
       actualBillingNotYetReconciled:true,ownerHumanScores:false}));
   }
