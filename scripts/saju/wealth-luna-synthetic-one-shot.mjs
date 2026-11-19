@@ -64,7 +64,7 @@ const writer = createOpenRouterOfficialWealthLunaWriterV1({
       committed=true;
       usage=input.usage;
     },
-    async fail(){process.stderr.write('MODEL_OR_VALIDATION_FAILED_NO_RETRY\\n');},
+    async fail(){process.stderr.write('MODEL_OR_VALIDATION_FAILED_NO_RETRY\n');},
   },
 });
 const start=Date.now();
@@ -75,7 +75,7 @@ const result=await writer.readOrCreateValidated({
 if(!committed||!usage||result.chapters.length!==2)throw Error('Synthetic model response not settled');
 const review={status:'SYNTHETIC_NOT_FOR_PRODUCTION',model:result.model,sourceHash:source.sourceHash,
   elapsedMs:Date.now()-start,usage,chapters:result.chapters};
-writeFileSync('wealth-luna-synthetic-probe.json',JSON.stringify(review,null,2)+'\\n',{mode:0o600});
+writeFileSync('wealth-luna-synthetic-probe.json',JSON.stringify(review,null,2)+'\n',{mode:0o600});
 const escape=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 writeFileSync('wealth-luna-synthetic-probe.html',
   '<!doctype html><html lang="ko"><meta charset="utf-8"><title>태겸 Luna 실제 모델 합성 검토본</title>'+
@@ -84,4 +84,4 @@ writeFileSync('wealth-luna-synthetic-probe.html',
   result.chapters.map(c=>'<section><h2>'+escape(c.title)+'</h2>'+
     c.paragraphs.map(p=>'<p>'+escape(p)+'</p>').join('')+'</section>').join('')+'</html>',
   {mode:0o600});
-process.stdout.write(JSON.stringify({status:'SYNTHETIC_LUNA_VALIDATED',chapters:result.chapters.length,usage,elapsedMs:Date.now()-start})+'\\n');
+process.stdout.write(JSON.stringify({status:'SYNTHETIC_LUNA_VALIDATED',chapters:result.chapters.length,usage,elapsedMs:Date.now()-start})+'\n');
