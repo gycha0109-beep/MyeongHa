@@ -745,6 +745,12 @@
       "prMode": "none",
       "mainMode": "manual-one-shot",
       "workTrackAttribution": "character-runtime-lab"
+    },
+    "yeoul-examples-abc-live-v1.yml": {
+      "responsibility": "character-runtime-lab-owner-manual-gpt6-luna-four-examples-abc-synthetic-evaluation",
+      "prMode": "none",
+      "mainMode": "manual-one-shot",
+      "workTrackAttribution": "character-runtime-lab"
     }
   }
 }
