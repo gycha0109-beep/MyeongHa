@@ -202,12 +202,10 @@ export function validateOfficialWealthLunaDraftV1(
   });
 }
 
-export async function createOfficialWealthLunaSupplementV1(
-  record: OfficialReadingRecordV1,
+export async function createOfficialWealthLunaSupplementFromSourceV1(
+  source: OfficialWealthLunaSourceV1,
   writer: AuthorizedOfficialWealthLunaWriterPortV1,
-): Promise<OfficialWealthLunaNarrativeV1 | null> {
-  const source = buildOfficialWealthLunaSourceV1(record);
-  if (source === null) return null;
+): Promise<OfficialWealthLunaNarrativeV1> {
   if (writer.model !== OFFICIAL_WEALTH_LUNA_MODEL_ID_V1) {
     throw new TypeError('Official Wealth supplementary writer requires published Luna model');
   }
@@ -227,4 +225,15 @@ export async function createOfficialWealthLunaSupplementV1(
     throw new TypeError('Wealth Luna writer returned an unverified publication');
   }
   return output;
+}
+
+/** Legacy bounded source helper for offline integration tests only.
+ * Paid six-chapter routes must supply an already verified product source. */
+export async function createOfficialWealthLunaSupplementV1(
+  record: OfficialReadingRecordV1,
+  writer: AuthorizedOfficialWealthLunaWriterPortV1,
+): Promise<OfficialWealthLunaNarrativeV1 | null> {
+  const source = buildOfficialWealthLunaSourceV1(record);
+  if (source === null) return null;
+  return createOfficialWealthLunaSupplementFromSourceV1(source, writer);
 }
