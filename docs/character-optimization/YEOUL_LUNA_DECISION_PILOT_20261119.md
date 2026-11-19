@@ -37,3 +37,9 @@
 - `yeoul-gpt6-luna-ab-plan-v1.mjs`: 동일 모델·동일 원본 Runtime·동일 질문을 쓰는 baseline/decision-first API 요청 페이로드 6쌍을 오프라인 생성한다. `node scripts/character-optimization/yeoul-gpt6-luna-ab-plan-v1.mjs`로 결과를 확인한다.
 - 이 계획은 원본 여울 성격과 판단 의도 연결을 실제 코드로 만든 것이지 유료 추론이 아니다. 판단 규칙은 초기 가설이며 사람의 여울다운 판단과 동일하다는 근거가 없다.
 - 앞선 500원 파일럿의 누적 청구가 정확히 대사되지 않았으므로 새로운 유료 호출/중복 일회성 워크플로 재실행은 금지한다. 6쌍 답변 품질은 미검증이다.
+
+## 2026-11-19 실측 실행 연결
+- 사용자가 기존 예산 대기를 해제하고 실행을 지시했다. 기존 실험의 역사적 청구 기록은 변경하지 않는다.
+- `yeoul-gpt6-luna-ab-live-once-v1.mjs`는 `gpt-6-luna`를 OpenAI Responses API로 6개 합성 질문 × 기존/판단우선 각 1회, 최대 12회 호출한다. 실패 시 재시도하지 않는다.
+- `.github/workflows/yeoul-gpt6-luna-ab-live-once-v1.yml`는 저장소 소유자만 main에서 수동 실행하고 비공개 검토 전 결과를 7일 보존하는 경로다. API 키는 GitHub Secret에서 읽는다.
+- 이 커밋에서는 **실제 실행 미확인**. GitHub Actions 수동 dispatch와 실행 결과 확인이 필요하며 품질 개선 주장은 금지한다.
