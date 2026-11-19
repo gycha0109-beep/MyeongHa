@@ -10,6 +10,15 @@ import { getSajuProductChapterBlueprintV1 } from '../../../packages/domain/src/s
 export const WEALTH_NOTION_LUNA_PRODUCT_SOURCE_VERSION_V1 =
   'myeongha-wealth-notion-sixchapter-source-v1' as const;
 
+/** The server host may install this only after a signed Saju source and
+ * owner-scoped Reader plan have been independently validated. A model adapter
+ * cannot implement this authority by constructing generic prose. */
+export interface OfficialWealthLunaProductSourceAuthorityV1 {
+  readonly getSixChapterSourceFromApprovedPlan: (
+    issued: OfficialReadingRecordV1,
+  ) => Promise<OfficialWealthLunaSourceV1 | null>;
+}
+
 export interface SignedNativeReadingToIssuedRecordBindingV1 {
   /** Supplied by the existing signed canonical Saju Source verifier,
    * not derived from the public request or from arbitrary raw text. */
