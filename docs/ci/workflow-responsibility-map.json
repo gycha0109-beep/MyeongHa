@@ -739,6 +739,12 @@
       "prMode": "none",
       "mainMode": "manual-one-shot",
       "workTrackAttribution": "character-runtime-lab"
+    },
+    "yeoul-voice-ab-live-v1.yml": {
+      "responsibility": "character-runtime-lab-owner-manual-gpt6-luna-voice-distinctiveness-synthetic-ab",
+      "prMode": "none",
+      "mainMode": "manual-one-shot",
+      "workTrackAttribution": "character-runtime-lab"
     }
   }
 }
