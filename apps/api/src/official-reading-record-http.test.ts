@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { getSajuProductChapterBlueprintV1 } from '../../../packages/domain/src/saju-product-chapter-blueprints-v1.js';
 import { MyeongHaApiClientV1, readApprovedSajuPurchaseReadingsV1 } from '../../../packages/api-client/src/index.js';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import { handleOfficialReadingRecordRequestV1 } from './official-reading-record-http.js';
@@ -361,17 +362,40 @@ describe('Official Reading separate Wealth Luna route', () => {
       identityEvidenceVerifier: verifier(),
       pool: fakePool({ approvedRows: [approvedRow] }),
       approvedSajuArchiveEnabled: true,
+      officialWealthLunaProductSource: {
+        async getSixChapterSourceFromApprovedPlan(record) {
+          const blueprints = getSajuProductChapterBlueprintV1('wealth');
+          return {
+            version: 'myeongha-official-wealth-luna-reader-v1',
+            readingId: record.readingId,
+            readerCharacterId: 'taegyeom',
+            sourceHash: 'f'.repeat(64),
+            chapters: blueprints.map((chapter, index) => ({
+              index, title: chapter.fixedTitle,
+              excerpts: ['승인 의미 [test-' + index + ']\\n근거 블록: sections.' +
+                index + '.blocks.0\\n이 명식의 실제 승인된 해석은 사람마다 적용되는 구조와 조건이 다르다는 점을 전제합니다.'],
+            })),
+            limitations: [],
+            voice: {
+              register: '단호한 존댓말',
+              sentenceRhythm: '원칙 결과 행동',
+              interpretationStyle: '근거와 조건을 구별',
+              prohibited: [],
+            },
+          };
+        },
+      },
       officialWealthLunaWriter: {
         model: 'gpt-6-luna',
         async readOrCreateValidated({source,validateDraft}) {
           calls++;
-          expect(source.chapters).toHaveLength(2);
+          expect(source.chapters).toHaveLength(6);
           const chapters = source.chapters.map(chapter => {
-            const sourceAnchor = chapter.excerpts[0]!.slice(0, 29);
-            const paragraph = sourceAnchor +
-              ' 이것은 출생정보만으로 돈의 액수를 예측한다는 뜻이 아닙니다. 현재 확인된 두 종류의 판단 근거를 각각 따로 살펴보고 실제 사용 조건을 확인할 필요가 있습니다.';
-            return {index:chapter.index,title:chapter.title,sourceAnchor,
-              paragraphs:[paragraph,paragraph]};
+            const sourceAnchor = '이 명식의 실제 승인된 해석은 사람마다 적용되는 구조와 조건이 다르다는 점을 전제합니다.';
+            const paragraphs = [1,2,3].map(part =>
+              sourceAnchor + ' 이 장의 고유한 질문은 ' + chapter.title +
+              ' 입니다. '+ part + '번째 장면에서는 해당 근거를 다른 해석으로 넓히기보다 그 안에서 어떤 조건과 대가가 구별되는지 확인합니다. 공식 원문에 없는 실제 소득이나 미래 자산을 알아맞힌다고 주장하지 않으며, 이 장의 해석을 앞뒤 장과 혼동하지 않고 이해할 필요가 있습니다.');
+            return {index:chapter.index,title:chapter.title,sourceAnchor,paragraphs};
           });
           return validateDraft({chapters});
         },
@@ -384,7 +408,7 @@ describe('Official Reading separate Wealth Luna route', () => {
     };
     expect(payload.ok).toBe(true);
     expect(payload.data.originalReadingUnchanged).toBe(true);
-    expect(payload.data.chapters).toHaveLength(2);
+    expect(payload.data.chapters).toHaveLength(6);
     expect(calls).toBe(1);
   });
 });

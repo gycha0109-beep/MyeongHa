@@ -1,10 +1,12 @@
 import { ApiCommandError } from './api-error.js';
 import {
   buildOfficialWealthLunaSourceV1,
-  createOfficialWealthLunaSupplementV1,
+  createOfficialWealthLunaSupplementFromSourceV1,
   type AuthorizedOfficialWealthLunaWriterPortV1,
 } from './official-wealth-luna-reader-v1.js';
 import { readBoundedUpstreamJsonTextV1 } from './upstream-json-response-resource.js';
+import type { OfficialWealthLunaProductSourceAuthorityV1 } from './official-wealth-luna-product-source-v1.js';
+import { getSajuProductChapterBlueprintV1 } from '../../../packages/domain/src/saju-product-chapter-blueprints-v1.js';
 import type { createAdminAnalyticsVerifiedReadingAdapterV1 } from './admin-analytics-verified-reading-v1.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
@@ -231,6 +233,7 @@ export async function handleOfficialReadingRecordRequestV1(input: {
   readonly trustedOriginalOriginV1?: true;
   /** Optional gated Luna add-on. Never alters the signed archive Reading. */
   readonly officialWealthLunaWriter?: AuthorizedOfficialWealthLunaWriterPortV1;
+  readonly officialWealthLunaProductSource?: OfficialWealthLunaProductSourceAuthorityV1;
   /** Disabled until the approved component archive SQL and grant are installed. */
   readonly approvedSajuArchiveEnabled?: boolean;
   /** Opt-in after an authorized Official archive read. Reads the persisted
@@ -241,7 +244,8 @@ export async function handleOfficialReadingRecordRequestV1(input: {
   const selector = requestedArchiveId(input.request, input.approvedSajuArchiveEnabled === true);
   if (selector === null) return new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL } });
   const isLunaRequest = input.request.method === 'POST' && selector.key === 'readingId' &&
-    input.officialWealthLunaWriter !== undefined;
+    input.officialWealthLunaWriter !== undefined &&
+    input.officialWealthLunaProductSource !== undefined;
   if (input.request.method !== GET_METHOD && !isLunaRequest) {
     return new Response(null, { status: 405, headers: { Allow: GET_METHOD, 'Cache-Control': NO_STORE_CACHE_CONTROL } });
   }
@@ -255,7 +259,8 @@ export async function handleOfficialReadingRecordRequestV1(input: {
 
   try {
     if (isLunaRequest) {
-      if (input.officialWealthLunaWriter === undefined) {
+      if (input.officialWealthLunaWriter === undefined ||
+          input.officialWealthLunaProductSource === undefined) {
         return jsonError({ status: 503, code: 'WEALTH_LUNA_UNAVAILABLE', messageKey: 'reading.supplement_unavailable', retryable: false, requestId });
       }
       const origin = new URL(input.request.url).origin;
@@ -294,10 +299,22 @@ export async function handleOfficialReadingRecordRequestV1(input: {
         return jsonError({ status: 404, code: 'NOT_FOUND', messageKey: 'readings.not_found', retryable: false, requestId });
       }
       try {
-        const narrative = await createOfficialWealthLunaSupplementV1(
-          record, input.officialWealthLunaWriter,
+        const approvedSource = await input.officialWealthLunaProductSource.getSixChapterSourceFromApprovedPlan(record);
+        const expectedTitles = getSajuProductChapterBlueprintV1('wealth').map(chapter => chapter.fixedTitle);
+        if (approvedSource === null ||
+            approvedSource.readingId !== record.readingId ||
+            approvedSource.readerCharacterId !== 'taegyeom' ||
+            approvedSource.chapters.length !== expectedTitles.length ||
+            approvedSource.chapters.some((chapter, i) =>
+              chapter.index !== i || chapter.title !== expectedTitles[i] ||
+              chapter.excerpts.length === 0 ||
+              chapter.excerpts.some(excerpt => !excerpt.includes('승인 의미 [') ||
+                !excerpt.includes('근거 블록:')))) {
+          return jsonError({ status: 503, code: 'WEALTH_REPORT_NOT_READY', messageKey: 'reading.supplement_unavailable', retryable: false, requestId });
+        }
+        const narrative = await createOfficialWealthLunaSupplementFromSourceV1(
+          approvedSource, input.officialWealthLunaWriter,
         );
-        if (narrative === null) throw new Error('Wealth supplement unexpectedly unavailable');
         return successResponse(narrative, requestId, serverTime);
       } catch {
         return jsonError({ status: 503, code: 'WEALTH_LUNA_UNAVAILABLE', messageKey: 'reading.supplement_unavailable', retryable: true, requestId });
@@ -344,6 +361,7 @@ export async function handleOfficialReadingRecordRequestV1(input: {
       ...data,
       wealthLunaAvailable:
         input.officialWealthLunaWriter !== undefined &&
+        input.officialWealthLunaProductSource !== undefined &&
         buildOfficialWealthLunaSourceV1(data) !== null,
     }, requestId, serverTime);
   } catch (error) {
