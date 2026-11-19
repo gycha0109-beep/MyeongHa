@@ -692,6 +692,12 @@
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
     },
+    "yeoul-gpt6-luna-ab-live-once-v1.yml": {
+      "responsibility": "character-runtime-lab-owner-dispatched-gpt6-luna-six-synthetic-ab-comparison",
+      "prMode": "none",
+      "mainMode": "manual-one-shot",
+      "workTrackAttribution": "character-runtime-lab"
+    },
     "yeoul-luna-one-shot-real-v1.yml": {
       "responsibility": "character-runtime-lab-owner-manual-gpt6-luna-synthetic-paid-abc-with-encrypted-results",
       "prMode": "none",
