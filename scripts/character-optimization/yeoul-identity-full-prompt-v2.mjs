@@ -98,9 +98,12 @@ export function buildFull(caseId,{roleFrame=false}={}){
  const c=cases.find(x=>x.id===caseId);
  if(!c)throw Error('UNKNOWN_FIXTURE_'+caseId);
  const system=roleFrame?frame+'\n\n'+contents:contents;
+ const sceneFacts=c.sceneFacts.map(f=>f.replace(/^합성 실험 장면에서 /u,''));
+ if(sceneFacts.some(f=>/합성 실험|fixtureOnly|평가 실행/iu.test(f)))
+  throw Error('TEST_METADATA_IN_CHARACTER_CONTEXT');
  const user=JSON.stringify({
   message:c.message,relationship:c.relationship,verifiedEvents:[],
-  sceneFacts:c.sceneFacts,fixtureOnly:true
+  sceneFacts
  });
  const sourceHashes=Object.fromEntries(Object.entries(files).map(([k,v])=>[k,sha256(v)]));
  for(const [kind,source] of Object.entries(files)){
