@@ -92,7 +92,7 @@ export function createOpenRouterOfficialWealthLunaWriterV1(
     const response = await send(ENDPOINT, {
       method: 'POST',
       redirect: 'error',
-      signal: init.signal ?? AbortSignal.timeout(45000),
+      signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(45000)]) : AbortSignal.timeout(45000),
       headers: {
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + config.apiKey,
