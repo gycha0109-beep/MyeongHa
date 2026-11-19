@@ -146,7 +146,7 @@ export function createProductionReadingHistoryReadRuntimeV1(
         // Existing POST /api/readings remains Reading creation. Only an exact
         // owner-specific readingId POST can request a separately cost-admitted
         // Luna supplement; do not turn purchases into a free model endpoint.
-        if (requestUrl.searchParams.has('readingId')) {
+        if (input.officialWealthLunaWriter !== undefined && requestUrl.searchParams.has('readingId')) {
           return handleOfficialReadingRecordRequestV1({
             request: requestInput.request,
             requestId: requestInput.requestId,
