@@ -89,7 +89,7 @@ function blockExcerpts(block: unknown): readonly string[] {
 function sha256(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
-const PROHIBITED_NEW_PREDICTION = /(?:확실히|반드시|무조건|틀림없이).{0,36}(?:부자|수익|돈을 벌|재산|투자|승진)|(?:로또|주식|코인|투자).{0,35}(?:오른다|급등|대박|벌게 됩니다)|(?:20\\d\\d년|내년|다음 달).{0,32}(?:큰돈|횡재|부자가)/u;
+const PROHIBITED_NEW_PREDICTION = /(?:확실히|반드시|무조건|틀림없이).{0,36}(?:부자|수익|돈을 벌|재산|투자|승진)|(?:로또|주식|코인|투자).{0,35}(?:오른다|급등|대박|벌게 됩니다)|(?:20\d\d년|내년|다음 달).{0,32}(?:큰돈|횡재|부자가)/u;
 const MAX_CHAPTERS = 7;
 const MAX_PARAGRAPH = 1300;
 
