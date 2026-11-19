@@ -709,6 +709,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "character-runtime-lab"
+    },
+    "yeoul-three-model-comparison-recovery-once-v2.yml": {
+      "responsibility": "character-runtime-lab-once-recovery-after-token-accounting-hold-with-original-owner-cap",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "character-runtime-lab"
     }
   }
 }
