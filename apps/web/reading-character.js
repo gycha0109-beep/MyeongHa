@@ -20,6 +20,7 @@ import { readingDomainPresentationV1 } from './reading-domain-presentation.js';
 import { blockTexts, issuedSectionSourcePartsV1 } from './reading-issued-source-projection.js';
 import { resolveReaderPresentationCandidateV1 } from './reader-rollout-policy.js';
 import { mountPurchasedSajuReaderPanelV1 } from './purchased-saju-reader-panel.js';
+import { mountVerifiedWealthLunaPanelV1 } from './wealth-luna-panel.js';
 
 const readerCatalog = {
   baekheon: {
@@ -157,6 +158,7 @@ document.addEventListener('myeongha:localechange', renderReaderLocalePresentatio
 
 let activeReadingOwner = null;
 let unmountPurchasedSajuReader;
+let unmountWealthLuna;
 
 function currentReadingOwnerEvidence() {
   return { memberSession: readMemberSession(), guestCredential: readGuestBearer() };
@@ -234,6 +236,8 @@ function renderInvalidRoute() {
 }
 
 function clearPersistedReadingPresentation() {
+  unmountWealthLuna?.();
+  unmountWealthLuna = undefined;
   unmountPurchasedSajuReader?.();
   unmountPurchasedSajuReader = undefined;
   const report = document.querySelector('[data-official-report]');
@@ -1045,6 +1049,20 @@ async function loadPersistedReading() {
     }
 
     activatePreviewReading({ ...readingView, source: 'record', record });
+    const wealthLunaPanel = document.querySelector('[data-wealth-luna-reader]');
+    if (wealthLunaPanel && activeBearer.kind === 'member') {
+      unmountWealthLuna = mountVerifiedWealthLunaPanelV1(
+        wealthLunaPanel, record,
+        async () => {
+          if (!ensureResponseOwnerCurrent(owner)) return null;
+          const bearer = await getActiveBearer();
+          if (!ensureResponseOwnerCurrent(owner)) return null;
+          const currentOwner = captureActiveReadingOwner(bearer);
+          return currentOwner?.kind === 'member' && currentOwner.key === owner.key ? bearer : null;
+        },
+        () => ensureResponseOwnerCurrent(owner),
+      );
+    }
     const purchasedReader = document.querySelector('[data-purchased-saju-reader]');
     if (purchasedReader && record.approvedComponent && activeBearer.kind === 'member') {
       unmountPurchasedSajuReader = mountPurchasedSajuReaderPanelV1(purchasedReader, record, async () => {
