@@ -14,14 +14,15 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '24'
-      - name: Run 12 real GPT-6 Luna responses
+      - name: Run 6 A/B pairs with GPT-6 Luna decision and dialogue
         env:
           OPENAI_EVAL_API_KEY: ${{ secrets.OPENAI_EVAL_API_KEY }}
         run: node scripts/character-optimization/yeoul-gpt6-luna-ab-live-once-v1.mjs
       - name: Store private unreviewed results
-        if: success()
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: yeoul-gpt6-luna-ab-results
           path: yeoul-gpt6-luna-ab-results.json
           retention-days: 7
+          if-no-files-found: ignore
