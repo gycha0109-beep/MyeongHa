@@ -356,12 +356,6 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
-    "saju-t10-pair-production-cross-service-e2e.yml": {
-      "responsibility": "saju-official-t10-pair-cross-service-verification",
-      "prMode": "narrow",
-      "mainMode": "narrow",
-      "workTrackAttribution": "pr-metadata"
-    },
     "reader-grounding-cross-service-e2e.yml": {
       "responsibility": "saju-character-cross-service-verification",
       "prMode": "narrow",
@@ -403,6 +397,12 @@
       "prMode": "none",
       "mainMode": "manual",
       "workTrackAttribution": "workflow-dispatch"
+    },
+    "saju-t10-pair-production-cross-service-e2e.yml": {
+      "responsibility": "saju-official-t10-pair-cross-service-verification",
+      "prMode": "narrow",
+      "mainMode": "narrow",
+      "workTrackAttribution": "pr-metadata"
     },
     "seyeon-c06-f01-v2-manual-eval.yml": {
       "responsibility": "production-character-model-evaluation",
@@ -708,6 +708,12 @@
       "responsibility": "character-runtime-lab-once-openrouter-luna-synthetic-live-recovery-under-existing-owner-cap",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "character-runtime-lab"
+    },
+    "yeoul-runtime-role-live-v1.yml": {
+      "responsibility": "character-runtime-lab-owner-initiated-luna-runtime-role-framing-synthetic-ab",
+      "prMode": "none",
+      "mainMode": "manual-one-shot",
       "workTrackAttribution": "character-runtime-lab"
     },
     "yeoul-three-model-comparison-once-v1.yml": {
