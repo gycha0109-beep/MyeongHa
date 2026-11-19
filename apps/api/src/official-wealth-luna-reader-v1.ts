@@ -4,6 +4,7 @@ import {
   findReadingPublicTrustLanguageViolationV1,
 } from '../../../packages/character-content/src/index.js';
 import type { OfficialReadingRecordV1 } from './official-reading-record-read.js';
+import { getSajuProductChapterBlueprintV1 } from '../../../packages/domain/src/saju-product-chapter-blueprints-v1.js';
 
 export const OFFICIAL_WEALTH_LUNA_READER_VERSION_V1 =
   'myeongha-official-wealth-luna-reader-v1' as const;
@@ -163,6 +164,10 @@ export function validateOfficialWealthLunaDraftV1(
       Object.keys(raw).some(key => key !== 'chapters')) {
     throw new TypeError('Luna Wealth draft must contain all source-bound chapters');
   }
+  const isNotionSixChapterProduct =
+    source.chapters.length === 6 &&
+    source.chapters.every((chapter, index) =>
+      chapter.title === getSajuProductChapterBlueprintV1('wealth')[index]?.fixedTitle);
   const chapters = raw.chapters.map((item, index) => {
     const original = source.chapters[index]!;
     if (!record(item) || Object.keys(item).some(key =>
@@ -173,12 +178,22 @@ export function validateOfficialWealthLunaDraftV1(
         item.sourceAnchor.length < 12 ||
         !original.excerpts.some(excerpt => excerpt.includes(item.sourceAnchor as string)) ||
         !Array.isArray(item.paragraphs) ||
-        item.paragraphs.length < 2 || item.paragraphs.length > 4 ||
+        item.paragraphs.length < (isNotionSixChapterProduct ? 3 : 2) ||
+        item.paragraphs.length > (isNotionSixChapterProduct ? 5 : 4) ||
         !item.paragraphs.every(p => typeof p === 'string' &&
-          p.trim().length >= 80 && p.length <= MAX_PARAGRAPH)) {
+          p.trim().length >= (isNotionSixChapterProduct ? 140 : 80) &&
+          p.length <= MAX_PARAGRAPH)) {
       throw new TypeError('Luna Wealth chapter is not grounded in its issued source');
     }
     const paragraphs = item.paragraphs.map(p => (p as string).trim());
+    if(isNotionSixChapterProduct && (
+      item.sourceAnchor.length < 20 ||
+      ['승인 의미 [','근거 블록:', '적용 조건:', '금지 확장:'].some(
+        marker => item.sourceAnchor.includes(marker)
+      ) || new Set(paragraphs).size !== paragraphs.length
+    )) {
+      throw new TypeError('Six-chapter product requires unique, meaning-anchored paragraphs');
+    }
     if (!paragraphs.some(p => p.includes(item.sourceAnchor as string)) ||
         paragraphs.some(p => PROHIBITED_NEW_PREDICTION.test(p) ||
           findReadingPublicTrustLanguageViolationV1(p) !== null)) {
@@ -191,6 +206,12 @@ export function validateOfficialWealthLunaDraftV1(
       paragraphs: Object.freeze(paragraphs),
     });
   });
+  if(isNotionSixChapterProduct) {
+    const allParagraphs=chapters.flatMap(chapter=>chapter.paragraphs);
+    if(new Set(allParagraphs).size !== allParagraphs.length){
+      throw new TypeError('Wealth chapters repeat the same text across unrelated questions');
+    }
+  }
   return Object.freeze({
     version: OFFICIAL_WEALTH_LUNA_READER_VERSION_V1,
     readingId: source.readingId,
