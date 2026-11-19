@@ -35,7 +35,7 @@ const decision={
   neverOverrideSajuAuthority:true
  },
  rendererContract:{
-  modelAlias:'GPT Luna',modelId:'CHATGPT_SESSION_ONLY_NO_API_CALL',
+  modelAlias:'GPT Luna',modelId:'gpt-6-luna',
   instruction:'여울의 실제 Bible/Runtime에 근거해 결정된 intent와 stance를 지키면서 자연스러운 한국어 존댓말로 답한다. 실제 기억이나 감정을 만들어내지 않는다. 단순한 츤데레 고정 대사, 상담사형 감정 요약, 매번 질문으로 끝내기를 피한다.',
   decision:{detected,affect,stance,intent},
   message,relationship,verifiedEvents:memory.filter(x=>x&&typeof x==='object'&&x.verified===true&&typeof x.description==='string').map(x=>x.description),
