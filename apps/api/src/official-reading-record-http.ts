@@ -228,6 +228,7 @@ export async function handleOfficialReadingRecordRequestV1(input: {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
+  readonly trustedOriginalOriginV1?: true;
   /** Optional gated Luna add-on. Never alters the signed archive Reading. */
   readonly officialWealthLunaWriter?: AuthorizedOfficialWealthLunaWriterPortV1;
   /** Disabled until the approved component archive SQL and grant are installed. */
@@ -259,7 +260,7 @@ export async function handleOfficialReadingRecordRequestV1(input: {
       }
       const origin = new URL(input.request.url).origin;
       const sameOrigin = input.request.headers.get('Origin') === origin ||
-        input.request.headers.get('x-myeongha-records-origin-admitted-v1') === '1';
+        input.trustedOriginalOriginV1 === true;
       if (!sameOrigin ||
           input.request.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
         return jsonError({ status: 403, code: 'ACCESS_DENIED', messageKey: 'auth.denied', retryable: false, requestId });
