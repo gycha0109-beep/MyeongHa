@@ -122,6 +122,10 @@ export function parseOfficialReadingRecordPayloadV1(payload) {
     readingContractVersion,
     productResponseState,
   });
+  if (payload.wealthLunaAvailable !== undefined &&
+      typeof payload.wealthLunaAvailable !== 'boolean') {
+    fail('wealthLunaAvailable is invalid');
+  }
   const sajuDomain = requireSajuDomain(payload.sajuDomain, 'sajuDomain');
   const { approvedComponent } = payload;
   if (approvedComponent !== undefined && APPROVED_COMPONENT_DOMAIN.get(approvedComponent) !== sajuDomain) {
@@ -138,6 +142,8 @@ export function parseOfficialReadingRecordPayloadV1(payload) {
     readerCharacterIds: requireReaderCharacterIds(payload.readerCharacterIds),
     completedAt: requireTimestamp(payload.completedAt, 'completedAt'),
     birthRevision: requireBirthRevisionStatus(payload.birthRevision),
+    ...(payload.wealthLunaAvailable === undefined
+      ? {} : {wealthLunaAvailable:payload.wealthLunaAvailable}),
     reading,
   });
 }

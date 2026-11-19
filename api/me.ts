@@ -946,10 +946,15 @@ export default {
           return routeNotFound();
         }
 
+        const admittedOriginalOriginV1 =
+          target.kind === 'records' && target.route === READINGS_ROUTE &&
+          target.readingId !== undefined && request.method === 'POST' &&
+          request.headers.get('Origin') === new URL(request.url).origin;
         const result = await runtimeForTarget(target).handleRequest({
           request: toCanonicalMeRequestForTestV1(request, target),
           requestId,
           serverTime,
+          ...(admittedOriginalOriginV1 ? { trustedOriginalOriginV1: true as const } : {}),
         });
 
         // Last Vercel Fetch dispatch defense: a refactor removing the earlier

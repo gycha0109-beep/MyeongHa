@@ -1,4 +1,10 @@
 import { ApiCommandError } from './api-error.js';
+import {
+  buildOfficialWealthLunaSourceV1,
+  createOfficialWealthLunaSupplementV1,
+  type AuthorizedOfficialWealthLunaWriterPortV1,
+} from './official-wealth-luna-reader-v1.js';
+import { readBoundedUpstreamJsonTextV1 } from './upstream-json-response-resource.js';
 import type { createAdminAnalyticsVerifiedReadingAdapterV1 } from './admin-analytics-verified-reading-v1.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
@@ -222,6 +228,9 @@ export async function handleOfficialReadingRecordRequestV1(input: {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
+  readonly trustedOriginalOriginV1?: true;
+  /** Optional gated Luna add-on. Never alters the signed archive Reading. */
+  readonly officialWealthLunaWriter?: AuthorizedOfficialWealthLunaWriterPortV1;
   /** Disabled until the approved component archive SQL and grant are installed. */
   readonly approvedSajuArchiveEnabled?: boolean;
   /** Opt-in after an authorized Official archive read. Reads the persisted
@@ -231,7 +240,9 @@ export async function handleOfficialReadingRecordRequestV1(input: {
 }): Promise<Response> {
   const selector = requestedArchiveId(input.request, input.approvedSajuArchiveEnabled === true);
   if (selector === null) return new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL } });
-  if (input.request.method !== GET_METHOD) {
+  const isLunaRequest = input.request.method === 'POST' && selector.key === 'readingId' &&
+    input.officialWealthLunaWriter !== undefined;
+  if (input.request.method !== GET_METHOD && !isLunaRequest) {
     return new Response(null, { status: 405, headers: { Allow: GET_METHOD, 'Cache-Control': NO_STORE_CACHE_CONTROL } });
   }
 
@@ -243,6 +254,55 @@ export async function handleOfficialReadingRecordRequestV1(input: {
   }
 
   try {
+    if (isLunaRequest) {
+      if (input.officialWealthLunaWriter === undefined) {
+        return jsonError({ status: 503, code: 'WEALTH_LUNA_UNAVAILABLE', messageKey: 'reading.supplement_unavailable', retryable: false, requestId });
+      }
+      const origin = new URL(input.request.url).origin;
+      const sameOrigin = input.request.headers.get('Origin') === origin ||
+        input.trustedOriginalOriginV1 === true;
+      if (!sameOrigin ||
+          input.request.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
+        return jsonError({ status: 403, code: 'ACCESS_DENIED', messageKey: 'auth.denied', retryable: false, requestId });
+      }
+      let body: unknown;
+      try {
+        body = JSON.parse(await readBoundedUpstreamJsonTextV1(input.request, {
+          maximumBodyBytes: 512,
+          signal: AbortSignal.any([input.request.signal, AbortSignal.timeout(5000)]),
+        }));
+      } catch {
+        return jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId });
+      }
+      if (typeof body !== 'object' || body === null || Array.isArray(body) ||
+          Object.keys(body).length !== 0 || verifiedEvidence.kind !== 'member') {
+        return jsonError({ status: 403, code: 'ACCESS_DENIED', messageKey: 'auth.denied', retryable: false, requestId });
+      }
+      const record = await executePostgresSubjectTransactionV1({
+        pool: input.pool,
+        verifiedEvidence,
+        execute: ({ resolvedSubject, client }) =>
+          getOfficialReadingRecord({
+            resolvedSubjectId: resolvedSubject.subjectId,
+            readingId: selector.id,
+            authorityPort: createPostgresOfficialReadingRecordAuthorityPortV1(
+              client, input.approvedSajuArchiveEnabled === true ? selector.id : undefined,
+            ),
+          }),
+      });
+      if (buildOfficialWealthLunaSourceV1(record) === null) {
+        return jsonError({ status: 404, code: 'NOT_FOUND', messageKey: 'readings.not_found', retryable: false, requestId });
+      }
+      try {
+        const narrative = await createOfficialWealthLunaSupplementV1(
+          record, input.officialWealthLunaWriter,
+        );
+        if (narrative === null) throw new Error('Wealth supplement unexpectedly unavailable');
+        return successResponse(narrative, requestId, serverTime);
+      } catch {
+        return jsonError({ status: 503, code: 'WEALTH_LUNA_UNAVAILABLE', messageKey: 'reading.supplement_unavailable', retryable: true, requestId });
+      }
+    }
     if (selector.key === 'purchaseIntentId') {
       const purchaseIntentId = selector.id.toLowerCase();
       const readings = await executePostgresSubjectTransactionV1({
@@ -278,7 +338,14 @@ export async function handleOfficialReadingRecordRequestV1(input: {
         // unavailable analytics never affect the Official Reading response.
       }
     }
-    return successResponse(data, requestId, serverTime);
+    // This switch is only a UI availability hint. Actual grant, active publication
+    // and cost authority are rechecked by the server-side POST writer.
+    return successResponse({
+      ...data,
+      wealthLunaAvailable:
+        input.officialWealthLunaWriter !== undefined &&
+        buildOfficialWealthLunaSourceV1(data) !== null,
+    }, requestId, serverTime);
   } catch (error) {
     if (!(error instanceof ApiCommandError)) throw error;
     if (error.code === 'AUTH_REQUIRED') {

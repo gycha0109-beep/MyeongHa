@@ -305,3 +305,69 @@ describe('Official Reading record HTTP adapter', () => {
     expect(onRollback).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe('Official Reading separate Wealth Luna route', () => {
+  it('returns a validated extra narration only from a signed, owned Taegyeom Wealth report', async () => {
+    const original = {
+      ...SNAPSHOT,
+      reading: {
+        ...SNAPSHOT.reading,
+        sections: [
+          { sectionType: 'wealth', state: 'complete', title: '돈을 쓰는 기준',
+            blocks: [{ type: 'paragraph', text: '내가 원하는 선택과 현실적인 비용 사이에서 어떤 기준을 지킬지 구분하는 장면이 재물 해석의 중심에 있습니다.' }] },
+          { sectionType: 'wealth', state: 'complete', title: '자원을 관리하는 구조',
+            blocks: [{ type: 'paragraph', text: '돈을 한 덩어리로만 다루지 않고 지켜야 할 비용과 남길 자원을 구분하는 판단이 재물의 관리 관점으로 읽힙니다.' }] },
+        ],
+      },
+    };
+    const row = {
+      ...ROW,
+      approvedComponent: 'wealth',
+      sajuDomain: 'wealth',
+      readerCharacterIds: Object.freeze(['taegyeom']),
+      responseSnapshotJsonb: original,
+      responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(original),
+    };
+    let calls = 0;
+    const response = await handleOfficialReadingRecordRequestV1({
+      request: new Request('https://myeongha.internal/api/readings?readingId=' + READING_ID, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer member-secret',
+          Origin: 'https://myeongha.internal',
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }),
+      requestId: 'req-wealth-luna',
+      serverTime: '2026-11-19T00:00:00.000Z',
+      identityEvidenceVerifier: verifier(),
+      pool: fakePool({ rows: [row] }),
+      officialWealthLunaWriter: {
+        model: 'gpt-6-luna',
+        async readOrCreateValidated({source,validateDraft}) {
+          calls++;
+          expect(source.chapters).toHaveLength(2);
+          const chapters = source.chapters.map(chapter => {
+            const sourceAnchor = chapter.excerpts[0]!.slice(0, 29);
+            const paragraph = sourceAnchor +
+              ' 이것은 출생정보만으로 돈의 액수를 예측한다는 뜻이 아닙니다. 현재 확인된 두 종류의 판단 근거를 각각 따로 살펴보고 실제 사용 조건을 확인할 필요가 있습니다.';
+            return {index:chapter.index,title:chapter.title,sourceAnchor,
+              paragraphs:[paragraph,paragraph]};
+          });
+          return validateDraft({chapters});
+        },
+      },
+    });
+    expect(response.status).toBe(200);
+    const payload = await response.json() as {
+      ok:boolean;
+      data:{originalReadingUnchanged:boolean;chapters:unknown[]};
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.data.originalReadingUnchanged).toBe(true);
+    expect(payload.data.chapters).toHaveLength(2);
+    expect(calls).toBe(1);
+  });
+});
