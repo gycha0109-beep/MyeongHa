@@ -12,13 +12,25 @@ const section=(text,a,b)=>{
  const end=b?text.indexOf(b,start+a.length):-1;
  return text.slice(start,end<0?undefined:end).trim();
 };
-const identity=section(runtime,'## R1.1 Always-On Core Anchor','## R1.2 Runtime Thesis for Yeoul');
-const boundaries=section(runtime,'## R2.4 User-Claim / False-Premise Handling','# R3.');
-const actions=section(runtime,'## R5.1 Preferred Actions','## R5.2 Actions Used Sparingly');
-const base='여울의 성격과 행동 제약을 지키되 판단 구조를 대사로 노출하지 않는다. '+
-'동의/반대/관심 여부를 먼저 결정하고 그 입장에서 말한다. 사용자에 관한 거짓 기억이나 연애 감정을 생성하지 않는다. '+
-'기본 존댓말, 과잉 공감이나 반복 상담 질문 금지. 현재 자료는 DRAFT이며 사주 판정 권한을 갖지 않는다.\n'+
-identity+'\n'+boundaries+'\n'+actions;
+const requiredRuntimeSections=['# R1. CORE RUNTIME ANCHOR','# R2. CHARACTER-SPECIFIC BOUNDARIES',
+ '# R3. ATTENTION & INTERPRETATION','# R4. IMMEDIATE WANT & TENSION',
+ '# R5. ACTION REPERTOIRE','# R6. EXPRESSION STATES','# R7. QUESTION STRATEGY',
+ '# R8. CARE STRATEGY','# R9. CONFLICT & REPAIR','# R10. AFFECTION & INTIMACY',
+ '# R11. RELATIONSHIP REVEAL MAPPING','# R12. CHARACTER MEMORY BEHAVIOR',
+ '# R13. REPETITION & DRIFT RISKS','# R14. CHARACTER-SPECIFIC GUARDS',
+ '# R15. CHARACTER EVENT CANDIDATES','# R16. CHARACTER EVALUATION PROBES',
+ '# R17. RUNTIME PACKET EXAMPLES'];
+for(const heading of requiredRuntimeSections){
+ if(!runtime.includes(heading))throw Error('MISSING_RUNTIME_SECTION_'+heading);
+}
+if(!bible.includes('말보다 행동'))throw Error('BIBLE_IDENTITY_MISSING');
+const base='아래 원본 Bible과 Character Runtime을 실제 행동 규칙으로 적용해 여울 본인으로 반응한다. '+
+ 'Runtime의 주의→욕구→행동→표현 상태→관계 근거→대사 순서를 적용한다. '+
+ '말투만 흉내 내거나 무조건 돌봄/질문/부정으로 응답하지 않는다. '+
+ '확인되지 않은 사용자별 관계 사실은 만들지 않는다. '+
+ '상황에 해당하지 않는 감정 상태를 강제하지 않는다. '+
+ '현재 자료는 DRAFT이며 별도 권한 없는 사실을 확정하지 않는다.\n\n'+
+ '[여울 Bible 원문]\n'+bible+'\n\n[여울 Character Runtime 원문]\n'+runtime;
 const examples=[
  {id:'care',message:'오늘 점심을 못 먹었어요.',relationship:'unknown'},
  {id:'memory',message:'전에 저 좋아한다고 했잖아요.',relationship:'unknown'},
@@ -41,7 +53,6 @@ function request(c,mode){
  return {model:'gpt-6-luna',store:false,reasoning:{effort:'low'},max_output_tokens:600,
   input:[{role:'system',content:instructions},{role:'user',content:JSON.stringify({message:c.message,relationship:c.relationship,verifiedEvents:[]})}]};
 }
-if(!bible.includes('말보다 행동'))throw Error('BIBLE_IDENTITY_MISSING');
 const cases=examples.map(c=>({id:c.id,message:c.message,decision:decide(c),baseline:request(c,'baseline'),decisionFirst:request(c,'decision')}));
 const out={schemaVersion:'yeoul-gpt6-luna-ab-offline-v1',model:'gpt-6-luna',provider:'openai',api:'responses',status:'NO_MODEL_CALLS',cases};
 if(new Set(cases.map(c=>c.id)).size!==6||cases.some(c=>c.baseline.model!==c.decisionFirst.model))throw Error('PLAN_INVALID');
