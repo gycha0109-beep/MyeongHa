@@ -69,9 +69,10 @@ async function fetchJson(url,init){
 async function oneShotGuard(token){
   const url='https://api.github.com/repos/'+REPO+'/actions/workflows/'+WORKFLOW+'/runs?per_page=30';
   const {res,data}=await fetchJson(url,{headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json'}});
-  must(res.status===200 && data?.total_count===1 && data.workflow_runs?.length===1 &&
-    String(data.workflow_runs[0].id)===process.env.GITHUB_RUN_ID &&
-    data.workflow_runs[0].run_attempt===1,'RUN_ONCE_HISTORY');
+  const pushed=(data?.workflow_runs||[]).filter(run=>run.event==='push' && run.head_branch==='main');
+  must(res.status===200 && Number.isInteger(data?.total_count) && data.total_count<=100 &&
+    pushed.length===1 && String(pushed[0].id)===process.env.GITHUB_RUN_ID &&
+    pushed[0].run_attempt===1,'RUN_ONCE_HISTORY');
 }
 async function catalog(key){
   const headers={Authorization:'Bearer '+key,Accept:'application/json'};
