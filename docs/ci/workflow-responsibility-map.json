@@ -733,6 +733,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "character-runtime-lab"
+    },
+    "yeoul-compact-system-live-v1.yml": {
+      "responsibility": "character-runtime-lab-owner-manual-gpt6-luna-short-system-synthetic-evaluation",
+      "prMode": "none",
+      "mainMode": "manual-one-shot",
+      "workTrackAttribution": "character-runtime-lab"
     }
   }
 }
