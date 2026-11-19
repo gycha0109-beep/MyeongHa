@@ -242,7 +242,7 @@ export async function handleOfficialReadingRecordRequestV1(input: {
   const isLunaRequest = input.request.method === 'POST' && selector.key === 'readingId' &&
     input.officialWealthLunaWriter !== undefined;
   if (input.request.method !== GET_METHOD && !isLunaRequest) {
-    return new Response(null, { status: 405, headers: { Allow: 'GET, POST', 'Cache-Control': NO_STORE_CACHE_CONTROL } });
+    return new Response(null, { status: 405, headers: { Allow: GET_METHOD, 'Cache-Control': NO_STORE_CACHE_CONTROL } });
   }
 
   const requestId = requireString('request id', input.requestId);
