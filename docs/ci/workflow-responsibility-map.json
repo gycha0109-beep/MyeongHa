@@ -692,6 +692,12 @@
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
     },
+    "yeoul-identity-full-live-v2.yml": {
+      "responsibility": "character-runtime-lab-identity-explicit-complete-bible-runtime-standard-manual-luna-ab",
+      "prMode": "none",
+      "mainMode": "manual-one-shot",
+      "workTrackAttribution": "character-runtime-lab"
+    },
     "yeoul-gpt6-luna-ab-live-once-v1.yml": {
       "responsibility": "character-runtime-lab-owner-dispatched-gpt6-luna-six-synthetic-ab-comparison",
       "prMode": "none",
