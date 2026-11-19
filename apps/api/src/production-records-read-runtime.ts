@@ -10,6 +10,7 @@ import { handleReadingCreateRequestV1 } from './reading-create-http.js';
 import { handleReadingHistoryRequestV1 } from './reading-history-http.js';
 import { handleOfficialReadingRecordRequestV1 } from './official-reading-record-http.js';
 import type { AuthorizedOfficialWealthLunaWriterPortV1 } from './official-wealth-luna-reader-v1.js';
+import type { OfficialWealthLunaProductSourceAuthorityV1 } from './official-wealth-luna-product-source-v1.js';
 import {
   handleLifeRecordReadRequestV1,
   handleMemoryItemsReadRequestV1,
@@ -39,6 +40,7 @@ export interface CreateProductionRecordsReadRuntimeInputV1 {
   readonly approvedSajuArchiveEnabled?: true;
   /** Optional published, owner- and cost-verified Wealth Luna writer; disabled by default. */
   readonly officialWealthLunaWriter?: AuthorizedOfficialWealthLunaWriterPortV1;
+  readonly officialWealthLunaProductSource?: OfficialWealthLunaProductSourceAuthorityV1;
 }
 
 type RecordsReadHandlerV1 = (input: {
@@ -141,6 +143,7 @@ export function createProductionReadingHistoryReadRuntimeV1(
           pool: poolLease.pool,
           ...(input.approvedSajuArchiveEnabled === true ? { approvedSajuArchiveEnabled: true } : {}),
           ...(input.officialWealthLunaWriter === undefined ? {} : { officialWealthLunaWriter: input.officialWealthLunaWriter }),
+          ...(input.officialWealthLunaProductSource === undefined ? {} : { officialWealthLunaProductSource: input.officialWealthLunaProductSource }),
         });
       }
       if (requestInput.request.method === 'POST') {
@@ -148,7 +151,9 @@ export function createProductionReadingHistoryReadRuntimeV1(
         // Existing POST /api/readings remains Reading creation. Only an exact
         // owner-specific readingId POST can request a separately cost-admitted
         // Luna supplement; do not turn purchases into a free model endpoint.
-        if (input.officialWealthLunaWriter !== undefined && requestUrl.searchParams.has('readingId')) {
+        if (input.officialWealthLunaWriter !== undefined &&
+            input.officialWealthLunaProductSource !== undefined &&
+            requestUrl.searchParams.has('readingId')) {
           return handleOfficialReadingRecordRequestV1({
             request: requestInput.request,
             requestId: requestInput.requestId,
@@ -158,6 +163,7 @@ export function createProductionReadingHistoryReadRuntimeV1(
             ...(requestInput.trustedOriginalOriginV1 === true ? { trustedOriginalOriginV1: true as const } : {}),
             ...(input.approvedSajuArchiveEnabled === true ? { approvedSajuArchiveEnabled: true } : {}),
             ...(input.officialWealthLunaWriter === undefined ? {} : { officialWealthLunaWriter: input.officialWealthLunaWriter }),
+          ...(input.officialWealthLunaProductSource === undefined ? {} : { officialWealthLunaProductSource: input.officialWealthLunaProductSource }),
           });
         }
         const response = await handleReadingCreateRequestV1({
