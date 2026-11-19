@@ -187,9 +187,9 @@ export function validateOfficialWealthLunaDraftV1(
     }
     const paragraphs = item.paragraphs.map(p => (p as string).trim());
     if(isNotionSixChapterProduct && (
-      item.sourceAnchor.length < 20 ||
+      (item.sourceAnchor as string).length < 20 ||
       ['승인 의미 [','근거 블록:', '적용 조건:', '금지 확장:'].some(
-        marker => item.sourceAnchor.includes(marker)
+        marker => (item.sourceAnchor as string).includes(marker)
       ) || new Set(paragraphs).size !== paragraphs.length
     )) {
       throw new TypeError('Six-chapter product requires unique, meaning-anchored paragraphs');
