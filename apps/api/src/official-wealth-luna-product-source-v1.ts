@@ -20,12 +20,17 @@ export interface OfficialWealthLunaProductSourceAuthorityV1 {
 }
 
 export interface SignedNativeReadingToIssuedRecordBindingV1 {
-  /** Supplied by the existing signed canonical Saju Source verifier,
-   * not derived from the public request or from arbitrary raw text. */
+  /** Supplied by the existing signed canonical Saju Source verifier and the
+   * owner-scoped approved Reader authority, never by the client. Native
+   * Saju source IDs/hashes must NOT be confused with the issued DB IDs/hashes.
+   */
   readonly issuedReadingId: string;
-  readonly nativeReadingRef: string;
+  /** The archived DB Response digest is the V1 projected bundle source hash. */
+  readonly issuedResponseHash: `sha256:v1:${string}`;
+  readonly canonicalGroundingHash: string;
+  /** Preserved native source proof lineage; checked by signed source verifier. */
   readonly nativeSourceResponseHash: string;
-  readonly groundingHash: string;
+  readonly nativeExecutionAttemptId: string;
 }
 
 /**
@@ -45,12 +50,15 @@ export function buildNotionWealthSixChapterLunaSourceV1(input:Readonly<{
   const original=buildOfficialWealthLunaSourceV1(input.issued);
   if(original===null || input.placement.state!=='ready' ||
       input.placement.characterId!=='taegyeom')return null;
-  const {issuedReadingId,nativeReadingRef,nativeSourceResponseHash,groundingHash}=
-    input.verifiedBinding;
+  const {issuedReadingId,issuedResponseHash,canonicalGroundingHash,
+    nativeSourceResponseHash,nativeExecutionAttemptId}=input.verifiedBinding;
   if(issuedReadingId!==input.issued.readingId ||
-      nativeReadingRef!==input.placement.readingRef ||
-      nativeSourceResponseHash!==input.placement.sourceResponseHash ||
-      groundingHash!==input.placement.groundingHash) {
+      input.placement.readingRef!==issuedReadingId ||
+      !/^sha256:v1:[0-9a-f]{64}$/u.test(issuedResponseHash) ||
+      issuedResponseHash.slice('sha256:v1:'.length)!==input.placement.sourceResponseHash ||
+      canonicalGroundingHash!==input.placement.groundingHash ||
+      !/^[0-9a-f]{64}$/u.test(nativeSourceResponseHash) ||
+      !nativeExecutionAttemptId.trim()) {
     throw new TypeError('Wealth Luna product source does not match verified Saju origin');
   }
   const expected=getSajuProductChapterBlueprintV1('wealth');
@@ -106,6 +114,7 @@ export function buildNotionWealthSixChapterLunaSourceV1(input:Readonly<{
     productVersion:WEALTH_NOTION_LUNA_PRODUCT_SOURCE_VERSION_V1,
     readingId:original.readingId,
     groundingHash:input.placement.groundingHash,
+    issuedResponseHash, nativeSourceResponseHash,nativeExecutionAttemptId,
     planId:input.placement.planId,
     chapters,limitations,
   })).digest('hex');
