@@ -171,7 +171,7 @@ export function validateOfficialWealthLunaDraftV1(
         item.title !== original.title ||
         typeof item.sourceAnchor !== 'string' ||
         item.sourceAnchor.length < 12 ||
-        !original.excerpts.some(excerpt => excerpt.includes(item.sourceAnchor)) ||
+        !original.excerpts.some(excerpt => excerpt.includes(item.sourceAnchor as string)) ||
         !Array.isArray(item.paragraphs) ||
         item.paragraphs.length < 2 || item.paragraphs.length > 4 ||
         !item.paragraphs.every(p => typeof p === 'string' &&
@@ -179,7 +179,7 @@ export function validateOfficialWealthLunaDraftV1(
       throw new TypeError('Luna Wealth chapter is not grounded in its issued source');
     }
     const paragraphs = item.paragraphs.map(p => (p as string).trim());
-    if (!paragraphs.some(p => p.includes(item.sourceAnchor)) ||
+    if (!paragraphs.some(p => p.includes(item.sourceAnchor as string)) ||
         paragraphs.some(p => PROHIBITED_NEW_PREDICTION.test(p) ||
           findReadingPublicTrustLanguageViolationV1(p) !== null)) {
       throw new TypeError('Luna Wealth prose is missing its source anchor or violates the safety boundary');
