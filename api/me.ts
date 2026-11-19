@@ -828,9 +828,18 @@ export function toCanonicalMeRequestForTestV1(
     ? undefined
     : request.body ?? undefined;
 
+  const headers = canonicalizeRequestUiLocaleHeadersV1(request);
+  // Internal proof is minted only here from the original ingress Origin.
+  // Discard any browser-supplied lookalike before canonicalization.
+  headers.delete('x-myeongha-records-origin-admitted-v1');
+  if (target.kind === 'records' && target.route === READINGS_ROUTE &&
+      target.readingId !== undefined && request.method === 'POST' &&
+      request.headers.get('Origin') === new URL(request.url).origin) {
+    headers.set('x-myeongha-records-origin-admitted-v1', '1');
+  }
   return new Request(url, {
     method: request.method,
-    headers: canonicalizeRequestUiLocaleHeadersV1(request),
+    headers,
     ...(body === undefined ? {} : { body, duplex: 'half' as const }),
   } as RequestInit & { duplex?: 'half' });
 }
