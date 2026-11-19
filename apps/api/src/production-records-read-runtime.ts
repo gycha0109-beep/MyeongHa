@@ -20,6 +20,8 @@ export interface ProductionRecordsReadRequestV1 {
   readonly request: Request;
   readonly requestId: string;
   readonly serverTime: string;
+  /** Minted by the server ingress, never copied from request headers. */
+  readonly trustedOriginalOriginV1?: true;
 }
 
 export interface ProductionRecordsReadRuntimeV1 {
@@ -153,6 +155,7 @@ export function createProductionReadingHistoryReadRuntimeV1(
             serverTime: requestInput.serverTime,
             identityEvidenceVerifier,
             pool: poolLease.pool,
+            ...(requestInput.trustedOriginalOriginV1 === true ? { trustedOriginalOriginV1: true as const } : {}),
             ...(input.approvedSajuArchiveEnabled === true ? { approvedSajuArchiveEnabled: true } : {}),
             ...(input.officialWealthLunaWriter === undefined ? {} : { officialWealthLunaWriter: input.officialWealthLunaWriter }),
           });
