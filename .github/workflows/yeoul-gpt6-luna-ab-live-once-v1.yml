@@ -1,0 +1,26 @@
+name: Yeoul GPT-6 Luna decision A/B one-shot
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    if: github.actor == 'gycha0109-beep' && github.ref == 'refs/heads/main' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run 12 real GPT-6 Luna responses
+        env:
+          OPENAI_EVAL_API_KEY: ${{ secrets.OPENAI_EVAL_API_KEY }}
+        run: node scripts/character-optimization/yeoul-gpt6-luna-ab-live-once-v1.mjs
+      - name: Store private unreviewed results
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yeoul-gpt6-luna-ab-results
+          path: yeoul-gpt6-luna-ab-results.json
+          retention-days: 7
