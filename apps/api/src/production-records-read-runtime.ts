@@ -9,6 +9,7 @@ import {
 import { handleReadingCreateRequestV1 } from './reading-create-http.js';
 import { handleReadingHistoryRequestV1 } from './reading-history-http.js';
 import { handleOfficialReadingRecordRequestV1 } from './official-reading-record-http.js';
+import type { AuthorizedOfficialWealthLunaWriterPortV1 } from './official-wealth-luna-reader-v1.js';
 import {
   handleLifeRecordReadRequestV1,
   handleMemoryItemsReadRequestV1,
@@ -34,6 +35,8 @@ export interface CreateProductionRecordsReadRuntimeInputV1 {
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   /** Server-owned opt-in for an isolated approved Saju archive runtime. */
   readonly approvedSajuArchiveEnabled?: true;
+  /** Optional published, owner- and cost-verified Wealth Luna writer; disabled by default. */
+  readonly officialWealthLunaWriter?: AuthorizedOfficialWealthLunaWriterPortV1;
 }
 
 type RecordsReadHandlerV1 = (input: {
@@ -135,9 +138,25 @@ export function createProductionReadingHistoryReadRuntimeV1(
           identityEvidenceVerifier,
           pool: poolLease.pool,
           ...(input.approvedSajuArchiveEnabled === true ? { approvedSajuArchiveEnabled: true } : {}),
+          ...(input.officialWealthLunaWriter === undefined ? {} : { officialWealthLunaWriter: input.officialWealthLunaWriter }),
         });
       }
       if (requestInput.request.method === 'POST') {
+        const requestUrl = new URL(requestInput.request.url);
+        // Existing POST /api/readings remains Reading creation. Only an exact
+        // owner-specific readingId POST can request a separately cost-admitted
+        // Luna supplement; do not turn purchases into a free model endpoint.
+        if (requestUrl.searchParams.has('readingId')) {
+          return handleOfficialReadingRecordRequestV1({
+            request: requestInput.request,
+            requestId: requestInput.requestId,
+            serverTime: requestInput.serverTime,
+            identityEvidenceVerifier,
+            pool: poolLease.pool,
+            ...(input.approvedSajuArchiveEnabled === true ? { approvedSajuArchiveEnabled: true } : {}),
+            ...(input.officialWealthLunaWriter === undefined ? {} : { officialWealthLunaWriter: input.officialWealthLunaWriter }),
+          });
+        }
         const response = await handleReadingCreateRequestV1({
           request: requestInput.request,
           requestId: requestInput.requestId,
