@@ -10,6 +10,7 @@ jobs:
   synthetic-one-shot:
     name: One bounded GPT-6 Luna synthetic Reading
     if: github.actor == 'gycha0109-beep' && github.ref == 'refs/heads/main' && github.run_attempt == 1
+    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
