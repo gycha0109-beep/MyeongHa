@@ -46,14 +46,6 @@ export type WealthProductChapterPlacementDecisionV1 = Readonly<{
   missingChapterIds: readonly string[];
 }>;
 
-const FOCUS: readonly Readonly<{axis:readonly string[];role?:string}>[] = [
-  {axis:['wealth','structure','core_identity']},
-  {axis:['expression','action_style','work']},
-  {axis:['responsibility','wealth','decision_style']},
-  {axis:['tension','boundary'],role:'tension'},
-  {axis:['decision_style','learning','custom','wealth','tension']},
-];
-
 function deny(message: string): never {
   throw new TypeError('Wealth chapter source admission: '+message);
 }
@@ -158,41 +150,63 @@ export function buildWealthProductChapterPlacementV1(input:Readonly<{
   const disclosureRefs=input.grounding.disclosures.map(d=>d.disclosureRef);
   const scheduledDisclosures=new Set(plan.beats.filter(b=>b.kind==='protected_disclosure').map(b=>b.disclosureRef));
   for(const unit of selected)if(unit.requiredDisclosureRefs.some(ref=>!scheduledDisclosures.has(ref)))deny('plan omits required disclosure');
-  const used=new Set<string>();
-  const chapters:WealthChapterPlacementV1[]=[];
-  for(let i=0;i<FOCUS.length;i++){
-    const focus=FOCUS[i]!;
-    const candidates=selected.filter(u=>!used.has(u.unitId) &&
-      u.narrativeRole!=='limitation' &&
-      (focus.role===undefined || u.narrativeRole===focus.role) &&
-      focus.axis.includes(u.axis) &&
-      u.realizationPolicyRef!=='protected_only_v1');
-    // Existing ReadingPlan defines priority. Do not run a second ranking/selector.
-    const main=candidates[0];
-    if(main===undefined){
-      chapters.push(chapter({index:i,primary:[],supporting:[],tension:[],selected,disclosures:disclosureRefs}));
-      continue;
+  const allowed = selected.filter(u => u.narrativeRole !== 'limitation' &&
+    u.realizationPolicyRef !== 'protected_only_v1');
+  // V2 source-owned Wealth semantic payload already maps distinct structures
+  // to wealth / responsibility / tension / decision_style. The older V1
+  // grouping does not distinguish them; never infer which is which from prose.
+  const findAxis = (axis:string) => allowed.find(u => u.axis === axis);
+  const creation=findAxis('wealth');
+  const management=findAxis('responsibility');
+  const friction=allowed.find(u => u.axis==='tension' && u.narrativeRole==='tension');
+  const spending=findAxis('decision_style');
+  const distinct=allowed.filter((u,index)=>
+    allowed.findIndex(x=>x.axis===u.axis)===index);
+  const asRefs=(units:readonly (CharacterGroundingUnitViewV1|undefined)[])=>
+    units.filter((u):u is CharacterGroundingUnitViewV1=>u!==undefined).map(u=>u.unitId);
+  function withRequiredCompanions(primary:readonly string[], supporting:readonly string[], tension:readonly string[]){
+    const all=[...new Set([...primary,...supporting,...tension])];
+    const pending=[...all];
+    for(let i=0;i<pending.length;i++){
+      const u=indexed.get(pending[i]!);
+      if(!u)deny('missing selected canonical source');
+      for(const ref of u.requiredCompanionUnitRefs){
+        if(!selectedIds.includes(ref))deny('selected source omits required companion');
+        if(!all.includes(ref)){all.push(ref);pending.push(ref);}
+      }
     }
-    const companionIds=main.requiredCompanionUnitRefs;
-    if(companionIds.some(id=>!selectedIds.includes(id)))deny('selected claim has an unselected required companion');
-    const refs=[main.unitId,...companionIds];
-    refs.forEach(id=>used.add(id));
-    chapters.push(chapter({
-      index:i,
-      primary:[main.unitId],
-      supporting:refs.filter(id=>id!==main.unitId && indexed.get(id)?.narrativeRole!=='tension'),
-      tension:refs.filter(id=>id!==main.unitId && indexed.get(id)?.narrativeRole==='tension'),
-      selected,disclosures:disclosureRefs,
-    }));
+    return {
+      primary:Object.freeze([...primary]),
+      supporting:Object.freeze(all.filter(id=>!primary.includes(id) && indexed.get(id)?.narrativeRole!=='tension')),
+      tension:Object.freeze(all.filter(id=>!primary.includes(id) && indexed.get(id)?.narrativeRole==='tension')),
+    };
   }
-  const grounded=chapters.filter(c=>c.status==='grounded');
-  // A conclusion is a comparison of independently supported established claims,
-  // not a sixth invented claim or generic budgeting advice.
-  const first=grounded[0]?.primaryUnitIds[0];
-  const contrast=grounded.find(c=>c.chapterId==='wealth-04')?.primaryUnitIds[0] ??
-    grounded.find(c=>c.primaryUnitIds[0]!==first)?.primaryUnitIds[0];
-  const conclusionRefs=first&&contrast&&first!==contrast?[first,contrast]:[];
-  chapters.push(chapter({index:5,primary:conclusionRefs,supporting:[],tension:[],selected,disclosures:disclosureRefs}));
+  const make=(index:number,main:readonly (CharacterGroundingUnitViewV1|undefined)[],
+    context:readonly (CharacterGroundingUnitViewV1|undefined)[]=[])=>{
+    const mainRefs=asRefs(main), supportRefs=asRefs(context);
+    const split=withRequiredCompanions(mainRefs,supportRefs,[]);
+    return chapter({index,...split,selected,disclosures:disclosureRefs});
+  };
+  const chapters:WealthChapterPlacementV1[]=[];
+  // Opening: the full structure, not a fourth unsupported standalone claim.
+  chapters.push(distinct.length>=2 && creation
+    ? make(0,[creation],[management,friction,spending]) : make(0,[]));
+  // Origin: approved value-creation evidence, never predicted income.
+  chapters.push(make(1,[creation]));
+  // Earned vs retained: both sides must actually exist, not generic budgeting.
+  chapters.push(creation && management
+    ? make(2,[management],[creation]) : make(2,[]));
+  // Friction: only a real tension Claim, not a guess about spending habits.
+  chapters.push(make(3,[friction],[management,spending]));
+  // Individual deep chapter: at least three different approved structural
+  // axes jointly present; the writer may contrast them, not invent a fourth.
+  chapters.push(creation && management && friction &&
+    new Set([creation.axis,management.axis,friction.axis]).size===3
+    ? make(4,[friction],[creation,management,spending]) : make(4,[]));
+  // Conclusion is an editorial synthesis of verified claims, never a new
+  // fortune or investment recommendation.
+  chapters.push(creation && management && friction
+    ? make(5,[creation,management,friction],[spending]) : make(5,[]));
   const missing=chapters.filter(c=>c.status!=='grounded').map(c=>c.chapterId);
   return Object.freeze({
     version:SAJU_WEALTH_CHAPTER_PLACEMENT_VERSION_V1,
