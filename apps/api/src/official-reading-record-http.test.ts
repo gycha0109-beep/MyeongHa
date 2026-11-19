@@ -62,6 +62,7 @@ function fakePool(input: {
   readonly onBirthQuery?: (values: readonly unknown[]) => void;
   readonly onRollback?: () => void;
   readonly archiveRows?: readonly object[];
+  readonly approvedRows?: readonly object[];
 } = {}): PostgresSubjectPoolV1 {
   return {
     async connect(): Promise<PostgresSubjectConnectionV1> {
@@ -101,6 +102,9 @@ function fakePool(input: {
           if (text.includes('qry_official_reading_record_runtime_v1')) {
             input.onAuthorityQuery?.(values ?? []);
             return { rows: (input.rows ?? [ROW]) as readonly ResultRow[] };
+          }
+          if (text.includes('qry_approved_saju_component_record_v1')) {
+            return { rows: (input.approvedRows ?? []) as readonly ResultRow[] };
           }
           if (text.includes('qry_approved_saju_purchase_readings_v1')) {
             expect(values).toEqual([SUBJECT_ID, PURCHASE_ID]);
@@ -329,6 +333,18 @@ describe('Official Reading separate Wealth Luna route', () => {
       responseSnapshotJsonb: original,
       responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(original),
     };
+    const approvedRow = {
+      ...row,
+      component: 'wealth',
+      productId: '77777777-7777-4777-8777-777777777777',
+      readerCharacterId: 'taegyeom',
+      readerContentBundleId: '88888888-8888-4888-8888-888888888888',
+      sourceBirthRevisionId: '99999999-9999-4999-8999-999999999999',
+      domainCapabilityVersion: 'v1',
+      sajuEngineVersion: 'v1',
+      issuedRevisionNo: 1,
+      currentRevisionNo: 1,
+    };
     let calls = 0;
     const response = await handleOfficialReadingRecordRequestV1({
       request: new Request('https://myeongha.internal/api/readings?readingId=' + READING_ID, {
@@ -343,7 +359,8 @@ describe('Official Reading separate Wealth Luna route', () => {
       requestId: 'req-wealth-luna',
       serverTime: '2026-11-19T00:00:00.000Z',
       identityEvidenceVerifier: verifier(),
-      pool: fakePool({ rows: [row] }),
+      pool: fakePool({ approvedRows: [approvedRow] }),
+      approvedSajuArchiveEnabled: true,
       officialWealthLunaWriter: {
         model: 'gpt-6-luna',
         async readOrCreateValidated({source,validateDraft}) {

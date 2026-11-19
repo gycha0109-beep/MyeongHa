@@ -126,7 +126,7 @@ export function createOpenAiOfficialWealthLunaWriterV1(
   const send=config.fetchImpl??fetch;
   return Object.freeze({
     model:OFFICIAL_WEALTH_LUNA_MODEL_ID_V1,
-    async readOrCreateValidated(input){
+    async readOrCreateValidated(input: Parameters<AuthorizedOfficialWealthLunaWriterPortV1['readOrCreateValidated']>[0]){
       const decision=await config.authority.admit({
         readingId:input.source.readingId,sourceHash:input.source.sourceHash,
         readerCharacterId:'taegyeom',model:OFFICIAL_WEALTH_LUNA_MODEL_ID_V1,

@@ -1,0 +1,38 @@
+name: Wealth Luna Synthetic One-Shot
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: wealth-luna-synthetic-one-shot
+  cancel-in-progress: false
+jobs:
+  synthetic-one-shot:
+    name: One bounded GPT-6 Luna synthetic Reading
+    if: github.actor == 'gycha0109-beep' && github.ref == 'refs/heads/main' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build source without production activation
+        run: npm run build
+      - name: Call the exact Luna model once against synthetic source only
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: node scripts/saju/wealth-luna-synthetic-one-shot.mjs
+      - name: Keep synthetic-only, non-public review output for three days
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wealth-luna-synthetic-review
+          path: |
+            wealth-luna-synthetic-probe.json
+            wealth-luna-synthetic-probe.html
+          if-no-files-found: ignore
+          retention-days: 3
