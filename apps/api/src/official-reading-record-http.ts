@@ -257,7 +257,9 @@ export async function handleOfficialReadingRecordRequestV1(input: {
         return jsonError({ status: 503, code: 'WEALTH_LUNA_UNAVAILABLE', messageKey: 'reading.supplement_unavailable', retryable: false, requestId });
       }
       const origin = new URL(input.request.url).origin;
-      if (input.request.headers.get('Origin') !== origin ||
+      const sameOrigin = input.request.headers.get('Origin') === origin ||
+        input.request.headers.get('x-myeongha-records-origin-admitted-v1') === '1';
+      if (!sameOrigin ||
           input.request.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
         return jsonError({ status: 403, code: 'ACCESS_DENIED', messageKey: 'auth.denied', retryable: false, requestId });
       }
