@@ -703,6 +703,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "character-runtime-lab"
+    },
+    "yeoul-three-model-comparison-once-v1.yml": {
+      "responsibility": "character-runtime-lab-owner-requested-bounded-yeoul-three-model-synthetic-benchmark",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "character-runtime-lab"
     }
   }
 }
