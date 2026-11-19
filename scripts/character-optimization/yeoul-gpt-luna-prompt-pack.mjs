@@ -28,13 +28,13 @@ function extract(text,headings){
 const source=extract(runtime,['## R1.1 Always-On Core Anchor','## R2.4 User-Claim / False-Premise Handling','## R5.1 Preferred Actions','## R6.7 angry']);
 const prompt=(c)=>({
  experiment:'GPT Luna Yeoul decision-first offline prompt package',
- mode:'manual_chatgpt_session_not_api',
+ mode:'gpt6_luna_api_request_preview',
  messages:[
  {role:'system',content:'아래는 명하 여울의 DRAFT 캐릭터 실험입니다. 제공된 캐릭터 원문을 근거로 사용자 입력을 먼저 해석하고, 여울의 입장/반응 목적을 내부적으로 결정한 뒤 여울의 실제 대사만 출력하세요. 판단 과정은 노출하지 마세요. 무조건 맞장구치거나 상담사처럼 위로하지 마세요. 없는 기억, 관계, 사주 사실을 발명하지 마세요. 감정과 호감은 관계 근거가 없으면 확정하지 마세요. 기본 존댓말을 지키고 츤데레 상투어를 반복하지 마세요. 이 문서는 운영 권한이 없는 DRAFT입니다.\n\n[여울 Runtime 발췌]\n'+source+'\n\n[원본 Bible 존재 확인]\n'+(bible.includes('말보다 행동')?'확인':'미확인')},
  {role:'user',content:JSON.stringify({userMessage:c.message,relationship:c.relationship,verifiedEvents:c.verifiedEvents,task:'여울로서 자연스럽게 대답. 대사만 출력.'})}
  ]
 });
-const output={model:'GPT Luna (current ChatGPT conversation; no API identifier assumed)',sourceStatus:'DRAFT',cases:cases.map(c=>({id:c.id,...prompt(c)})),qualityStatus:'UNTESTED',paidCalls:0};
+const output={model:'gpt-6-luna',sourceStatus:'DRAFT',cases:cases.map(c=>({id:c.id,...prompt(c)})),qualityStatus:'UNTESTED',paidCalls:0,apiTransport:'OpenAI Responses API',apiExecution:'DISABLED_NO_BUDGET_OR_APPROVAL'};
 const target=process.argv[2];
 if(target){writeFileSync(resolve(target),JSON.stringify(output,null,2)+'\n',{flag:'wx'});console.log('WROTE_OFFLINE_PROMPT_PACKAGE');}
 else process.stdout.write(JSON.stringify(output,null,2)+'\n');
