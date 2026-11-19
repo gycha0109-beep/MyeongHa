@@ -84,14 +84,20 @@ describe('Notion approved saju product chapter blueprints',()=>{
 describe('Source-owned Wealth 6-chapter placement',()=>{
   const units=[unit(1,'wealth'),unit(2,'expression'),unit(3,'responsibility'),
     unit(4,'tension','tension'),unit(5,'learning')];
-  it('places actual selected meanings in five distinct chapters and concludes from two verified units',()=>{
+  it('reuses three independent approved structures for six different reader questions without new claims',()=>{
     const result=buildWealthProductChapterPlacementV1(caseInput(units));
     expect(result.state).toBe('ready');
     expect(result.chapters.map(x=>x.fixedTitle)).toEqual(titles);
     expect(result.chapters.map(x=>x.status)).toEqual(Array(6).fill('grounded'));
-    const selected=result.chapters.slice(0,5).flatMap(c=>c.primaryUnitIds);
-    expect(new Set(selected).size).toBe(5);
-    expect(result.chapters[5]?.primaryUnitIds).toEqual([units[0]!.unitId,units[3]!.unitId]);
+    expect(result.chapters[1]?.primaryUnitIds).toEqual([units[0]!.unitId]);
+    expect(result.chapters[2]?.primaryUnitIds).toEqual([units[2]!.unitId]);
+    expect(result.chapters[3]?.primaryUnitIds).toEqual([units[3]!.unitId]);
+    expect(result.chapters[4]?.primaryUnitIds).toEqual([units[3]!.unitId]);
+    expect(result.chapters[4]?.supportingUnitIds).toContain(units[0]!.unitId);
+    expect(result.chapters[4]?.supportingUnitIds).toContain(units[2]!.unitId);
+    expect(result.chapters[5]?.primaryUnitIds).toEqual([
+      units[0]!.unitId,units[2]!.unitId,units[3]!.unitId,
+    ]);
     for(const chapter of result.chapters){
       expect(chapter.evidence.length).toBeGreaterThan(0);
       expect(chapter.evidence.every(e=>e.canonicalMeaning.includes('승인된 근거 의미'))).toBe(true);
