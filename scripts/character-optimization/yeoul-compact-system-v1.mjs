@@ -74,6 +74,7 @@ export function buildCompact(id){
  return {id,system:SYSTEM,user,sourceHeadings:chosen,systemLength:SYSTEM.length,
   contextLength:context.length,sourceHash:{bible:sha(bible),runtime:sha(runtime)}};
 }
+export {cases};
 if(process.argv.includes('--preview')){
  const outputs=cases.map(c=>buildCompact(c.id));
  console.log(JSON.stringify({system:SYSTEM,systemLength:SYSTEM.length,
