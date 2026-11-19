@@ -1,0 +1,45 @@
+name: "[WT:character-runtime-lab] Yeoul identity full-source GPT-6 Luna A/B"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: yeoul-full-bible-runtime-retake-20261119
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    if: ${{ github.actor == 'gycha0109-beep' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - name: Validate identity, complete source injection and role-only delta
+        run: |
+          node --check scripts/character-optimization/yeoul-identity-full-prompt-v2.mjs
+          node --check scripts/character-optimization/yeoul-identity-full-live-v2.mjs
+          node scripts/character-optimization/yeoul-identity-full-prompt-v2.mjs --preview
+          node scripts/character-optimization/yeoul-identity-full-live-v2.mjs --plan-only
+      - name: Generate 8 pairs with same GPT-6 Luna model
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: node scripts/character-optimization/yeoul-identity-full-live-v2.mjs
+      - name: Save real responses including incomplete results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: yeoul-identity-full-live-${{ github.run_id }}
+          path: yeoul-identity-full-live-results.json
+          retention-days: 7
+          if-no-files-found: ignore
