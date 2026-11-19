@@ -29,7 +29,7 @@ const refs=['a','b','c','d','e','f'];
 function placement():WealthProductChapterPlacementDecisionV1{
   return {
     version:'myeongha-saju-wealth-source-owned-chapter-placement-v1',
-    state:'ready',readingRef:'native-reading-ref-1',
+    state:'ready',readingRef:ID,
     characterId:'taegyeom',sourceResponseHash:'a'.repeat(64),
     groundingHash:'b'.repeat(64),planId:'source-selected-plan',
     missingChapterIds:[],
@@ -54,8 +54,9 @@ function input(){
  const valid=placement();
  return {
   issued:record(),placement:valid,
-  verifiedBinding:{issuedReadingId:ID,nativeReadingRef:valid.readingRef,
-    nativeSourceResponseHash:valid.sourceResponseHash,groundingHash:valid.groundingHash},
+  verifiedBinding:{issuedReadingId:ID,issuedResponseHash:'sha256:v1:'+valid.sourceResponseHash,
+    canonicalGroundingHash:valid.groundingHash,
+    nativeSourceResponseHash:'c'.repeat(64),nativeExecutionAttemptId:'native-exec-proof-1'},
   requiredProtectedDisclosures:{'mandatory-caution':'해당 조건은 확정된 미래 사건을 뜻하지 않습니다.'},
  };
 }
@@ -77,7 +78,9 @@ describe('Approved 6-chapter Luna wealth authoring source',()=>{
   const broken=[...p.placement.chapters];
   broken[2]={...broken[2]!,fixedTitle:'일반적인 예산 관리'};
   expect(buildNotionWealthSixChapterLunaSourceV1({...p,placement:{...p.placement,chapters:broken}})).toBeNull();
-  expect(()=>buildNotionWealthSixChapterLunaSourceV1({...p,verifiedBinding:{...p.verifiedBinding,groundingHash:'c'.repeat(64)}})).toThrow('origin');
+  expect(()=>buildNotionWealthSixChapterLunaSourceV1({...p,verifiedBinding:{...p.verifiedBinding,canonicalGroundingHash:'c'.repeat(64)}})).toThrow('origin');
   expect(()=>buildNotionWealthSixChapterLunaSourceV1({...p,requiredProtectedDisclosures:{}})).toThrow('disclosure');
+  expect(()=>buildNotionWealthSixChapterLunaSourceV1({...p,verifiedBinding:{...p.verifiedBinding,issuedResponseHash:'sha256:v1:'+'0'.repeat(64)}})).toThrow('origin');
+
  });
 });
