@@ -60,10 +60,10 @@ export function ReadingDetailPage() {
           <h2>해석의 적용 범위</h2>
           <p data-official-report-notice-text />
         </aside>
-        <section className="official-report-luna" data-wealth-luna-reader hidden aria-label="태겸의 재물운 심층 해설">
+        <section className="official-report-luna" data-wealth-luna-reader hidden aria-labelledby="official-wealth-luna-heading">
           <header className="official-report-luna-heading">
             <span className="reading-route-kicker">TAEGYEOM · LUNA NARRATION</span>
-            <h2>태겸의 심층 해설</h2>
+            <h2 id="official-wealth-luna-heading">태겸의 심층 해설</h2>
             <p>공식 보고서의 명리 판단은 바꾸지 않고, 해당 근거를 태겸의 말로 풀어낸 별도 보충 해설입니다.</p>
           </header>
           <button type="button" data-wealth-luna-load>태겸의 심층 해설 읽기</button>
