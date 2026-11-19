@@ -77,12 +77,13 @@ try {
    promptSha256:{noRole:p.plain.promptSha256,roleFramed:p.framed.promptSha256},
    sourceHeadings:{runtime:p.plain.runtimeSections,bible:p.plain.bibleSections},
    noRole:null,roleFramed:null};
+  result.responses.push(row);
+  persist();
   for(const [arm,packet] of [['noRole',p.plain],['roleFramed',p.framed]]){
    row[arm]=await infer(packet);
    persist();
    console.log('YEOUL_ROLE_CALL',JSON.stringify({caseId:p.id,arm,completed:result.completedCalls}));
   }
-  result.responses.push(row);
   persist();
   console.log('YEOUL_ROLE_PAIR',JSON.stringify({caseId:p.id,pairs:result.responses.length}));
  }
