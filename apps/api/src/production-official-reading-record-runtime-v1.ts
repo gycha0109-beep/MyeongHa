@@ -1,5 +1,6 @@
 import type { createAdminAnalyticsVerifiedReadingAdapterV1 } from './admin-analytics-verified-reading-v1.js';
 import { handleOfficialReadingRecordRequestV1 } from './official-reading-record-http.js';
+import type { AuthorizedOfficialWealthLunaWriterPortV1 } from './official-wealth-luna-reader-v1.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
@@ -21,6 +22,8 @@ export interface ProductionOfficialReadingRecordRequestV1 {
 export function createProductionOfficialReadingRecordRuntimeV1(input:{
   readonly env:ProductionUserDataRuntimeEnvV1;
   readonly pool?:PostgresSubjectPoolV1;
+  /** No production Luna call is enabled without explicit published/paid authority. */
+  readonly officialWealthLunaWriter?:AuthorizedOfficialWealthLunaWriterPortV1;
   readonly memberFetchImpl?:SupabaseMemberVerifierFetchV1;
   /** An explicitly approved, consent-bound server analytics adapter only.
    * The adapter independently verifies stored succeeded Reading state.
@@ -38,6 +41,7 @@ export function createProductionOfficialReadingRecordRuntimeV1(input:{
     handleRequest(req:ProductionOfficialReadingRecordRequestV1):Promise<Response>{
       return handleOfficialReadingRecordRequestV1({
         ...req,identityEvidenceVerifier,pool:lease.pool,
+        ...(input.officialWealthLunaWriter===undefined?{}:{officialWealthLunaWriter:input.officialWealthLunaWriter}),
         ...(input.verifiedReadingAnalytics===undefined?{}:{verifiedReadingAnalytics:input.verifiedReadingAnalytics}),
       });
     },
