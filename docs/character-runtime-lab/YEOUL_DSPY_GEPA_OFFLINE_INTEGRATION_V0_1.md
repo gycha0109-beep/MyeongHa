@@ -25,6 +25,21 @@ PowerShell은 Scripts/python.exe를 사용하고 Unix는 bin/python을 사용한
 - 모의 개선 제안자가 표현 지시문을 한 번 수정하고, 실제 GEPA가 합성 기준 점수로 후보 2개 중 새로운 지시문을 선택하는 것까지 검증했다. 모델 대사 자체는 전후 동일하다. 이는 실제 대사 개선, 사주 보고서 품질, 사람 평가, 독립 holdout, 운영 배포와 전혀 다르다.
 - 이 파일럿은 캐릭터 표현 슬롯만 다루며 Canon, 사용자 관계, 사주 사실, 기억을 변경하지 않는다.
 
+## 실측 코퍼스 수집 연결 — 2026-11-20
+
+- `yeoul_dspy_actual_corpus.py`: GitHub Actions 44664993665의 실제 GPT-6 Luna 9쌍/18개 결과를 검증한 뒤 DSPy Example으로 불러온다.
+- `--summary`는 실행 상황·대사 개수·원본 SHA-256·검토 상태만 내보낸다. `--review-template`는 선택 가능한 v5/v6 선호 및 자연성·인물성 평가 칸을 **모두 null**로 생성한다.
+- Academy PC에서 실측 9쌍/18개 파싱 성공. 관계 unknown 4 / acquaintance 4 / close 1. 사용자 선호 평가 0건.
+- `gepa_learning_ready=false`: **실측 응답을 GEPA가 개선한 것 아님**. 실측 코퍼스 파싱과 별도 합성 GEPA 후보 탐색만 실행했다. 사람의 점수를 임의 작성하거나 공개 실측을 봉인 평가라 부르지 않는다.
+- 실제 응답 원문·비공개 평가 파일은 로컬에만 보관하고 PR에는 올리지 않는다.
+
+로컬 실행 예:
+
+```
+python research/character-optimization-gepa/yeoul_dspy_actual_corpus.py --input /path/to/yeoul-v6-comparison-results.json --summary /private/out/import-summary.json --review-template /private/out/human-review-template.json
+python -m unittest discover -s research/character-optimization-gepa -p 'test_yeoul_dspy*.py'
+```
+
 ## 다음 실제 구현
 
 1. 기존 v5·v6 응답과 사람이 평가한 데이터 연결. 기공개 9쌍은 개발 자료로 사용하고 봉인된 독립 검증으로 승격하지 않는다.
