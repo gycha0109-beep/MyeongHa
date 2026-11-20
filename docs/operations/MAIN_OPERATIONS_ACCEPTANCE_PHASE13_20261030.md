@@ -1,3 +1,33 @@
+## 2026-11-14 23:28 KST — exact deployed Worker/main Phase 13 read-only acceptance snapshot
+
+**Evidence source:** Cloudflare read-only deployments, exact Worker-version Builds metadata, GitHub main read-only collector, and anonymous/no-credential HTTP header/status checks. This snapshot is specific to version `a3f08d90-7034-4a1b-b339-0cec91e74325`; a later deployment invalidates its claim to be *current*. No provider setting, Worker, DB, authentication identity, paid action, or other Production state was modified.
+
+- Cloudflare Worker `myeongha`: 100% deployed version `a3f08d90-7034-4a1b-b339-0cec91e74325` (deployment observation `2026-11-14T14:28:46.602935Z`); linked successful Worker Build `507047e2-a861-4f84-9148-c5cbdbc7b867`. Build trigger `push_event` from `main` at exact source SHA `333dc44b314ca6f8da6c0d2cd84295d0eb913e5b`, which matched GitHub main at that observation.
+- Existing read-only `scripts/operations/inspect-main-operations-acceptance.mjs --sha 333dc44b314ca6f8da6c0d2cd84295d0eb913e5b`: `sourceIsCurrentMain=true`. Exact-main workflow SUCCESS: [CI #43604877652](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43604877652), [Governance #43604877545](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43604877545), [Web Browser Smoke #43604877452](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43604877452), [Supabase Production #43604877474](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43604877474). **Supabase deploy-migrations job = SKIPPED**, not evidence of an applied migration. The collector itself reports `acceptanceDecision=NOT_EVALUATED_BY_COLLECTOR`.
+- Cloudflare Worker logging settings read-only inspection: observability/log persistence `enabled=true`, `head_sampling_rate=1`, invocation logs `false`, traces `false`, **`redact_query_string=false`**. Cloudflare [current configuration reference](https://developers.cloudflare.com/workers/wrangler/configuration/) defines this flag as whether query strings are removed from request URLs in logs/traces; the configured false value is a **privacy redaction gap to assess**, not evidence that any specific personal data was logged. Account-level Worker metric export list returned **0 exports**; this does **not** imply no built-in platform metrics. No raw logs or URL query values were requested, and no production setting was changed. §33 items 12/13 remain not accepted.
+- No-credential live probes, all with exact same `x-myeongha-worker-version` header and `Cache-Control: no-store`: `GET /api/health` `200`, `GET /api/readiness` `200`, `GET /api/me` `401`, `GET /api/me/shared-memory` `404`, `GET /api/me/saju/calculation` `405` (method fence), `POST /api/me/saju/calculation` `401`. No request supplied a bearer token, real user identifier, birth data, payment, message body or personal record. **404 on shared memory is an unconnected route, not proof of authorized private read.**
+
+| §33 | Requirement | Exact-version evidence and remaining acceptance boundary |
+|---|---|---|
+| 1 | expected source SHA / OCI digest | **Worker SHA verified** through 100% deployed version→Build→GitHub main. Saju OCI/digest equivalence **not observed** |
+| 2 | provider deployment state | **Worker 100% deployment and successful build observed**. Other provider services not accepted |
+| 3 | configuration preflight without secrets | **Not accepted**; live full secret/config preflight not observed |
+| 4 | liveness | **Observed** `/api/health 200` at pinned version |
+| 5 | readiness/capability for assigned traffic | **Configuration readiness 200 observed**, DB/Auth/Saju actual dependency readiness not observed |
+| 6 | negative auth smoke | **Observed limited anonymous Member and Saju POST 401**; not a complete role/method coverage |
+| 7 | positive authenticated synthetic smoke | **Not observed** at pinned version; no synthetic login or mutation run |
+| 8 | required dependency check | **Not observed** as live positive Auth/DB/Saju request path |
+| 9 | MyeongHa ↔ Saju contract | **Not observed** at pinned production version; prior isolated Saju tests remain separate |
+| 10 | user-private no-store/cache | **Observed no-store on six tested responses**; full authenticated private path/CDN isolation not accepted |
+| 11 | secret non-reflection | **Not accepted**; public status/header checks do not prove full body/log redaction |
+| 12 | log presence/redaction | **Not observed** for pinned deployment |
+| 13 | metrics presence | **Not observed** for pinned deployment and dependencies |
+| 14 | identified rollback candidate | Previous 100% Worker version `bb6b06aa-c842-40ed-86eb-93e86863e697`, successful Build from `main=ffc908adf3d190da0b86ca2b2c63baf437fae966` is a **historical candidate only**. Compatibility, rollback authority and actual switch **not accepted** |
+
+**Non-promotion:** `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false`, `productionCapacityProven=false`. The source/Provider/limited ingress portions have immutable observation evidence; positive authenticated smoke, dependency health, Saju compatibility, full private cache/log/metrics, safe rollback, Production DB normalization and Hosted/Privacy DR remain separate requirements. Do not rerun prior accepted isolation tests or interpret `readiness 200` as dependency readiness. A future main/Worker version must be re-pinned.
+
+Watchtower-Track: ops
+
 # Phase 13 — Main-commit production operations acceptance evidence
 
 Source: `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md` §33, §38 Phase 13.

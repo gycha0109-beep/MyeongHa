@@ -1,3 +1,13 @@
+## 2026-11-14 Phase 13 최신 배포 14항목 대조 — 소스·익명 범위 부분 실측, 전체 수용 HOLD
+
+- [PR #3315](https://github.com/gycha0109-beep/MyeongHa/pull/3315) 병합/Integration [#43599753824](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43599753824) SUCCESS, Phase 11 느린 DB·획득 대기 초과 격리 실증 문서 정본 반영 완료. 이미 성공한 실험 반복하지 않음.
+- 2026-11-14 23:28 KST 관측 Worker 100% 버전 `a3f08d90-7034-4a1b-b339-0cec91e74325`, 성공 빌드 `507047e2-a861-4f84-9148-c5cbdbc7b867`에서 확인한 source SHA `333dc44b314ca6f8da6c0d2cd84295d0eb913e5b`가 조회 당시 GitHub `main`과 정확히 일치. 4개 main 워크플로 읽기 전용 증거는 SUCCESS, Supabase Production `deploy-migrations`만 `SKIPPED`. 실제 DB 정합화 작업으로 승격 금지.
+- 비인증 실측 `/api/health=200`, `/api/readiness=200`, `/api/me=401`, 사주 POST=401 및 GET=405, 공유 메모리 404(미연결), 전 응답 `no-store`·배포 버전 헤더 일치. 설정 기반 readiness/음성 인증/limited cache만 수용한 근거임. 전체 14항목 정본 판정은 [Phase 13 버전별 수용 행렬](MAIN_OPERATIONS_ACCEPTANCE_PHASE13_20261030.md). 다른 배포가 등장하면 다시 source/버전 대조 필요.
+- **Phase 8-C 실시간 차단 재확인(2026-11-14 UTC):** Production read-only 이력 `245` / `20261113062455`, `2360/2370/2380=0`, 공유 메모리·삭제 이벤트 테이블 모두 부재. 최신 암호화 개인정보 원장 수집 [#43605171278](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43605171278)에서 `public.subject_shared_memory_delete_events_v1` 관계 부재로 READ ONLY export FAIL; 최신성 감시 [#43604009868](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43604009868)는 `CAPTURE_COMPLETION_STALE` FAIL(최근 완료 원장 없음). 이는 원장 재생/삭제 연속성 **운영 미충족**이지 CI 진단 오류가 아님. 개인정보 검사 비활성화·임의 역사 repair 금지. 기존 2360→2370→2380 최소 적용 후보는 실제 배포 의존성과 개인정보 영향 재확인 및 사용자 명시 승인 전 적용 금지.
+- **다음 필수:** 출시 기능·현재 배포 의존성에 맞춘 Production 최소 정합화(사용자 승인 전 DB 변경 금지), 실제 Hosted Auth/Storage/Provider DR·개인정보 독립 연속성, 인증 synthetic positive smoke·현재 Saju 계약·메트릭/로그/rollback 수용, Phase 12 수동 확장 기준 및 §34/§35 잔여 항목. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false` 유지. 새 기능을 임의로 추가하지 않음.
+
+Watchtower-Track: ops
+
 ## 2026-11-14 — Phase 11 느린 DB·연결 획득 대기 초과 실제 격리 검증 PASS
 
 - **정본 실행:** [보호 Linux 실행 #43597769780](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43597769780) `SUCCESS`, `main=5ad56e5775644e656db6b1029612c3911c5032a8`, 수동 `workerd_db_slow_pool`. [PR #3310](https://github.com/gycha0109-beep/MyeongHa/pull/3310) `MERGED` 및 [정확한 수정 HEAD 통합 CI #43594107224](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43594107224) `SUCCESS`. 이전 실패 실행 [#43592572032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43592572032)은 역사적 실패 증거로 보존하며 완료로 승격하지 않음.
