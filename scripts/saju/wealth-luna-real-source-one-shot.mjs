@@ -56,7 +56,13 @@ const chapters=original.chapters.map((chapter,index)=>{
         unitIds.has(unit.unitId))throw Error('Saju material lacks traceable canonical meaning');
     unitIds.add(unit.unitId);
     used.add(unit.unitId);sourceIds++;
+    if(!Array.isArray(unit.tenGodFamilies)||unit.tenGodFamilies.length===0 ||
+        !unit.tenGodFamilies.every(f=>['output','wealth','officer','peer','resource'].includes(f)) ||
+        typeof unit.tenGodReason!=='string'||unit.tenGodReason.length<30){
+      throw Error('Missing actual Ten-God rule premises for report meaning');
+    }
     return '승인 의미 ['+unit.unitId+']\n'+unit.canonicalMeaning+
+      '\n실제 명리 판단 조건: '+unit.tenGodReason+
       '\n근거 블록: '+unit.sourceRefs.join(' · ')+
       '\n이 장의 질문: '+chapter.question;
   });
