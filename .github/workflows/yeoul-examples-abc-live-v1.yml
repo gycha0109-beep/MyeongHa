@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
-      - name: Validate three prompt variants
+      - name: Validate lively v4 comparison
         run: |
           node --check scripts/character-optimization/yeoul-lively-voice-v4.mjs
           node --check scripts/character-optimization/yeoul-lively-v4-live-v1.mjs
@@ -34,7 +34,7 @@ jobs:
         with:
           name: yeoul-lively-v4-${{ github.run_id }}
           path: |
-            yeoul-lively-v4-results.json
+            yeoul-lively-v4-live-results.json
             yeoul-lively-v4-comparison.html
           retention-days: 7
           if-no-files-found: ignore
