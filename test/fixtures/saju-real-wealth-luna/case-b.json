@@ -1,0 +1,327 @@
+{
+  "schemaVersion": "saju-wealth-real-source-sixchapter-demo-v1",
+  "status": "SOURCE_COMPLETE_FOR_RESEARCH",
+  "productionIssuance": false,
+  "customerPurchased": false,
+  "readerDraft": false,
+  "label": "case-b",
+  "birthInput": {
+    "calendarType": "solar",
+    "date": {
+      "year": 2003,
+      "month": 7,
+      "day": 17
+    },
+    "time": {
+      "known": true,
+      "hour": 8,
+      "minute": 15
+    }
+  },
+  "officialReportHash": "6124ac4e58d7763198e99788cec0b3028aa07d73a6c290205921ec217fd4722e",
+  "evidenceKindCounts": {
+    "friction": 1,
+    "management": 1,
+    "value_creation": 2,
+    "spending": 1
+  },
+  "sourceUnitCount": 5,
+  "chapters": [
+    {
+      "chapterId": "wealth-01",
+      "title": "돈복을 타고났을까?",
+      "question": "명식에서 재물의 전체 구조는 무엇인가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_a002b00ae6796241067e5b9b",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 결과에 가치가 붙는 구조를 이해하기 쉽습니다 — 생각이나 능력을 실제 결과물로 바꾸는 과정이 돈의 흐름을 이해하는 출발점이 될 수 있습니다. 무엇을 만들었고 누가 왜 필요로 하는지가 보일 때 금전적인 판단도 더 구체적으로 하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_b6849e157926f281f2df5821",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_d349839f75d81f2a3da42785",
+          "kind": "management",
+          "canonicalMeaning": "돈을 숫자보다 실제 선택지를 만드는 자원으로 보는 편입니다 — 돈이 얼마나 쌓였는지만 보는 것보다 그 돈으로 무엇을 할 수 있는지, 어떤 결과를 만들 수 있는지를 함께 생각하는 편에 가깝습니다. 목적이 분명한 돈은 관리하기 쉽지만 용도가 명확하지 않은 돈은 기준이 흐려질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_9de4af0a1be6d46a54c23987",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_f585fd2cb9f052e08e3490f9",
+          "kind": "friction",
+          "canonicalMeaning": "더 배우기 위해 쓰는 돈과 지금 결과를 내야 하는 돈 사이에서 흔들릴 수 있습니다 — 조금 더 배우거나 더 나은 준비 수단을 갖추면 결과가 좋아질 것 같다는 생각과, 지금 가진 것으로 먼저 결과를 내야 한다는 현실이 충돌하기 쉽습니다. 지출 전에 “이걸 언제 실제로 쓸 것인가”를 정하면 과잉 준비를 줄이는 데 도움이 됩니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_8573a2b47ed2ead0c2636bb7",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_b72dadeaefc1a76b8ff881b3",
+          "kind": "spending",
+          "canonicalMeaning": "배움과 도구에 쓰는 돈은 비교적 납득하기 쉬운 편입니다 — 배움, 준비, 도구, 자료처럼 앞으로의 판단이나 활동 범위를 넓혀주는 지출에는 의미를 느끼기 쉽습니다. 다만 준비 자체가 목적이 되면 실제로 써보지 못한 채 비용만 늘어날 수 있어 사용 시점을 함께 정하는 편이 좋습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_d8ce1224582060201ec4c5ca",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    },
+    {
+      "chapterId": "wealth-02",
+      "title": "돈은 어디에서 들어오는가",
+      "question": "가치를 만들어 자원으로 연결하는 축은 무엇인가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_a002b00ae6796241067e5b9b",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 결과에 가치가 붙는 구조를 이해하기 쉽습니다 — 생각이나 능력을 실제 결과물로 바꾸는 과정이 돈의 흐름을 이해하는 출발점이 될 수 있습니다. 무엇을 만들었고 누가 왜 필요로 하는지가 보일 때 금전적인 판단도 더 구체적으로 하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_b6849e157926f281f2df5821",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_f02e07be9a8330c5e0ab9908",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 것을 실제 가치와 연결할 때 돈의 감각이 선명해집니다 — 만든 결과가 사람에게 어떤 도움을 주고 어떤 대가를 받을 수 있는지까지 이어서 볼 때 금전적인 판단이 구체화될 수 있습니다. 결과물과 가치 교환이 가까이 있는 구조에서 돈의 흐름을 이해하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_df59f3e61adc898bcaebc3ca",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_d349839f75d81f2a3da42785",
+          "kind": "management",
+          "canonicalMeaning": "돈을 숫자보다 실제 선택지를 만드는 자원으로 보는 편입니다 — 돈이 얼마나 쌓였는지만 보는 것보다 그 돈으로 무엇을 할 수 있는지, 어떤 결과를 만들 수 있는지를 함께 생각하는 편에 가깝습니다. 목적이 분명한 돈은 관리하기 쉽지만 용도가 명확하지 않은 돈은 기준이 흐려질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_9de4af0a1be6d46a54c23987",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    },
+    {
+      "chapterId": "wealth-03",
+      "title": "버는 돈과 남는 돈",
+      "question": "만든 결과와 자원 관리의 기준은 어떻게 다른가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_d349839f75d81f2a3da42785",
+          "kind": "management",
+          "canonicalMeaning": "돈을 숫자보다 실제 선택지를 만드는 자원으로 보는 편입니다 — 돈이 얼마나 쌓였는지만 보는 것보다 그 돈으로 무엇을 할 수 있는지, 어떤 결과를 만들 수 있는지를 함께 생각하는 편에 가깝습니다. 목적이 분명한 돈은 관리하기 쉽지만 용도가 명확하지 않은 돈은 기준이 흐려질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_9de4af0a1be6d46a54c23987",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_b72dadeaefc1a76b8ff881b3",
+          "kind": "spending",
+          "canonicalMeaning": "배움과 도구에 쓰는 돈은 비교적 납득하기 쉬운 편입니다 — 배움, 준비, 도구, 자료처럼 앞으로의 판단이나 활동 범위를 넓혀주는 지출에는 의미를 느끼기 쉽습니다. 다만 준비 자체가 목적이 되면 실제로 써보지 못한 채 비용만 늘어날 수 있어 사용 시점을 함께 정하는 편이 좋습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_d8ce1224582060201ec4c5ca",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_a002b00ae6796241067e5b9b",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 결과에 가치가 붙는 구조를 이해하기 쉽습니다 — 생각이나 능력을 실제 결과물로 바꾸는 과정이 돈의 흐름을 이해하는 출발점이 될 수 있습니다. 무엇을 만들었고 누가 왜 필요로 하는지가 보일 때 금전적인 판단도 더 구체적으로 하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_b6849e157926f281f2df5821",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_f02e07be9a8330c5e0ab9908",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 것을 실제 가치와 연결할 때 돈의 감각이 선명해집니다 — 만든 결과가 사람에게 어떤 도움을 주고 어떤 대가를 받을 수 있는지까지 이어서 볼 때 금전적인 판단이 구체화될 수 있습니다. 결과물과 가치 교환이 가까이 있는 구조에서 돈의 흐름을 이해하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_df59f3e61adc898bcaebc3ca",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    },
+    {
+      "chapterId": "wealth-04",
+      "title": "돈이 새어나가는 곳",
+      "question": "실제 승인된 구조적 긴장과 선택 비용은 무엇인가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_f585fd2cb9f052e08e3490f9",
+          "kind": "friction",
+          "canonicalMeaning": "더 배우기 위해 쓰는 돈과 지금 결과를 내야 하는 돈 사이에서 흔들릴 수 있습니다 — 조금 더 배우거나 더 나은 준비 수단을 갖추면 결과가 좋아질 것 같다는 생각과, 지금 가진 것으로 먼저 결과를 내야 한다는 현실이 충돌하기 쉽습니다. 지출 전에 “이걸 언제 실제로 쓸 것인가”를 정하면 과잉 준비를 줄이는 데 도움이 됩니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_8573a2b47ed2ead0c2636bb7",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_b72dadeaefc1a76b8ff881b3",
+          "kind": "spending",
+          "canonicalMeaning": "배움과 도구에 쓰는 돈은 비교적 납득하기 쉬운 편입니다 — 배움, 준비, 도구, 자료처럼 앞으로의 판단이나 활동 범위를 넓혀주는 지출에는 의미를 느끼기 쉽습니다. 다만 준비 자체가 목적이 되면 실제로 써보지 못한 채 비용만 늘어날 수 있어 사용 시점을 함께 정하는 편이 좋습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_d8ce1224582060201ec4c5ca",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_d349839f75d81f2a3da42785",
+          "kind": "management",
+          "canonicalMeaning": "돈을 숫자보다 실제 선택지를 만드는 자원으로 보는 편입니다 — 돈이 얼마나 쌓였는지만 보는 것보다 그 돈으로 무엇을 할 수 있는지, 어떤 결과를 만들 수 있는지를 함께 생각하는 편에 가깝습니다. 목적이 분명한 돈은 관리하기 쉽지만 용도가 명확하지 않은 돈은 기준이 흐려질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_9de4af0a1be6d46a54c23987",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    },
+    {
+      "chapterId": "wealth-05",
+      "title": "당신의 특별한 돈 이야기 — 특별 심층 장",
+      "question": "서로 다른 승인된 재물 근거가 함께 작용하는 개인의 복합 구조는 무엇인가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_f02e07be9a8330c5e0ab9908",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 것을 실제 가치와 연결할 때 돈의 감각이 선명해집니다 — 만든 결과가 사람에게 어떤 도움을 주고 어떤 대가를 받을 수 있는지까지 이어서 볼 때 금전적인 판단이 구체화될 수 있습니다. 결과물과 가치 교환이 가까이 있는 구조에서 돈의 흐름을 이해하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_df59f3e61adc898bcaebc3ca",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_d349839f75d81f2a3da42785",
+          "kind": "management",
+          "canonicalMeaning": "돈을 숫자보다 실제 선택지를 만드는 자원으로 보는 편입니다 — 돈이 얼마나 쌓였는지만 보는 것보다 그 돈으로 무엇을 할 수 있는지, 어떤 결과를 만들 수 있는지를 함께 생각하는 편에 가깝습니다. 목적이 분명한 돈은 관리하기 쉽지만 용도가 명확하지 않은 돈은 기준이 흐려질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_9de4af0a1be6d46a54c23987",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_f585fd2cb9f052e08e3490f9",
+          "kind": "friction",
+          "canonicalMeaning": "더 배우기 위해 쓰는 돈과 지금 결과를 내야 하는 돈 사이에서 흔들릴 수 있습니다 — 조금 더 배우거나 더 나은 준비 수단을 갖추면 결과가 좋아질 것 같다는 생각과, 지금 가진 것으로 먼저 결과를 내야 한다는 현실이 충돌하기 쉽습니다. 지출 전에 “이걸 언제 실제로 쓸 것인가”를 정하면 과잉 준비를 줄이는 데 도움이 됩니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_8573a2b47ed2ead0c2636bb7",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_b72dadeaefc1a76b8ff881b3",
+          "kind": "spending",
+          "canonicalMeaning": "배움과 도구에 쓰는 돈은 비교적 납득하기 쉬운 편입니다 — 배움, 준비, 도구, 자료처럼 앞으로의 판단이나 활동 범위를 넓혀주는 지출에는 의미를 느끼기 쉽습니다. 다만 준비 자체가 목적이 되면 실제로 써보지 못한 채 비용만 늘어날 수 있어 사용 시점을 함께 정하는 편이 좋습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_d8ce1224582060201ec4c5ca",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_a002b00ae6796241067e5b9b",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 결과에 가치가 붙는 구조를 이해하기 쉽습니다 — 생각이나 능력을 실제 결과물로 바꾸는 과정이 돈의 흐름을 이해하는 출발점이 될 수 있습니다. 무엇을 만들었고 누가 왜 필요로 하는지가 보일 때 금전적인 판단도 더 구체적으로 하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_b6849e157926f281f2df5821",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    },
+    {
+      "chapterId": "wealth-06",
+      "title": "결국 돈을 남기는 사람은",
+      "question": "앞 장들의 검증된 결론을 함께 읽을 때 무엇을 구별해야 하는가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_a002b00ae6796241067e5b9b",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 결과에 가치가 붙는 구조를 이해하기 쉽습니다 — 생각이나 능력을 실제 결과물로 바꾸는 과정이 돈의 흐름을 이해하는 출발점이 될 수 있습니다. 무엇을 만들었고 누가 왜 필요로 하는지가 보일 때 금전적인 판단도 더 구체적으로 하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_b6849e157926f281f2df5821",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_d349839f75d81f2a3da42785",
+          "kind": "management",
+          "canonicalMeaning": "돈을 숫자보다 실제 선택지를 만드는 자원으로 보는 편입니다 — 돈이 얼마나 쌓였는지만 보는 것보다 그 돈으로 무엇을 할 수 있는지, 어떤 결과를 만들 수 있는지를 함께 생각하는 편에 가깝습니다. 목적이 분명한 돈은 관리하기 쉽지만 용도가 명확하지 않은 돈은 기준이 흐려질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_9de4af0a1be6d46a54c23987",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_f585fd2cb9f052e08e3490f9",
+          "kind": "friction",
+          "canonicalMeaning": "더 배우기 위해 쓰는 돈과 지금 결과를 내야 하는 돈 사이에서 흔들릴 수 있습니다 — 조금 더 배우거나 더 나은 준비 수단을 갖추면 결과가 좋아질 것 같다는 생각과, 지금 가진 것으로 먼저 결과를 내야 한다는 현실이 충돌하기 쉽습니다. 지출 전에 “이걸 언제 실제로 쓸 것인가”를 정하면 과잉 준비를 줄이는 데 도움이 됩니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_8573a2b47ed2ead0c2636bb7",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_b72dadeaefc1a76b8ff881b3",
+          "kind": "spending",
+          "canonicalMeaning": "배움과 도구에 쓰는 돈은 비교적 납득하기 쉬운 편입니다 — 배움, 준비, 도구, 자료처럼 앞으로의 판단이나 활동 범위를 넓혀주는 지출에는 의미를 느끼기 쉽습니다. 다만 준비 자체가 목적이 되면 실제로 써보지 못한 채 비용만 늘어날 수 있어 사용 시점을 함께 정하는 편이 좋습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_d8ce1224582060201ec4c5ca",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    }
+  ],
+  "sourceHash": "38c0530c38d52a866e7e6973c67dc197ddd0390495d7ee7653206b62b7f415ab"
+}
