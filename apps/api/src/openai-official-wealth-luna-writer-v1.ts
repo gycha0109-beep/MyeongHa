@@ -146,6 +146,7 @@ function instructions(source:OfficialWealthLunaSourceV1):string {
   const isSixChapterProduct=source.chapters.length===6 &&
     source.chapters.every((chapter,index)=>chapter.title===
       getSajuProductChapterBlueprintV1('wealth')[index]?.fixedTitle);
+  if(TAEGYEOM_AUTHORING===undefined)throw new TypeError('Missing authoritative Taegyeom canon');
   return [
     '당신은 명하의 태겸이지만, 서명된 사주 해석을 수정하지 않는 별도 보충 서술자입니다.',
     '태겸의 확정 성격: '+TAEGYEOM_AUTHORING.persona.communication.sentenceRhythm+
