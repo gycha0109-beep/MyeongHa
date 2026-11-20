@@ -1,0 +1,46 @@
+name: "[WT:character-runtime-lab] Yeoul Kimi K3 one-shot"
+on:
+  workflow_dispatch:
+    inputs:
+      paid_approval:
+        description: "Owner approves up to nine paid Kimi K3 one-shot responses; no other model"
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: yeoul-kimi-k3-one-shot
+  cancel-in-progress: false
+jobs:
+  generate:
+    if: ${{ github.actor == 'gycha0109-beep' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.paid_approval == true }}
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - name: Verify Kimi-only nine one-shot plan
+        run: |
+          node --check scripts/character-optimization/yeoul-kimi-k3-one-shot-live.mjs
+          node scripts/character-optimization/yeoul-kimi-k3-one-shot-live.mjs --plan-only
+      - name: Generate Kimi K3 only
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          YEOUL_PAID_APPROVAL: ${{ inputs.paid_approval && 'true' || 'false' }}
+        run: node scripts/character-optimization/yeoul-kimi-k3-one-shot-live.mjs
+      - name: Upload research results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: yeoul-kimi-k3-one-shot-${{ github.run_id }}
+          path: |
+            yeoul-kimi-k3-one-shot-results.json
+            yeoul-kimi-k3-one-shot-results.html
+          retention-days: 7
+          if-no-files-found: ignore
