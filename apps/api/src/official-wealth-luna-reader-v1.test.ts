@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import {getSajuProductChapterBlueprintV1} from '../../../packages/domain/src/saju-product-chapter-blueprints-v1.js';
 import type { OfficialReadingRecordV1 } from './official-reading-record-read.js';
 import {
   buildOfficialWealthLunaSourceV1,
@@ -64,6 +65,36 @@ describe('owner-authorized Luna wealth supplement',()=>{
     const missing=draft(source);
     missing.chapters[0]!.sourceAnchor='확인되지 않은 임의 해석';
     expect(()=>validateOfficialWealthLunaDraftV1(source,missing)).toThrow();
+  });
+  it('keeps six-chapter Taegyeom prose concise and citation-free, while preserving exact source anchors',()=>{
+    const blueprint=getSajuProductChapterBlueprintV1('wealth');
+    const original=buildOfficialWealthLunaSourceV1(report())!;
+    const source={
+      ...original,
+      chapters:blueprint.map((chapter,index)=>({
+        index,title:chapter.fixedTitle,
+        excerpts:['승인 의미 [unit-'+index+']\\n각기 다른 승인 근거 '+index+
+          '번은 개인의 책임과 선택의 경계를 분명히 읽게 합니다. 실제 재물의 규모는 알려주지 않습니다.'],
+      })),
+    };
+    const output={
+      chapters:source.chapters.map(chapter=>({
+        index:chapter.index,title:chapter.title,
+        sourceAnchor:'각기 다른 승인 근거 '+chapter.index+
+          '번은 개인의 책임과 선택의 경계를 분명히 읽게 합니다.',
+        paragraphs:[
+          '먼저 중요한 것은 선택에 따르는 책임을 구분하는 일입니다. 감당할 수 있는 범위까지는 당신의 선택이지만, 결과를 미리 약속할 수는 없습니다.',
+          '각 선택에는 서로 다른 조건이 붙습니다. 명리에서 읽힌 책임과 선택의 관계를 따져 봐야 할 때입니다. 눈에 보이는 결과와 감당할 무게를 혼동할 필요는 없습니다.',
+          '결정은 당신이 합니다. 저는 구분해야 할 선만 짚겠습니다. 필요한 것과 원하는 것을 나누면 판단이 조금 더 명확해질 수 있습니다.',
+        ],
+      })),
+    };
+    expect(validateOfficialWealthLunaDraftV1(source,output).chapters).toHaveLength(6);
+    output.chapters[0]!.paragraphs[0]='이 명식에서 재물의 흐름을 다시 살펴보겠습니다. '+output.chapters[0]!.paragraphs[0];
+    expect(()=>validateOfficialWealthLunaDraftV1(source,output)).toThrow('research audit');
+    output.chapters[0]!.paragraphs[0]=output.chapters[1]!.paragraphs[0]!;
+    output.chapters[0]!.paragraphs[1]='이 장의 핵심은 재물을 위한 예산을 따로 만드는 것입니다. '+output.chapters[0]!.paragraphs[1];
+    expect(()=>validateOfficialWealthLunaDraftV1(source,output)).toThrow('research audit');
   });
   it('delegates only admitted source to idempotent server writer and rechecks draft',async()=>{
     let called=0;
