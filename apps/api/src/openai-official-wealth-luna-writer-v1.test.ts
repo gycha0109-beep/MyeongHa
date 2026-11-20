@@ -67,6 +67,12 @@ describe('OpenAI GPT-6 Luna Wealth writer',()=>{
     expect(actual.chapters).toHaveLength(2);
     expect(events).toEqual(['authority','claim','reserve','provider','commit']);
     expect(sent).toBeDefined();
+    const sentPayload=sent as {input:{content:{text:string}[]}[]};
+    const admitted=JSON.parse(sentPayload.input[1]!.content[0]!.text) as {sourceAnchors:{index:number;quote:string}[]};
+    expect(admitted.sourceAnchors).toEqual([
+      {index:0,quote:'결과물을 만든다는 것과 결과물이 실제로 쓰이는 것을 구분할 때 돈의 판단 기준이 달라집니다.'},
+      {index:1,quote:'결과물을 만든다는 것과 결과물이 실제로 쓰이는 것을 구분할 때 돈의 판단 기준이 달라집니다.'},
+    ]);
   });
   it('refuses to call model when current active publication or grant is held',async()=>{
     let called=false;

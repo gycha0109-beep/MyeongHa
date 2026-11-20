@@ -96,6 +96,24 @@ function readDraft(body:unknown):unknown{
   if(texts.length!==1)throw new Error('Luna structured output must be one object');
   return JSON.parse(texts[0]!);
 }
+/**
+ * Give Luna a literal, source-owned quote instead of asking the model to
+ * invent an anchor and hoping the resulting quote matches. This is a writing
+ * aid only; the existing final validator still verifies source membership.
+ */
+function sourceOwnedQuoteV1(source:OfficialWealthLunaSourceV1['chapters'][number]):string|null{
+  for(const excerpt of source.excerpts){
+    const lines=excerpt.split(/\r?\n/u).map(line=>line.trim()).filter(Boolean);
+    for(const line of lines){
+      if(line.length<20 || /^(?:승인 의미 \[|근거 블록:|이 장의 질문:|적용 조건:|금지 확장:)/u.test(line))continue;
+      const sentence=line.match(/^.{20,130}?[.!?。]/u)?.[0];
+      const chosen=(sentence??line.slice(0,Math.min(65,line.length))).trim();
+      if(chosen.length>=20 && excerpt.includes(chosen))return chosen;
+    }
+  }
+  return null;
+}
+
 function instructions(source:OfficialWealthLunaSourceV1):string {
   const isSixChapterProduct=source.chapters.length===6 &&
     source.chapters.every((chapter,index)=>chapter.title===
@@ -112,7 +130,7 @@ function instructions(source:OfficialWealthLunaSourceV1):string {
       '각 장은 전달받은 승인 의미 [unitId]와 근거 블록이 전제입니다. 반드시 개별 canonicalMeaning의 구체적 논리와 조건을 독자 언어로 풀고, 추가로 실제 경험이나 새 명리 구조를 만들어내지 마십시오.',
       '각 장마다 다른 질문에 답하십시오. 1장은 재물의 기본 구조, 2장은 산출·교환, 3장은 벌기와 관리의 차이, 4장은 승인된 긴장·제약, 5장은 여러 승인 의미를 엮은 특별한 조건, 6장은 앞서 확인한 상반된 선택 기준의 종합입니다.',
       '실생활 사례는 장의 실제 승인 의미가 허용하는 경우에만 제시하는 가상 장면입니다. 설명용 장면이 실제 고객에게 있었다고 말하지 마십시오.',
-      'sourceAnchor는 본문에 그대로 인용할 승인 의미 문장의 연속된 20자 이상이어야 합니다. source ID나 근거 블록 이름 자체를 sourceAnchor로 쓰면 거부됩니다.',
+      '서버가 제공한 sourceAnchors 배열의 해당 index 문자열을 sourceAnchor에 글자 하나도 바꾸지 말고 사용하고, 첫 문단에 그 문자열을 그대로 한 번 넣으십시오. 원문에서 벗어나 새 근거 인용문을 만들지 마십시오.',
       '각 장의 맨 첫 문단에 그 장에서만 도출되는 핵심 판단과 근거를 제시하십시오. 다른 챕터에서 같은 판단을 반복하지 마십시오.',
       '주어진 의미가 평범한 조언만 뒷받침한다면 억지로 심오한 운명론을 만들지 마십시오. 검증에서 불합격될 수 있습니다.',
     ] : []),
@@ -175,6 +193,7 @@ export function createOpenAiOfficialWealthLunaWriterV1(
               {role:'user',content:[{type:'input_text',text:JSON.stringify({
                 kind:'verified_official_wealth_source',
                 sourceHash:input.source.sourceHash,chapters:input.source.chapters,
+                sourceAnchors:input.source.chapters.map(chapter=>({index:chapter.index,quote:sourceOwnedQuoteV1(chapter)})),
                 limitations:input.source.limitations,
               })}]},
             ],
