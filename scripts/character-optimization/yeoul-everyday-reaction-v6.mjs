@@ -20,7 +20,7 @@ if(exemplars<0||V6_SYSTEM.slice(V6_SYSTEM.indexOf('대사의 에너지 예시'))
  throw Error('V5_EXEMPLAR_DRIFT');
 if(!V6_SYSTEM.startsWith(V5_SYSTEM.split('\n')[0])||V6_SYSTEM===V5_SYSTEM||V6_SYSTEM.length>2900||V6_SYSTEM.length<1100)
  throw Error('V6_PROMPT_INVALID');
-for(const token of ['verifiedEvents','관계','일상','진짜 갈등','자기 취향'])if(!V6_SYSTEM.includes(token))
+for(const token of ['verifiedEvents','관계','음식·날씨','진짜 갈등','자기 취향'])if(!V6_SYSTEM.includes(token))
  throw Error('V6_RULE_MISSING_'+token);
 
 export const UNSEEN_CASES=[
