@@ -347,7 +347,7 @@ jobs:
           echo "public_evidence=$final_evidence" >> "$GITHUB_OUTPUT"
 
       - name: Upload identifier-free canary evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v4.6.2
         with:
           name: production-privacy-recovery-canary-${{ github.run_id }}
           path: ${{ steps.validate.outputs.public_evidence }}
@@ -474,7 +474,7 @@ jobs:
             "$RUNNER_TEMP/production-privacy-canary-public-evidence.json"
 
       - name: Upload read-only, identifier-free historical completion proof
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v4.6.2
         with:
           name: production-privacy-recovery-canary-${{ github.run_id }}
           path: ${{ runner.temp }}/production-privacy-canary-public-evidence.json

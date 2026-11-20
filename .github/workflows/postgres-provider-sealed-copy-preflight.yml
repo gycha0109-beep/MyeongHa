@@ -97,7 +97,7 @@ jobs:
         run: bash scripts/operations/run-postgres-provider-sealed-copy-preflight-ci.sh
       - name: Upload only identifier-free compatibility summary
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: provider-sealed-copy-preflight-${{ github.run_id }}
           path: ${{ runner.temp }}/myeongha-provider-sealed-copy-preflight.json
@@ -105,7 +105,7 @@ jobs:
           retention-days: 14
       - name: Upload only aggregate isolated Provider row delta summary
         if: ${{ always() && (github.event_name == 'push' || inputs.provider_data_replay) }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: provider-sealed-isolated-row-replay-${{ github.run_id }}
           path: ${{ runner.temp }}/myeongha-provider-isolated-row-replay.json
@@ -113,7 +113,7 @@ jobs:
           retention-days: 14
       - name: Upload aggregate Auth reference integrity verdict only
         if: ${{ always() && (github.event_name == 'push' || inputs.provider_data_replay) }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: provider-sealed-auth-reference-integrity-${{ github.run_id }}
           path: ${{ runner.temp }}/myeongha-provider-auth-reference-integrity.json
@@ -121,7 +121,7 @@ jobs:
           retention-days: 14
       - name: Upload metadata-only isolated Provider migration ledger parity
         if: ${{ always() && (github.event_name == 'push' || inputs.provider_data_replay) }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: provider-sealed-migration-ledger-parity-${{ github.run_id }}
           path: ${{ runner.temp }}/myeongha-provider-migration-ledger-parity.json
