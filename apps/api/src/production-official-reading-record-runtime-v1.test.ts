@@ -83,6 +83,27 @@ describe('production Official Reading record runtime optional analytics',()=>{
     expect(response.status).toBe(200);
     await runtime.close();
   });
+  it('keeps six-chapter POST disabled unless both protected source and writer are installed',async()=>{
+    const request=new Request('https://myeongha.internal/api/readings?readingId='+READING,{
+      method:'POST',headers:{'Content-Type':'application/json',Origin:'https://myeongha.internal'},
+      body:'{}',
+    });
+    const closed=createProductionOfficialReadingRecordRuntimeV1({env:ENV,pool:pool()});
+    const disabled=await closed.handleRequest({request,requestId:'req-no-product-ports',serverTime:'2026-11-20T01:00:00Z'});
+    expect(disabled.status).toBe(405);
+    await closed.close();
+    const installed=createProductionOfficialReadingRecordRuntimeV1({
+      env:ENV,pool:pool(),
+      officialWealthLunaWriter:{model:'gpt-6-luna',readOrCreateValidated:vi.fn(async()=>{
+        throw new Error('unauthorized writer must never run');
+      })},
+      officialWealthLunaProductSource:{getSixChapterSourceFromApprovedPlan:vi.fn(async()=>null)},
+    });
+    const response=await installed.handleRequest({request,requestId:'req-installed-ports-no-owner',serverTime:'2026-11-20T01:00:00Z'});
+    expect(response.status).toBe(401);
+    expect((await response.json() as {error:{code:string}}).error.code).toBe('AUTH_REQUIRED');
+    await installed.close();
+  });
   it('rejects invalid production DB/TLS identity before opening an injected pool',()=>{
     const connect=vi.fn(async()=>{throw Error('must not connect');});
     expect(()=>createProductionOfficialReadingRecordRuntimeV1({
