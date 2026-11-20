@@ -303,3 +303,13 @@
 - 이전 v3 실측 결과에 상담형 위로와 자기 이름 오용 오류가 존재했다. 기존 500원 누적 보수적 예약액 481원 안에서 별도의 압축형 성격 프롬프트로 합성 질문 10개를 API **한 번**에 배치하여 실측했다.
 - GPT-6 Luna 응답 10/10 수신. 이번 호출 보수적 비용 17원, 누적 보수적 498/500원, 공급자 보고 이번 비용 USD 0.0002226. 독립 개별 호출 10회의 증거는 아니다.
 - 허전함은 이전보다는 여울 개인의 관심이 나타났지만 여전히 상담형 말투가 남는다. 다른 평범한 질문 일부에서 새침한 개성이 확인됐으나 사람 검토·운영 검증은 완료되지 않았다. 추가 유료 호출은 보류하며 자동 재시도 금지. 상세: YEOUL_COMPACT_EVERYDAY_V4.md.
+
+## 2026-11-20 — DeepSeek 챗봇 기본 모델 선정 (연구·운영 구분)
+
+- **사용자 확정 선택:** 캐릭터 챗봇 기본 대화 모델은 OpenRouter `deepseek/deepseek-v4.1-flash-1017`. Kimi K3, GLM-5.3, GPT-6 Luna의 기본 챗봇 모델 순위 비교를 요청 없이 반복하지 않는다.
+- **실험 근거:** PR [#3387](https://github.com/gycha0109-beep/MyeongHa/pull/3387) / Actions [44690417818](https://github.com/gycha0109-beep/MyeongHa/actions/runs/44690417818): GLM·DeepSeek 각 9회 성공. PR [#3388](https://github.com/gycha0109-beep/MyeongHa/pull/3388) / Actions [44694617531](https://github.com/gycha0109-beep/MyeongHa/actions/runs/44694617531): DeepSeek 10턴×3 합성 다중 대화 30회 성공. PR [#3389](https://github.com/gycha0109-beep/MyeongHa/pull/3389) / Actions [44696519721](https://github.com/gycha0109-beep/MyeongHa/actions/runs/44696519721): Kimi 9회 성공.
+- **인간 선택 기준:** DeepSeek의 짧고 자연스러운 한국어 카톡 반응 및 관찰된 호출 비용을 종합해 선택. 이는 GEPA 최적화 성공이나 실제 사용자 자유 대화 검증이 아니다.
+- **관찰된 실패:** 없는 과거 관계·인연의 창작, 건강 조언 및 츤데레 반응의 반복. 확인되지 않은 관계·기억을 만들어내지 않는 개선과 독립 사용자 검토는 여전히 필요하다.
+- **운영 경계:** 확정은 **모델 선정 결정**일 뿐 운영 라우팅 적용·콘텐츠 발표·유료 GEPA 승인·새 평가셋 승인에 해당하지 않는다. 기존 연구·운영 코드와 권한을 자동 수정하지 않는다.
+- **사주 보고서 모델:** 별개로 미선정. Saju 공식 해석과 검증된 Reading을 source of truth로 유지하고, 기존 Reader 표현 계층의 입력/출력 계약 안에서 DeepSeek과 Gemini Flash 계열을 후속 비교한다. 새로운 유료 호출은 별도 사용자 승인 전 0회.
+- 1~4단계의 미완료 조건, 5~7단계의 미착수 및 **ROADMAP_COMPLETE 미선언**은 그대로 유지한다.
