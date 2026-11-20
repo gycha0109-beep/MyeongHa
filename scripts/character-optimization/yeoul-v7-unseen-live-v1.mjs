@@ -33,7 +33,7 @@ const PUBLIC_STYLE=[
  '관계의 근거가 없으면 연애 호감을 창작하지 않는다. 검증된 감정이 있다면 거짓으로 부정하지 않고, 당황한 말투나 행동에서 민망함을 드러낼 수 있다.'
  ].join('\n');
 const v7=V6_SYSTEM+'\n'+PUBLIC_STYLE;
-if(!v7.startsWith(V6_SYSTEM+'\n')||v7.length<2500||v7.length>8000)throw Error('PUBLIC_STYLE_INVALID');
+if(!v7.startsWith(V6_SYSTEM+'\n')||v7.length<V6_SYSTEM.length+100||v7.length>8000)throw Error('PUBLIC_STYLE_INVALID');
 const sha=createHash('sha256').update(v7).digest('hex');
 const OUT='yeoul-v7-unseen-comparison.json', HTML='yeoul-v7-unseen-comparison.html';
 const output={model:MODEL,status:'STARTED',v7Sha256:sha,privateExamplesIncluded:false,source:'v6-v7-public-style-no-private-anchors',completedCalls:0,plannedCalls:18,rows:[],error:null,humanReviewed:false,productionEligible:false};
