@@ -1,0 +1,349 @@
+{
+  "schemaVersion": "saju-wealth-real-source-sixchapter-demo-v1",
+  "status": "SOURCE_COMPLETE_FOR_RESEARCH",
+  "productionIssuance": false,
+  "customerPurchased": false,
+  "readerDraft": false,
+  "label": "case-a",
+  "birthInput": {
+    "calendarType": "solar",
+    "date": {
+      "year": 2001,
+      "month": 11,
+      "day": 30
+    },
+    "time": {
+      "known": true,
+      "hour": 15,
+      "minute": 30
+    }
+  },
+  "officialReportHash": "eecbc841625ec5f957f6271c8f1e1199f2fcdb6d60e55ac176ce2b172bec1809",
+  "evidenceKindCounts": {
+    "management": 4,
+    "friction": 1,
+    "spending": 1,
+    "value_creation": 2
+  },
+  "sourceUnitCount": 8,
+  "chapters": [
+    {
+      "chapterId": "wealth-01",
+      "title": "돈복을 타고났을까?",
+      "question": "명식에서 재물의 전체 구조는 무엇인가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_b7d9fc555f45f38bf77171dd",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 것을 실제 가치와 연결할 때 돈의 감각이 선명해집니다 — 만든 결과가 사람에게 어떤 도움을 주고 어떤 대가를 받을 수 있는지까지 이어서 볼 때 금전적인 판단이 구체화될 수 있습니다. 결과물과 가치 교환이 가까이 있는 구조에서 돈의 흐름을 이해하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_5bd0a4348f337beea29f9f97",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_d5de1f9a74d5b2722c5d0ac2",
+          "kind": "management",
+          "canonicalMeaning": "돈 관리에도 최소한의 기준과 책임 경계가 있는 편이 안정적입니다 — 매번 기분에 따라 판단하기보다 고정비, 한도, 우선순위처럼 미리 정한 기준이 있으면 돈을 다루기 훨씬 편할 수 있습니다. 기준이 너무 촘촘할 필요는 없지만 어디까지 써도 되는지는 분명한 구조가 잘 맞습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_326e37e903fae88e04892806",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_e6add929ffefe7b8d11005c4",
+          "kind": "friction",
+          "canonicalMeaning": "내가 원하는 선택과 현실적인 예산이 부딪힐 때 스트레스가 커질 수 있습니다 — 원하는 방식이 분명할수록 비용이나 효율 때문에 선택을 바꿔야 할 때 답답함을 느끼기 쉽습니다. 모든 선택을 아끼는 방향으로 만들기보다 반드시 지킬 취향과 타협 가능한 비용을 미리 나누는 편이 현실적입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_345932f859ed950b6d02d92a",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_ea4865acc02f724f8f785f84",
+          "kind": "spending",
+          "canonicalMeaning": "돈을 선택권과 자율성을 확보하는 수단으로 느끼기 쉽습니다 — 남이 정한 방식에 맞추기보다 내가 원하는 선택을 할 수 있게 해주는 돈의 역할을 중요하게 볼 수 있습니다. 그래서 편의, 독립성, 시간을 아끼는 데 쓰는 돈은 단순 소비보다 선택권을 사는 비용처럼 느껴질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_58a4f2493820f2a57f58666b",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    },
+    {
+      "chapterId": "wealth-02",
+      "title": "돈은 어디에서 들어오는가",
+      "question": "가치를 만들어 자원으로 연결하는 축은 무엇인가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_b7d9fc555f45f38bf77171dd",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 것을 실제 가치와 연결할 때 돈의 감각이 선명해집니다 — 만든 결과가 사람에게 어떤 도움을 주고 어떤 대가를 받을 수 있는지까지 이어서 볼 때 금전적인 판단이 구체화될 수 있습니다. 결과물과 가치 교환이 가까이 있는 구조에서 돈의 흐름을 이해하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_5bd0a4348f337beea29f9f97",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_71913493f59c82ac6b67a148",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 결과에 가치가 붙는 구조를 이해하기 쉽습니다 — 생각이나 능력을 실제 결과물로 바꾸는 과정이 돈의 흐름을 이해하는 출발점이 될 수 있습니다. 무엇을 만들었고 누가 왜 필요로 하는지가 보일 때 금전적인 판단도 더 구체적으로 하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_c0195ed8578df8d78781132f",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_d5de1f9a74d5b2722c5d0ac2",
+          "kind": "management",
+          "canonicalMeaning": "돈 관리에도 최소한의 기준과 책임 경계가 있는 편이 안정적입니다 — 매번 기분에 따라 판단하기보다 고정비, 한도, 우선순위처럼 미리 정한 기준이 있으면 돈을 다루기 훨씬 편할 수 있습니다. 기준이 너무 촘촘할 필요는 없지만 어디까지 써도 되는지는 분명한 구조가 잘 맞습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_326e37e903fae88e04892806",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_87d17ae283f4a4fc6d2f2904",
+          "kind": "management",
+          "canonicalMeaning": "들어오고 나가는 돈을 역할별로 나누면 관리가 쉬워집니다 — 돈이 생겼을 때 전부 한 덩어리로 보기보다 생활비, 계획된 지출, 여유자금처럼 역할을 나누는 방식이 잘 맞을 수 있습니다. 현실적인 결과를 확인하면서도 지켜야 할 기준을 함께 두면 판단이 안정되는 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_7e170482e74a6867c178be5d",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    },
+    {
+      "chapterId": "wealth-03",
+      "title": "버는 돈과 남는 돈",
+      "question": "만든 결과와 자원 관리의 기준은 어떻게 다른가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_d5de1f9a74d5b2722c5d0ac2",
+          "kind": "management",
+          "canonicalMeaning": "돈 관리에도 최소한의 기준과 책임 경계가 있는 편이 안정적입니다 — 매번 기분에 따라 판단하기보다 고정비, 한도, 우선순위처럼 미리 정한 기준이 있으면 돈을 다루기 훨씬 편할 수 있습니다. 기준이 너무 촘촘할 필요는 없지만 어디까지 써도 되는지는 분명한 구조가 잘 맞습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_326e37e903fae88e04892806",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_87d17ae283f4a4fc6d2f2904",
+          "kind": "management",
+          "canonicalMeaning": "들어오고 나가는 돈을 역할별로 나누면 관리가 쉬워집니다 — 돈이 생겼을 때 전부 한 덩어리로 보기보다 생활비, 계획된 지출, 여유자금처럼 역할을 나누는 방식이 잘 맞을 수 있습니다. 현실적인 결과를 확인하면서도 지켜야 할 기준을 함께 두면 판단이 안정되는 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_7e170482e74a6867c178be5d",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_36df0e81cd6c5dd156a9673d",
+          "kind": "management",
+          "canonicalMeaning": "만들고, 가치가 생기는지 확인하고, 다시 관리하는 흐름이 잘 맞습니다 — 돈을 따로 떼어 생각하기보다 무엇을 만들었는지, 실제 가치가 생겼는지, 다음에 얼마를 다시 쓸지까지 한 흐름으로 보는 편이 이해하기 쉽습니다. 작은 선택에서도 결과와 비용을 함께 확인하면 판단 기준이 빠르게 선명해질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_85fba290977a1bcbd8506859",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_154b9cf3fced35059123ebe5",
+          "kind": "management",
+          "canonicalMeaning": "돈을 숫자보다 실제 선택지를 만드는 자원으로 보는 편입니다 — 돈이 얼마나 쌓였는지만 보는 것보다 그 돈으로 무엇을 할 수 있는지, 어떤 결과를 만들 수 있는지를 함께 생각하는 편에 가깝습니다. 목적이 분명한 돈은 관리하기 쉽지만 용도가 명확하지 않은 돈은 기준이 흐려질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_a4e5a08a12d9ef5607ec2a29",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    },
+    {
+      "chapterId": "wealth-04",
+      "title": "돈이 새어나가는 곳",
+      "question": "실제 승인된 구조적 긴장과 선택 비용은 무엇인가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_e6add929ffefe7b8d11005c4",
+          "kind": "friction",
+          "canonicalMeaning": "내가 원하는 선택과 현실적인 예산이 부딪힐 때 스트레스가 커질 수 있습니다 — 원하는 방식이 분명할수록 비용이나 효율 때문에 선택을 바꿔야 할 때 답답함을 느끼기 쉽습니다. 모든 선택을 아끼는 방향으로 만들기보다 반드시 지킬 취향과 타협 가능한 비용을 미리 나누는 편이 현실적입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_345932f859ed950b6d02d92a",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_ea4865acc02f724f8f785f84",
+          "kind": "spending",
+          "canonicalMeaning": "돈을 선택권과 자율성을 확보하는 수단으로 느끼기 쉽습니다 — 남이 정한 방식에 맞추기보다 내가 원하는 선택을 할 수 있게 해주는 돈의 역할을 중요하게 볼 수 있습니다. 그래서 편의, 독립성, 시간을 아끼는 데 쓰는 돈은 단순 소비보다 선택권을 사는 비용처럼 느껴질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_58a4f2493820f2a57f58666b",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_d5de1f9a74d5b2722c5d0ac2",
+          "kind": "management",
+          "canonicalMeaning": "돈 관리에도 최소한의 기준과 책임 경계가 있는 편이 안정적입니다 — 매번 기분에 따라 판단하기보다 고정비, 한도, 우선순위처럼 미리 정한 기준이 있으면 돈을 다루기 훨씬 편할 수 있습니다. 기준이 너무 촘촘할 필요는 없지만 어디까지 써도 되는지는 분명한 구조가 잘 맞습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_326e37e903fae88e04892806",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_87d17ae283f4a4fc6d2f2904",
+          "kind": "management",
+          "canonicalMeaning": "들어오고 나가는 돈을 역할별로 나누면 관리가 쉬워집니다 — 돈이 생겼을 때 전부 한 덩어리로 보기보다 생활비, 계획된 지출, 여유자금처럼 역할을 나누는 방식이 잘 맞을 수 있습니다. 현실적인 결과를 확인하면서도 지켜야 할 기준을 함께 두면 판단이 안정되는 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_7e170482e74a6867c178be5d",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    },
+    {
+      "chapterId": "wealth-05",
+      "title": "당신의 특별한 돈 이야기 — 특별 심층 장",
+      "question": "서로 다른 승인된 재물 근거가 함께 작용하는 개인의 복합 구조는 무엇인가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_71913493f59c82ac6b67a148",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 결과에 가치가 붙는 구조를 이해하기 쉽습니다 — 생각이나 능력을 실제 결과물로 바꾸는 과정이 돈의 흐름을 이해하는 출발점이 될 수 있습니다. 무엇을 만들었고 누가 왜 필요로 하는지가 보일 때 금전적인 판단도 더 구체적으로 하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_c0195ed8578df8d78781132f",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_154b9cf3fced35059123ebe5",
+          "kind": "management",
+          "canonicalMeaning": "돈을 숫자보다 실제 선택지를 만드는 자원으로 보는 편입니다 — 돈이 얼마나 쌓였는지만 보는 것보다 그 돈으로 무엇을 할 수 있는지, 어떤 결과를 만들 수 있는지를 함께 생각하는 편에 가깝습니다. 목적이 분명한 돈은 관리하기 쉽지만 용도가 명확하지 않은 돈은 기준이 흐려질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_a4e5a08a12d9ef5607ec2a29",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_e6add929ffefe7b8d11005c4",
+          "kind": "friction",
+          "canonicalMeaning": "내가 원하는 선택과 현실적인 예산이 부딪힐 때 스트레스가 커질 수 있습니다 — 원하는 방식이 분명할수록 비용이나 효율 때문에 선택을 바꿔야 할 때 답답함을 느끼기 쉽습니다. 모든 선택을 아끼는 방향으로 만들기보다 반드시 지킬 취향과 타협 가능한 비용을 미리 나누는 편이 현실적입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_345932f859ed950b6d02d92a",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_ea4865acc02f724f8f785f84",
+          "kind": "spending",
+          "canonicalMeaning": "돈을 선택권과 자율성을 확보하는 수단으로 느끼기 쉽습니다 — 남이 정한 방식에 맞추기보다 내가 원하는 선택을 할 수 있게 해주는 돈의 역할을 중요하게 볼 수 있습니다. 그래서 편의, 독립성, 시간을 아끼는 데 쓰는 돈은 단순 소비보다 선택권을 사는 비용처럼 느껴질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_58a4f2493820f2a57f58666b",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_d5de1f9a74d5b2722c5d0ac2",
+          "kind": "management",
+          "canonicalMeaning": "돈 관리에도 최소한의 기준과 책임 경계가 있는 편이 안정적입니다 — 매번 기분에 따라 판단하기보다 고정비, 한도, 우선순위처럼 미리 정한 기준이 있으면 돈을 다루기 훨씬 편할 수 있습니다. 기준이 너무 촘촘할 필요는 없지만 어디까지 써도 되는지는 분명한 구조가 잘 맞습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_326e37e903fae88e04892806",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    },
+    {
+      "chapterId": "wealth-06",
+      "title": "결국 돈을 남기는 사람은",
+      "question": "앞 장들의 검증된 결론을 함께 읽을 때 무엇을 구별해야 하는가",
+      "units": [
+        {
+          "unitId": "canonical_reading_unit_b7d9fc555f45f38bf77171dd",
+          "kind": "value_creation",
+          "canonicalMeaning": "직접 만든 것을 실제 가치와 연결할 때 돈의 감각이 선명해집니다 — 만든 결과가 사람에게 어떤 도움을 주고 어떤 대가를 받을 수 있는지까지 이어서 볼 때 금전적인 판단이 구체화될 수 있습니다. 결과물과 가치 교환이 가까이 있는 구조에서 돈의 흐름을 이해하기 쉬운 편입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_5bd0a4348f337beea29f9f97",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_d5de1f9a74d5b2722c5d0ac2",
+          "kind": "management",
+          "canonicalMeaning": "돈 관리에도 최소한의 기준과 책임 경계가 있는 편이 안정적입니다 — 매번 기분에 따라 판단하기보다 고정비, 한도, 우선순위처럼 미리 정한 기준이 있으면 돈을 다루기 훨씬 편할 수 있습니다. 기준이 너무 촘촘할 필요는 없지만 어디까지 써도 되는지는 분명한 구조가 잘 맞습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_326e37e903fae88e04892806",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_e6add929ffefe7b8d11005c4",
+          "kind": "friction",
+          "canonicalMeaning": "내가 원하는 선택과 현실적인 예산이 부딪힐 때 스트레스가 커질 수 있습니다 — 원하는 방식이 분명할수록 비용이나 효율 때문에 선택을 바꿔야 할 때 답답함을 느끼기 쉽습니다. 모든 선택을 아끼는 방향으로 만들기보다 반드시 지킬 취향과 타협 가능한 비용을 미리 나누는 편이 현실적입니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_345932f859ed950b6d02d92a",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        },
+        {
+          "unitId": "canonical_reading_unit_ea4865acc02f724f8f785f84",
+          "kind": "spending",
+          "canonicalMeaning": "돈을 선택권과 자율성을 확보하는 수단으로 느끼기 쉽습니다 — 남이 정한 방식에 맞추기보다 내가 원하는 선택을 할 수 있게 해주는 돈의 역할을 중요하게 볼 수 있습니다. 그래서 편의, 독립성, 시간을 아끼는 데 쓰는 돈은 단순 소비보다 선택권을 사는 비용처럼 느껴질 수 있습니다.",
+          "sourceRefs": [
+            "SRC-GENERAL-NATAL-YUANHAI-SEMANTICS-WIKISOURCE",
+            "SRC-SAMYEONG-TONGHOE-V5-FOUR-LIBRARIES-TENGOD-RELATIONS"
+          ],
+          "claimRef": "claim_58a4f2493820f2a57f58666b",
+          "methodologyRef": "M-WEALTH-NATAL-READING-TEN-GOD-SYNTHESIS-V1"
+        }
+      ]
+    }
+  ],
+  "sourceHash": "8823814087338ad480c54c9032a54daf2a89e5edc78a868907d0fb8d09e59d52"
+}
