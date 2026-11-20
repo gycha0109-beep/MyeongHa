@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import {getSajuProductChapterBlueprintV1} from '../../../packages/domain/src/saju-product-chapter-blueprints-v1.js';
 import { createOpenAiOfficialWealthLunaWriterV1 } from './openai-official-wealth-luna-writer-v1.js';
 import {
   OFFICIAL_WEALTH_LUNA_MODEL_ID_V1,
@@ -73,6 +74,50 @@ describe('OpenAI GPT-6 Luna Wealth writer',()=>{
       {index:0,quote:'결과물을 만든다는 것과 결과물이 실제로 쓰이는 것을 구분할 때 돈의 판단 기준이 달라집니다.'},
       {index:1,quote:'결과물을 만든다는 것과 결과물이 실제로 쓰이는 것을 구분할 때 돈의 판단 기준이 달라집니다.'},
     ]);
+  });
+  it('requires six different approved primary meanings before spending for six chapters',async()=>{
+    const original=source();
+    const blueprint=getSajuProductChapterBlueprintV1('wealth');
+    const build=(reuse:boolean):OfficialWealthLunaSourceV1=>({
+      ...original,
+      chapters:blueprint.map((chapter,index)=>({
+        index,title:chapter.fixedTitle,
+        excerpts:['승인 의미 [unit-'+(reuse&&index===5?0:index)+']\\n'+
+          '이 명식에서 별도로 승인된 재물 판단 '+(reuse&&index===5?0:index)+
+          '의 조건을 기반으로 실제 삶의 선택을 나누어 설명합니다. 일반적인 재테크 조언은 근거가 아닙니다.'],
+      })),
+    });
+    let providerCalled=false;
+    let submitted:unknown;
+    const writer=createOpenAiOfficialWealthLunaWriterV1({
+      apiKey:'test-secret',
+      authority:{async admit(){return 'authorized';}},
+      durable:{
+        async claim(){return {state:'claimed',reservationId:'test-reservation'};},
+        async reserveProviderCost(){},
+        async commit(){},
+        async fail(){},
+      },
+      fetchImpl:async(_url,init)=>{
+        providerCalled=true;submitted=JSON.parse(String(init?.body));
+        return new Response(null,{status:503});
+      },
+    });
+    await expect(writer.readOrCreateValidated({
+      source:build(true),idempotencyKey:'s'.repeat(64),validateDraft:raw=>raw as never,
+    })).rejects.toThrow('lacks distinct source-owned meaning');
+    expect(providerCalled).toBe(false);
+    await expect(writer.readOrCreateValidated({
+      source:build(false),idempotencyKey:'t'.repeat(64),validateDraft:raw=>raw as never,
+    })).rejects.toThrow('Luna network failure 503');
+    expect(providerCalled).toBe(true);
+    const request=submitted as {input:{content:{text:string}[]}[]};
+    const input=JSON.parse(request.input[1]!.content[0]!.text) as {
+      sourceAnchors:{index:number;quote:string|null}[];
+    };
+    expect(input.sourceAnchors).toHaveLength(6);
+    expect(new Set(input.sourceAnchors.map(item=>item.quote)).size).toBe(6);
+    expect(input.sourceAnchors.every(item=>item.quote?.length!>=20)).toBe(true);
   });
   it('refuses to call model when current active publication or grant is held',async()=>{
     let called=false;
