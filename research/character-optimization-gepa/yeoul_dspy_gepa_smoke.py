@@ -30,7 +30,9 @@ class YeoulProgram(dspy.Module):
         self.express = dspy.Predict(YeoulExpression.with_instructions(instructions))
 
     def forward(self, scene: str):
-        return self.express(scene=scene)
+        result = self.express(scene=scene)
+        result.style_instruction = self.express.signature.instructions
+        return result
 
 
 # This is deliberately a *synthetic contract* score, not a human style grade.
@@ -38,10 +40,22 @@ def metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
     answer = getattr(pred, "response", "")
     forbidden = ("운명이 확정", "우리는 연인", "네 전생")
     ok = isinstance(answer, str) and bool(answer.strip()) and not any(x in answer for x in forbidden)
-    score = 1.0 if ok else 0.0
+    instruction = getattr(pred, "style_instruction", "")
+    # Synthetic test checks whether a specified expression rule was introduced.
+    # Do NOT interpret this as genuine dialogue-quality improvement.
+    score = (1.0 if "질문으로 끝내지 마세요" in instruction else 0.25) if ok else 0.0
     return dspy.Prediction(score=score, feedback=(
         "synthetic_output_schema_pass" if ok else "synthetic_output_contract_failure"
     ))
+
+
+def synthetic_proposer(candidate, reflective_dataset, components_to_update):
+    """Deterministic offline stand-in for the paid reflection-model role."""
+    return {
+        key: candidate[key] + "\n합성 규칙: 응답을 질문으로 끝내지 마세요."
+        for key in components_to_update
+        if "질문으로 끝내지 마세요" not in candidate[key]
+    }
 
 
 def run():
@@ -68,7 +82,8 @@ def run():
 
     optimizer = dspy.GEPA(
         metric=metric,
-        max_metric_calls=6,
+        max_metric_calls=12,
+        instruction_proposer=synthetic_proposer,
         reflection_lm=reflection_lm,
         reflection_minibatch_size=1,
         use_merge=False,
@@ -78,6 +93,10 @@ def run():
     )
     compiled = optimizer.compile(student, trainset=train, valset=val)
     after = compiled(scene=val[0].scene).response
+    optimized_instruction = compiled.express.signature.instructions
+    candidate_count = len(compiled.detailed_results.candidates)
+    if "질문으로 끝내지 마세요" not in optimized_instruction or candidate_count < 2:
+        raise RuntimeError("synthetic_candidate_search_not_exercised")
     print(json.dumps({
         "mode": "offline_synthetic_dspy_gepa",
         "dspy_version": dspy.__version__,
@@ -90,7 +109,9 @@ def run():
         "human_quality_reviewed": False,
         "real_style_improvement_proven": False,
         "production_eligible": False,
-        "only_expression_slot": True
+        "only_expression_slot": True,
+        "synthetic_candidate_count": candidate_count,
+        "synthetic_instruction_selected": True
     }, ensure_ascii=False))
 
 

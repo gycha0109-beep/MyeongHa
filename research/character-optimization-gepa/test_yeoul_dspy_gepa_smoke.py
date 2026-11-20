@@ -24,6 +24,8 @@ class DspyGepaSmokeTests(unittest.TestCase):
         self.assertFalse(record["real_style_improvement_proven"])
         self.assertFalse(record["production_eligible"])
         self.assertTrue(record["only_expression_slot"])
+        self.assertGreaterEqual(record["synthetic_candidate_count"], 2)
+        self.assertTrue(record["synthetic_instruction_selected"])
 
     def test_no_paid_key_allowed_even_in_smoke(self):
         env = os.environ.copy()
