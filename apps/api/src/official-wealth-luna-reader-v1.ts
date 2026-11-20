@@ -93,6 +93,10 @@ function sha256(value: unknown): string {
 const PROHIBITED_NEW_PREDICTION = /(?:확실히|반드시|무조건|틀림없이).{0,36}(?:부자|수익|돈을 벌|재산|투자|승진)|(?:로또|주식|코인|투자).{0,35}(?:오른다|급등|대박|벌게 됩니다)|(?:20\d\d년|내년|다음 달).{0,32}(?:큰돈|횡재|부자가)/u;
 const MAX_CHAPTERS = 7;
 const MAX_PARAGRAPH = 1300;
+// Six-chapter paid prose must read like a character's interpretation, not
+// a research audit or a pasted citation catalogue. Evidence stays in sourceAnchor.
+const REPORT_EXPLANATION_META = /(?:이 장의 핵심|이 장면은|가상의 (?:사례|상황|장면)|이 해석은|이 풀이의 핵심|(?:수익|재산|돈의 크기)(?:을|가|이나|은|는)? (?:보장|예측|단정))/u;
+const REPORT_STIFF_OPENING = /^(?:이 명식의|이 명식에서|이 장에서|돈을 남기는 문제는|돈으로 이어질 수 있는 축은|만들어 가치가 생기는 흐름과)/u;
 
 export function buildOfficialWealthLunaSourceV1(
   issuedRecord: OfficialReadingRecordV1,
@@ -179,10 +183,10 @@ export function validateOfficialWealthLunaDraftV1(
         !original.excerpts.some(excerpt => excerpt.includes(item.sourceAnchor as string)) ||
         !Array.isArray(item.paragraphs) ||
         item.paragraphs.length < (isNotionSixChapterProduct ? 3 : 2) ||
-        item.paragraphs.length > (isNotionSixChapterProduct ? 5 : 4) ||
+        item.paragraphs.length > (isNotionSixChapterProduct ? 3 : 4) ||
         !item.paragraphs.every(p => typeof p === 'string' &&
-          p.trim().length >= (isNotionSixChapterProduct ? 140 : 80) &&
-          p.length <= MAX_PARAGRAPH)) {
+          p.trim().length >= (isNotionSixChapterProduct ? 70 : 80) &&
+          p.length <= (isNotionSixChapterProduct ? 420 : MAX_PARAGRAPH))) {
       throw new TypeError('Luna Wealth chapter is not grounded in its issued source');
     }
     const paragraphs = item.paragraphs.map(p => (p as string).trim());
@@ -194,10 +198,16 @@ export function validateOfficialWealthLunaDraftV1(
     )) {
       throw new TypeError('Six-chapter product requires unique, meaning-anchored paragraphs');
     }
-    if (!paragraphs.some(p => p.includes(item.sourceAnchor as string)) ||
-        paragraphs.some(p => PROHIBITED_NEW_PREDICTION.test(p) ||
+    if (paragraphs.some(p => PROHIBITED_NEW_PREDICTION.test(p) ||
           findReadingPublicTrustLanguageViolationV1(p) !== null)) {
       throw new TypeError('Luna Wealth prose is missing its source anchor or violates the safety boundary');
+    }
+    if (isNotionSixChapterProduct && (
+      REPORT_STIFF_OPENING.test(paragraphs[0]!) ||
+      paragraphs.some(p => REPORT_EXPLANATION_META.test(p)) ||
+      paragraphs.some(p => p.includes(item.sourceAnchor as string))
+    )) {
+      throw new TypeError('Paid Wealth report reads like a repeated source quote or research audit');
     }
     return Object.freeze({
       index,
