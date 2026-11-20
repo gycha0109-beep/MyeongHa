@@ -82,7 +82,7 @@ describe('OpenAI GPT-6 Luna Wealth writer',()=>{
       ...original,
       chapters:blueprint.map((chapter,index)=>({
         index,title:chapter.fixedTitle,
-        excerpts:['승인 의미 [unit-'+(reuse&&index===5?0:index)+']\\n'+
+        excerpts:['승인 의미 [unit-'+(reuse&&index===5?0:index)+']\n'+
           '이 명식에서 별도로 승인된 재물 판단 '+(reuse&&index===5?0:index)+
           '의 조건을 기반으로 실제 삶의 선택을 나누어 설명합니다. 일반적인 재테크 조언은 근거가 아닙니다.'],
       })),
