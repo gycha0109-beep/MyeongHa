@@ -1,0 +1,47 @@
+name: "[WT:character-runtime-lab] Yeoul v8 single only Luna"
+on:
+  workflow_dispatch:
+    inputs:
+      paid_approval:
+        description: "Owner approves up to nine paid v8-only responses"
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: yeoul-v8-single-only
+  cancel-in-progress: false
+jobs:
+  generate:
+    if: ${{ github.actor == 'gycha0109-beep' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.paid_approval == true }}
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - name: Validate v8 only plan
+        run: |
+          node --check scripts/character-optimization/yeoul-v8-only-live.mjs
+          node --test scripts/character-optimization/yeoul-v8-only-live.test.mjs
+          node scripts/character-optimization/yeoul-v8-only-live.mjs --plan-only
+      - name: Generate v8 only
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          YEOUL_PAID_APPROVAL: ${{ inputs.paid_approval && 'true' || 'false' }}
+        run: node scripts/character-optimization/yeoul-v8-only-live.mjs
+      - name: Upload v8 responses
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: yeoul-v8-only-${{ github.run_id }}
+          path: |
+            yeoul-v8-only-results.json
+            yeoul-v8-only-results.html
+          retention-days: 7
+          if-no-files-found: ignore
