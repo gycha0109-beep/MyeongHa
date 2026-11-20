@@ -7,7 +7,7 @@ test('nine v8 replies, zero earlier versions',()=>{
  const p=spawnSync(process.execPath,[script,'--plan-only'],{encoding:'utf8',env:{PATH:process.env.PATH}});
  assert.equal(p.status,0,p.stderr);
  const plan=JSON.parse(p.stdout);
- assert.equal(plan.version,'v8');assert.equal(plan.plannedCalls,9);
+ assert.equal(plan.version,'v8');assert.ok(plan.systemPromptChars<500, 'minimal system prompt exceeded 500 chars');assert.equal(plan.plannedCalls,9);
  assert.equal(plan.previousVersionCalls,0);assert.equal(new Set(plan.caseIds).size,9);
 });
 test('manual paid approval required',()=>{

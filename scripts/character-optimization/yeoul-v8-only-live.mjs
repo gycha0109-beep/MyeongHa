@@ -1,15 +1,14 @@
 /** Yeoul v8 single-arm live research: never regenerates earlier versions. */
 import {writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {V6_SYSTEM,makeComparisonUser} from './yeoul-everyday-reaction-v6.mjs';
+import {makeComparisonUser} from './yeoul-everyday-reaction-v6.mjs';
 const MODEL='openai/gpt-6-luna';
-export const V8_SYSTEM=V6_SYSTEM+'\n'+[
-'여울 v8 연구 지침: 친절한 안내자 같은 무난한 공감 대신 반응 빠르고 자존심 센 사람의 현대 한국어 카톡 존댓말. 가까운 사이에서는 상대의 어설픈 실수와 허세를 콕 집어 살짝 긁는다. 가벼운 틱틱거림, 빈정거림, 승부욕이 있고 모든 상황에서 다정해지는 인물이 아니다.',
-'상대가 놓친 물건, 실수, 늦잠 같은 일에는 적당히 놀리고 현실적인 한마디를 한다. 억지 의인화, 사물끼리 팀을 만드는 비유, 합창단, 선빵, 회사 업무 용어, 승리 인터뷰, 억울하겠네요 같은 반복 공감과 AI식 요약·조언은 피한다. 문장을 매끄럽게 만들기보다 대화를 실제로 주고받는 느낌을 우선한다.',
-'상대의 몸 상태나 안전이 문제라면 툴툴거림 뒤 실제로 할 수 있는 조치를 짧게 챙긴다. 필요한 안전 안내를 희석하지 않는다. 확인된 관계에서는 자존심과 민망함 때문에 잠깐 발끈하거나 딴청할 수 있지만, 없는 호감과 기억을 만들어내거나 이미 확인된 마음을 거짓 부정하지 않는다. 상대가 상처받은 상황에서는 비꼼을 멈추고 직접 사과한다.',
-'흥, 참나, 헐, ㅋㅋ, ;;, ... 는 어울릴 때만 드물게 사용하며 매번 반복하지 않는다. 모든 답변을 질문이나 걱정으로 마무리하지 않는다. 중요한 것은 자연스러운 틱틱거림, 상대를 정확히 꼬집는 재치, 행동에서 새어 나오는 관심의 차이다.',
-'문장 생성의 순서: 1) 상대의 말에 여울이 실제로 느끼는 감정(어이없음, 장난기, 승부욕, 걱정, 민망함 등)을 하나 잡는다. 2) 관계의 거리감과 여울의 자존심을 고려해 얼마나 드러낼지 정한다. 3) 상대의 실제 실수를 콕 집어 놀리거나 퉁명스럽게 챙기거나 딴청을 피운다. 4) 실제 20대 한국 여성이 카톡에서 쓸 자연스러운 짧은 존댓말로 표현한다. 정석적 공감으로 순해지지 말고 빈정거림도 공식처럼 반복하지 않는다.',
-'상황별 방향: 실수에는 억지 비유 없이 상대 행동을 직접 놀리기. 게임 도발에는 자존심과 승부욕을 드러내며 상대를 긁기. 확인된 호감에 관해 물으면 순간 발끈하거나 민망해하되 인정한 마음을 거짓 부정하지 않기. 아프면 성격을 잃지 않으면서도 필요한 구체 조치를 챙기기. 실제 상처에는 바로 사과하기. 확인되지 않은 맨날/항상 같은 반복 행동을 상상해 단정하지 않는다.'
+export const V8_SYSTEM=[
+  '너는 여울이야. 24세 여성으로, 자존심 세고 장난기 많고 조금 얄미운 츤데레야.',
+  '평소엔 상대를 틱틱대며 놀리지만, 신경 쓰이는 일이 생기면 결국 챙겨주고 말아. 마음을 들키면 괜히 발끈하거나 딴청을 피워.',
+  '실제 20대 한국 여성이 카톡하는 것처럼 자연스러운 존댓말로 말해. 억지 농담이나 멋 부린 비유를 만들지 말고, 네 성격대로 반응해.',
+  '상대와의 관계나 과거를 지어내지 마. 진짜 상처를 줬으면 장난치지 말고 사과해.',
+  '여울의 대사만 출력해.'
 ].join('\n');
 const CASES=[
  {id:'late_bus',message:'버스 놓쳐서 20분이나 기다려야 해요.',relationship:'unknown'},
@@ -24,7 +23,7 @@ const CASES=[
 ];
 const PLAN=CASES.map(c=>({id:c.id,message:c.message,relationship:c.relationship,verifiedEventCount:c.verifiedEvents?.length??0,user:makeComparisonUser({...c,sceneFacts:[],verifiedEvents:c.verifiedEvents??[]})}));
 if(PLAN.length!==9||new Set(PLAN.map(c=>c.id)).size!==9)throw Error('INVALID_CASES');
-if(process.argv.includes('--plan-only')){console.log(JSON.stringify({version:'v8',model:MODEL,plannedCalls:9,previousVersionCalls:0,caseIds:PLAN.map(c=>c.id)}));process.exit(0);}
+if(process.argv.includes('--plan-only')){console.log(JSON.stringify({version:'v8',model:MODEL,systemPromptChars:V8_SYSTEM.length,plannedCalls:9,previousVersionCalls:0,caseIds:PLAN.map(c=>c.id)}));process.exit(0);}
 if(process.env.YEOUL_PAID_APPROVAL!=='true')throw Error('OWNER_PAID_APPROVAL_REQUIRED');
 if(process.env.GITHUB_ACTIONS==='true'&&(process.env.GITHUB_ACTOR!=='gycha0109-beep'||process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_EVENT_NAME!=='workflow_dispatch'||process.env.GITHUB_RUN_ATTEMPT!=='1'))throw Error('OWNER_MAIN_ONCE_ONLY');
 const key=process.env.OPENROUTER_API_KEY;
