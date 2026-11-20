@@ -211,6 +211,9 @@ export function validateOfficialWealthLunaDraftV1(
     if(new Set(allParagraphs).size !== allParagraphs.length){
       throw new TypeError('Wealth chapters repeat the same text across unrelated questions');
     }
+    if(new Set(chapters.map(chapter=>chapter.sourceAnchor)).size!==chapters.length){
+      throw new TypeError('Wealth chapters reuse the same source interpretation as their primary anchor');
+    }
   }
   return Object.freeze({
     version: OFFICIAL_WEALTH_LUNA_READER_VERSION_V1,

@@ -114,6 +114,29 @@ function sourceOwnedQuoteV1(source:OfficialWealthLunaSourceV1['chapters'][number
   return null;
 }
 
+function chapterSourceAnchorsV1(source:OfficialWealthLunaSourceV1){
+  const sixChapterProduct=source.chapters.length===6 &&
+    source.chapters.every((chapter,index)=>
+      chapter.title===getSajuProductChapterBlueprintV1('wealth')[index]?.fixedTitle);
+  const usedUnits=new Set<string>();
+  const suggestions=source.chapters.map(chapter=>{
+    for(const excerpt of chapter.excerpts){
+      const unitId=excerpt.match(/^승인 의미 \[([^\]]+)\]/u)?.[1]??null;
+      if(sixChapterProduct && (unitId===null || usedUnits.has(unitId)))continue;
+      const quote=sourceOwnedQuoteV1({...chapter,excerpts:[excerpt]});
+      if(quote!==null){
+        if(unitId!==null)usedUnits.add(unitId);
+        return {index:chapter.index,quote};
+      }
+    }
+    return {index:chapter.index,quote:null};
+  });
+  if(sixChapterProduct && suggestions.some(item=>item.quote===null)){
+    throw new TypeError('Six-chapter Wealth report lacks distinct source-owned meaning for each chapter');
+  }
+  return suggestions;
+}
+
 function instructions(source:OfficialWealthLunaSourceV1):string {
   const isSixChapterProduct=source.chapters.length===6 &&
     source.chapters.every((chapter,index)=>chapter.title===
@@ -159,6 +182,8 @@ export function createOpenAiOfficialWealthLunaWriterV1(
   return Object.freeze({
     model:OFFICIAL_WEALTH_LUNA_MODEL_ID_V1,
     async readOrCreateValidated(input: Parameters<AuthorizedOfficialWealthLunaWriterPortV1['readOrCreateValidated']>[0]){
+      // Reject insufficient six-chapter meaning before reserving any paid model usage.
+      chapterSourceAnchorsV1(input.source);
       const decision=await config.authority.admit({
         readingId:input.source.readingId,sourceHash:input.source.sourceHash,
         readerCharacterId:'taegyeom',model:OFFICIAL_WEALTH_LUNA_MODEL_ID_V1,
@@ -193,7 +218,7 @@ export function createOpenAiOfficialWealthLunaWriterV1(
               {role:'user',content:[{type:'input_text',text:JSON.stringify({
                 kind:'verified_official_wealth_source',
                 sourceHash:input.source.sourceHash,chapters:input.source.chapters,
-                sourceAnchors:input.source.chapters.map(chapter=>({index:chapter.index,quote:sourceOwnedQuoteV1(chapter)})),
+                sourceAnchors:chapterSourceAnchorsV1(input.source),
                 limitations:input.source.limitations,
               })}]},
             ],
