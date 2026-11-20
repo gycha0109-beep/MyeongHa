@@ -86,7 +86,7 @@ describe('owner-authorized Luna wealth supplement',()=>{
           '먼저 중요한 것은 선택에 따르는 책임을 구분하는 일입니다. 감당할 수 있는 범위까지는 당신의 선택이지만, 결과를 미리 약속할 수는 없습니다.',
           '각 선택에는 서로 다른 조건이 붙습니다. 명리에서 읽힌 책임과 선택의 관계를 따져 봐야 할 때입니다. 눈에 보이는 결과와 감당할 무게를 혼동할 필요는 없습니다.',
           '결정은 당신이 합니다. 저는 구분해야 할 선만 짚겠습니다. 필요한 것과 원하는 것을 나누면 판단이 조금 더 명확해질 수 있습니다.',
-        ],
+        ].map(line=>line+' 지금은 '+(chapter.index+1)+'번 질문의 구분을 놓치지 마십시오.'),
       })),
     };
     expect(validateOfficialWealthLunaDraftV1(source,output).chapters).toHaveLength(6);
