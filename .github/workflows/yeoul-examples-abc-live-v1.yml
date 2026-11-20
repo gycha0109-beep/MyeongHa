@@ -1,10 +1,10 @@
-name: "[WT:character-runtime-lab] Yeoul four-examples GPT-6 Luna ABC"
+name: "[WT:character-runtime-lab] Yeoul voice development GPT-6 Luna controlled comparison"
 on:
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: yeoul-examples-abc-live-v1
+  group: yeoul-lively-v4-v1
   cancel-in-progress: false
 jobs:
   compare:
@@ -19,22 +19,22 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
-      - name: Validate three prompt variants
+      - name: Validate lively v4 comparison
         run: |
-          node --check scripts/character-optimization/yeoul-compact-examples-v3.mjs
-          node --check scripts/character-optimization/yeoul-examples-abc-live-v1.mjs
-          node scripts/character-optimization/yeoul-examples-abc-live-v1.mjs --plan-only
-      - name: Compare eight situations with each system
+          node --check scripts/character-optimization/yeoul-lively-voice-v4.mjs
+          node --check scripts/character-optimization/yeoul-lively-v4-live-v1.mjs
+          node scripts/character-optimization/yeoul-lively-v4-live-v1.mjs --plan-only
+      - name: Compare eight situations v3 vs v4
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: node scripts/character-optimization/yeoul-examples-abc-live-v1.mjs
+        run: node scripts/character-optimization/yeoul-lively-v4-live-v1.mjs
       - name: Upload answers and HTML comparison
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: yeoul-examples-abc-${{ github.run_id }}
+          name: yeoul-lively-v4-${{ github.run_id }}
           path: |
-            yeoul-examples-abc-live-results.json
-            yeoul-examples-abc-live-comparison.html
+            yeoul-lively-v4-live-results.json
+            yeoul-lively-v4-comparison.html
           retention-days: 7
           if-no-files-found: ignore
