@@ -29,7 +29,7 @@ jobs:
         run: node scripts/saju/wealth-luna-synthetic-one-shot.mjs
       - name: Keep synthetic-only, non-public review output for three days
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wealth-luna-synthetic-review
           path: |

@@ -146,7 +146,7 @@ jobs:
           echo 'PASS_ONE_SHOT_POST_MIGRATION_BACKUP: live captured frontier is the exact reviewed remote version'
 
       - name: Upload encrypted off-provider backup artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ${{ steps.dump.outputs.artifact_name }}
           path: |
@@ -159,7 +159,7 @@ jobs:
 
       - name: Upload optional encrypted Provider migration source only
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_provider_ledger }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ${{ steps.dump.outputs.provider_ledger_artifact_name }}
           path: |
