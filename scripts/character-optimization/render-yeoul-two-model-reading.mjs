@@ -1,0 +1,31 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+const [claudeFile,reviewFile,templateFile,outHtml,outMd]=process.argv.slice(2).map(x=>resolve(x));
+const draft=JSON.parse(readFileSync(claudeFile,'utf8')),review=JSON.parse(readFileSync(reviewFile,'utf8'));
+if(draft.status!=='CLAUDE_DRAFT_SAVED'||review.status!=='DEEPSEEK_REVIEW_SAVED'||draft.sourceHash!==review.sourceHash)throw Error('TWO_MODEL_RESULTS_REQUIRED');
+const h=x=>String(x).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+let html=readFileSync(templateFile,'utf8'),count=0;
+html=html.replace(/<section class="chapter" id="chapter-(\d)"[\s\S]*?<\/section>/g,(section,number)=>{
+ const i=Number(number)-1,c=draft.chapters[i],r=review.reviews[i];
+ if(c?.index!==Number(number)||r?.index!==Number(number))throw Error('CHAPTER_MISSING_OR_MISMATCH');
+ const pars=c.body.split(/\n\s*\n/u).filter(Boolean);
+ const body=pars.map((p,i)=>'<p class="'+(i===0?'chapter-lead':'')+'">'+h(p).replaceAll('\n','<br>')+'</p>').join('\n');
+ const quote=pars[0].split(/(?<=[.!?])\s/u)[0].slice(0,105);
+ let next=section.replace(/(<div class="chapter-content">)[\s\S]*?(<\/div>)/u,(_,a,b)=>a+body+b);
+ next=next.replace(/(<aside class="pullquote">[\s\S]*?<p>)[\s\S]*?(<\/p>)/u,(_,a,b)=>a+h(quote)+b);
+ const issues=r.issues.map(x=>'<li><strong>검토 대상:</strong> '+h(x.quote)+'<br>'+h(x.problem)+'<br><strong>수정 제안:</strong> '+h(x.suggestedCorrection)+'</li>').join('');
+ const facts='<details class="review-details"><summary>DeepSeek의 명리 근거 해설 '+(r.issues.length?' · 검토 항목 '+r.issues.length+'개':' · 검토 항목 없음')+'</summary><div class="review-inner"><p>'+h(r.explanation)+'</p>'+(issues?'<ul>'+issues+'</ul>':'')+'<small>원문은 Claude 생성 그대로 보존했습니다. DeepSeek은 검토·해설만 수행했습니다.</small></div></details>';
+ next=next.replace(/<div class="chapter-end">/u,facts+'<div class="chapter-end">');
+ for(const paragraph of pars){if(!next.includes(h(paragraph).replaceAll('\n','<br>')))throw Error('CLAUDE_PARAGRAPH_LOST:'+number)}
+ count++;return next;
+});
+if(count!==6)throw Error('CHAPTER_COUNT_NOT_SIX');
+html=html.replace(/<title>[^<]+<\/title>/,'<title>여울의 커리어 | Claude 집필 × DeepSeek 명리 해설</title>');
+html=html.replaceAll('DeepSeek V4.1 Flash 1017','Claude Sonnet 4.6 · DeepSeek V4.1 Flash 1017');
+html=html.replaceAll('실제 DeepSeek 생성 원문','Claude 생성 원문');
+html=html.replaceAll('DeepSeek 생성 원문','Claude 생성 원문');
+html=html.replace(/<\/style>/,'\n.review-details{margin:22px 0 35px;border:1px solid var(--line);background:var(--paper);border-radius:10px;overflow:hidden}.review-details summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:14px;padding:18px 20px}.review-inner{padding:0 20px 18px;color:var(--muted);font-size:14px;line-height:1.85}.review-inner ul{padding-left:22px}.review-inner li{padding:8px 0}.review-inner small{font-size:11px;color:var(--muted)}\n</style>');
+html=html.replace(/Source: Saju engine-derived synthetic research case A[^<]*/,'Source: 32 Saju research evidence units · Claude body '+draft.bodyCharacters.toLocaleString('ko-KR')+' chars · DeepSeek review '+review.reviews.length+' chapters');
+const md=['# 여울 — 직업·커리어 (Claude 생성 × DeepSeek 명리 근거 해설)','', '> 동일 합성 명식 · 연구용 · 공식 Reading 발급 아님','',...draft.chapters.flatMap((c,i)=>['## '+c.index+'장. '+c.title,'',c.body,'','### DeepSeek 검토·근거 해설','',review.reviews[i].explanation,'',...review.reviews[i].issues.map(x=>'- 검토: '+x.quote+' / '+x.problem+' / 권고: '+x.suggestedCorrection),'','<!-- Evidence: '+c.evidenceIds.join(', ')+' -->',''])].join('\n');
+writeFileSync(outHtml,html,'utf8');writeFileSync(outMd,md,'utf8');
+console.log(JSON.stringify({status:'TWO_MODEL_HTML_SAVED',chapters:count,characters:draft.bodyCharacters,reviewIssues:review.reviews.reduce((n,r)=>n+r.issues.length,0),html:outHtml,markdown:outMd}));
