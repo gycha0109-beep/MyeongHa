@@ -90,11 +90,14 @@ function parseRedirectUri(value: unknown, approvedWebOrigin?: string): URL | nul
     url.hostname === MOBILE_SOCIAL_REDIRECT_HOST &&
     url.pathname === MOBILE_SOCIAL_REDIRECT_PATH &&
     url.search === '';
+  const approvedWeb = approvedWebOrigin !== undefined &&
+    (url.origin === approvedWebOrigin ||
+      (approvedWebOrigin === 'http://127.0.0.1:8787' && url.origin === approvedWebOrigin)) &&
+    (url.protocol === 'https:' ||
+      (url.origin === 'http://127.0.0.1:8787' && url.protocol === 'http:'));
   const web =
     commonSafe &&
-    (approvedWebOrigin === undefined
-      ? WEB_SOCIAL_REDIRECT_ORIGINS.has(url.origin)
-      : url.origin === approvedWebOrigin) &&
+    (approvedWebOrigin === undefined ? WEB_SOCIAL_REDIRECT_ORIGINS.has(url.origin) : approvedWeb) &&
     url.pathname === WEB_SOCIAL_REDIRECT_PATH &&
     url.searchParams.getAll('social').length === 1 &&
     url.searchParams.get('social') === WEB_SOCIAL_REDIRECT_MARKER &&
@@ -142,11 +145,14 @@ export async function handleSocialAuthStartRequestV1(input: {
   if (!isRecord(body)) return failure('INVALID_REQUEST', 400);
   const provider = parseProvider(body.provider);
   const approvedWebOrigin = input.webOrigin;
+  const localAuth = input.env.MYEONGHA_LOCAL_AUTH_MODE === 'isolated-v1';
   if (approvedWebOrigin !== undefined) {
     let host: URL;
     try { host = new URL(approvedWebOrigin); }
     catch { return failure('INVALID_REQUEST', 400); }
-    if (host.origin !== approvedWebOrigin || host.protocol !== 'https:' ||
+    const localOriginAllowed = localAuth && approvedWebOrigin === 'http://127.0.0.1:8787' &&
+      host.origin === approvedWebOrigin && host.protocol === 'http:' && host.port === '8787';
+    if (host.origin !== approvedWebOrigin || (host.protocol !== 'https:' && !localOriginAllowed) ||
         host.username !== '' || host.password !== '' || host.search !== '' ||
         host.hash !== '') return failure('INVALID_REQUEST', 400);
   }
@@ -162,9 +168,13 @@ export async function handleSocialAuthStartRequestV1(input: {
   const state = randomState();
   redirectUri.searchParams.set('state', state);
 
+  const localSupabaseOrigin = localAuth ? input.env.MYEONGHA_LOCAL_SUPABASE_BROWSER_URL : undefined;
+  if (localAuth && localSupabaseOrigin !== 'http://127.0.0.1:15432') {
+    return failure('SOCIAL_AUTH_PROVIDER_DISABLED', 503);
+  }
   const authorizationUrl = new URL(
-    '/auth/v1/authorize',
-    MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
+    localAuth ? '/authorize' : '/auth/v1/authorize',
+    localSupabaseOrigin ?? MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
   );
   authorizationUrl.searchParams.set('provider', SUPABASE_PROVIDER_V1[provider]);
   authorizationUrl.searchParams.set('redirect_to', redirectUri.toString());

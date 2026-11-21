@@ -59,6 +59,19 @@ describe('Password Compromise Guard v1', () => {
     await expect(guard.check('password')).resolves.toEqual({ status: 'unavailable' });
   });
 
+  it('does not follow a redirected password-range response', async () => {
+    let observedRedirect: RequestRedirect | undefined;
+    const guard = createPwnedPasswordCompromiseGuardV1({
+      fetchImpl: vi.fn(async (_input, init) => {
+        observedRedirect = init?.redirect;
+        return new Response(null, { status: 302, headers: { Location: 'https://example.invalid/' } });
+      }),
+    });
+
+    await expect(guard.check('password')).resolves.toEqual({ status: 'unavailable' });
+    expect(observedRedirect).toBe('manual');
+  });
+
   it('fails unavailable on provider error or timeout without exposing the password', async () => {
     const providerError = createPwnedPasswordCompromiseGuardV1({
       fetchImpl: vi.fn(async () => new Response('unavailable', { status: 503 })),

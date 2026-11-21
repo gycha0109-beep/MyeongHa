@@ -8,6 +8,7 @@ import {
 import { createProductionGuestBootstrapRuntimePortsV1 } from './production-guest-bootstrap-runtime.js';
 import {
   parseProductionUserDataRuntimeConfigV1,
+  type ProductionUserDataRuntimeConfigV1,
   type ProductionUserDataRuntimeEnvV1,
 } from './production-user-data-runtime-config.js';
 import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-verifier.js';
@@ -27,6 +28,10 @@ export interface CreateProductionGuestBootstrapHttpRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
   /** Server-owned request-scoped Cloudflare Hyperdrive pool; not derived from HTTP input. */
   readonly pool?: PostgresSubjectPoolV1;
+  /** Existing-authority injection for isolated local integration only. */
+  readonly config?: ProductionUserDataRuntimeConfigV1;
+  /** Explicit local/test policy input; Production callers still parse bindings. */
+  readonly guestSessionTtlSeconds?: number;
   /** Server-side test/runtime injection only. Never derived from the client request. */
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
 }
@@ -53,8 +58,10 @@ function cancelUnusedRequestBodyBestEffort(request: Request): void {
 export function createProductionGuestBootstrapHttpRuntimeV1(
   input: CreateProductionGuestBootstrapHttpRuntimeInputV1,
 ): ProductionGuestBootstrapHttpRuntimeV1 {
-  const config = parseProductionUserDataRuntimeConfigV1(input.env);
-  const activationConfig = parseProductionGuestBootstrapActivationConfigV1(input.env);
+  const config = input.config ?? parseProductionUserDataRuntimeConfigV1(input.env);
+  const activationConfig = input.guestSessionTtlSeconds === undefined
+    ? parseProductionGuestBootstrapActivationConfigV1(input.env)
+    : Object.freeze({ guestSessionTtlSeconds: input.guestSessionTtlSeconds });
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({
     config,
     ...(input.pool === undefined ? {} : { pool: input.pool }),

@@ -1,0 +1,90 @@
+# Disposable local GoTrue and application DB. Both Postgres data directories
+# are tmpfs only; the two services are published exclusively to loopback.
+services:
+  auth-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LOCAL_AUTH_DB_PASSWORD:?required}
+      POSTGRES_DB: myeongha_saju_gotrue_verify
+    tmpfs: [/var/lib/postgresql/data]
+    volumes:
+      - ./saju-bridge-auth-init.sql:/docker-entrypoint-initdb.d/01-auth-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d myeongha_saju_gotrue_verify"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+
+  subject-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LOCAL_SUBJECT_DB_PASSWORD:?required}
+      POSTGRES_DB: myeongha_saju_subject_local_verify
+    ports: ["127.0.0.1:15433:5432"]
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d myeongha_saju_subject_local_verify"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+
+  gotrue:
+    image: supabase/gotrue:v2.196.0
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    ports: ["127.0.0.1:15432:9999"]
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: http://127.0.0.1:15432
+      GOTRUE_SITE_URL: http://127.0.0.1:8787
+      GOTRUE_URI_ALLOW_LIST: http://127.0.0.1:8787/**
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:${LOCAL_AUTH_DB_PASSWORD}@auth-db:5432/myeongha_saju_gotrue_verify?sslmode=disable
+      GOTRUE_JWT_SECRET: ${LOCAL_JWT_SECRET:?required}
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_EXTERNAL_GOOGLE_ENABLED: ${LOCAL_GOOGLE_ENABLED:-false}
+      GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${LOCAL_GOOGLE_CLIENT_ID:-}
+      GOTRUE_EXTERNAL_GOOGLE_SECRET: ${LOCAL_GOOGLE_CLIENT_SECRET:-}
+      GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: http://127.0.0.1:15432/callback
+      GOTRUE_EXTERNAL_KAKAO_ENABLED: ${LOCAL_KAKAO_ENABLED:-false}
+      GOTRUE_EXTERNAL_KAKAO_CLIENT_ID: ${LOCAL_KAKAO_CLIENT_ID:-}
+      GOTRUE_EXTERNAL_KAKAO_SECRET: ${LOCAL_KAKAO_CLIENT_SECRET:-}
+      GOTRUE_EXTERNAL_KAKAO_REDIRECT_URI: http://127.0.0.1:15432/callback
+
+  bootstrap-subject:
+    image: postgres:15
+    depends_on:
+      subject-db:
+        condition: service_healthy
+    working_dir: /repo
+    entrypoint: ["/bin/sh", "-euc"]
+    command:
+      - |
+        test "$(psql -X -Atqc 'select current_database()')" = 'myeongha_saju_subject_local_verify'
+        psql -X -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+        for migration in supabase/migrations/*.sql; do
+          psql -X -v ON_ERROR_STOP=1 -f "$$migration" >/dev/null
+        done
+        psql -X -v ON_ERROR_STOP=1 -v "subject_password=$$LOCAL_SUBJECT_LOGIN_PASSWORD" -f scripts/local/saju-bridge-subject-local-login.sql
+        psql -X -v ON_ERROR_STOP=1 -v "sync_password=$$LOCAL_IDENTITY_SYNC_PASSWORD" -f scripts/local/myeongha-auth-local-identity-sync.sql
+    environment:
+      PGHOST: subject-db
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: myeongha_saju_subject_local_verify
+      PGPASSWORD: ${LOCAL_SUBJECT_DB_PASSWORD:?required}
+      LOCAL_SUBJECT_LOGIN_PASSWORD: ${LOCAL_SUBJECT_LOGIN_PASSWORD:?required}
+      LOCAL_IDENTITY_SYNC_PASSWORD: ${LOCAL_IDENTITY_SYNC_PASSWORD:?required}
+    volumes:
+      - ../../:/repo:ro
+    restart: "no"
