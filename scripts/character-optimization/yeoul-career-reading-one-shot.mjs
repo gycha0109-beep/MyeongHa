@@ -15,7 +15,9 @@ const sha=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const isObject=x=>x&&typeof x==='object'&&!Array.isArray(x);
 const bad=(m)=>{throw Error(m)};
 export function validateSource(s){
- if(!isObject(s)||s.sourceKind!=='issued_official_saju_reading'||s.domain!=='career'||!['delivered','delivered_with_fallback'].includes(s.state)||typeof s.readingId!=='string'||!s.readingId.trim()||!Array.isArray(s.evidence)||s.evidence.length<3||!Array.isArray(s.limitations))bad('OFFICIAL_SOURCE_REQUIRED');
+ const issued=s?.sourceKind==='issued_official_saju_reading'&&['delivered','delivered_with_fallback'].includes(s.state);
+ const research=s?.sourceKind==='saju_engine_derived_research_only'&&s.state==='research_only'&&s.productionIssuance===false&&/^[a-f0-9]{64}$/i.test(s.officialReportHash??'');
+ if(!isObject(s)||!(issued||research)||s.domain!=='career'||typeof s.readingId!=='string'||!s.readingId.trim()||!Array.isArray(s.evidence)||s.evidence.length<3||!Array.isArray(s.limitations))bad('AUTHORIZED_SOURCE_KIND_REQUIRED');
  const ids=new Set();
  for(const e of s.evidence){
   if(!isObject(e)||typeof e.id!=='string'||!/^[A-Za-z0-9_-]{3,64}$/.test(e.id)||ids.has(e.id)||typeof e.text!=='string'||e.text.trim().length<20||e.text.length>2200||typeof e.origin!=='string'||!e.origin.trim())bad('INVALID_SOURCE_EVIDENCE');
@@ -47,10 +49,10 @@ export function makeMessages(s){
  '증거가 부족한 내용은 생략하고 시기 근거가 없으면 5장에서 시기 예측 대신 조건부 커리어 흐름의 한계를 설명한다.',
  '결과는 JSON 객체 하나만 출력: {"chapters":[{"index":1,"title":"고정 제목","body":"본문","evidenceIds":["근거 id"]},...]}.',
  ].join('\n');
- return [{role:'system',content:system},{role:'user',content:JSON.stringify({goal:'여울의 직업·커리어 개인화 사주 해설서. 6장 전체 5000~8000자 목표(반복으로 채우지 않기).',titles:CHAPTERS,officialReading:{readingId:s.readingId,state:s.state,domain:s.domain,evidence:s.evidence,limitations:s.limitations}},null,2)}];
+ return [{role:'system',content:system},{role:'user',content:JSON.stringify({goal:'여울의 직업·커리어 개인화 사주 해설서. 6장 전체 5000~8000자 목표(반복으로 채우지 않기).',titles:CHAPTERS,sourceMaterial:{readingId:s.readingId,sourceKind:s.sourceKind,state:s.state,domain:s.domain,productionIssuance:s.productionIssuance??null,evidence:s.evidence,limitations:s.limitations}},null,2)}];
 }
 export function buildPlan(s){
- const source=validateSource(s);return {type:'DEEPSEEK_ONE_SHOT_RESEARCH',model:MODEL,sourceHash:sha(source),sourceReadingId:source.readingId,evidenceCount:source.evidence.length,chapters:CHAPTERS,requestedCalls:1,officialWriterCalls:0,productionEnabled:false};
+ const source=validateSource(s);return {type:'DEEPSEEK_ONE_SHOT_RESEARCH',model:MODEL,sourceKind:source.sourceKind,productionIssuance:source.sourceKind==='issued_official_saju_reading',sourceHash:sha(source),sourceReadingId:source.readingId,evidenceCount:source.evidence.length,chapters:CHAPTERS,requestedCalls:1,officialWriterCalls:0,productionEnabled:false};
 }
 async function main(){
  const opts=process.argv.slice(2);

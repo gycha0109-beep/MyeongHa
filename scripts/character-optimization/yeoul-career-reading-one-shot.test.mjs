@@ -5,3 +5,9 @@ test('plan is one-shot only and no paid call',()=>{const p=buildPlan(src);assert
 test('no fabricated official input',()=>{assert.throws(()=>buildPlan({...src,sourceKind:'invented'}));});
 test('source is passed without editing and prompts include canonical evidence',()=>{const m=makeMessages(src);assert.match(m[1].content,/career-01/);assert.match(m[1].content,/시기 예측 근거 없음/);});
 test('reject incomplete result',()=>assert.throws(()=>validateDraft(src,{chapters:[]})));
+
+import {convertCareerSajuResearch} from './collect-yeoul-career-source.mjs';
+const sourceResearch={sourceKind:'saju_engine_derived_research_only',productionIssuance:false,maySell:false,domain:'career',officialReportHash:'a'.repeat(64),official:{reportHash:'a'.repeat(64),sections:[{sectionId:'s1'}]},units:Array.from({length:3},(_,i)=>({id:'unit-'+i,claimId:'claim-'+i,category:'career',headline:'서술된 업무 성향',summary:'업무 특성과 조건에 관해 공식 근거가 설명하는 내용을 가상으로 제공하는 평가 자료입니다.',sourceRefs:['SRC-TEST']}))};
+test('engine-derived research is never converted into issued official reading',()=>{const {source,manifest}=convertCareerSajuResearch(sourceResearch);const p=buildPlan(source);assert.equal(p.sourceKind,'saju_engine_derived_research_only');assert.equal(p.productionIssuance,false);assert.equal(manifest.unitCount,3);});
+test('reject altered report hash',()=>assert.throws(()=>convertCareerSajuResearch({...sourceResearch,official:{reportHash:'b'.repeat(64),sections:[{}]}})));
+test('reject research payload pretending to have production issuance',()=>assert.throws(()=>convertCareerSajuResearch({...sourceResearch,productionIssuance:true})));
