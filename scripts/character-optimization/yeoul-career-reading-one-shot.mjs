@@ -38,12 +38,12 @@ export function validateDraft(s,raw){
  return {chapters:raw.chapters,bodyCharacters:length};
 }
 const CHAPTER_GUIDES=[
- {index:1,title:CHAPTERS[0],purpose:'일하는 기본 방식과 그 안의 핵심 긴장을 발견한다. 성향을 항목별로 나열하지 말고 한 사람의 작동 방식으로 설명한다.'},
- {index:2,title:CHAPTERS[1],purpose:'실제로 발휘되는 강점과 그 강점이 성과로 이어지는 조건을 설명한다. 1장의 성향 설명을 반복하지 않는다.'},
- {index:3,title:CHAPTERS[2],purpose:'능력이 잘 발휘되는 업무 환경·역할·협업 방식·자율성의 조건을 근거에 맞게 설명한다. 근거 없는 특정 직업을 추천하지 않는다.'},
- {index:4,title:CHAPTERS[3],purpose:'강점이 과해질 때 생기는 비용과 놓치기 쉬운 약점을 설명한다. 막연한 단점 나열이나 훈계로 끝내지 않는다.'},
- {index:5,title:CHAPTERS[4],purpose:'입력된 연도별·월별 근거를 실제 기간과 함께 비교한다. 변화의 흐름과 기간별 차이를 설명하고, 절입 경계와 근거가 제공한 범위를 보존한다.'},
- {index:6,title:CHAPTERS[5],purpose:'앞선 장의 발견을 한 사람의 커리어 관점으로 연결하고 실제 선택에 사용할 판단 기준을 남긴다. 앞 장 요약만 반복하거나 새로운 예언을 만들지 않는다.'},
+ {index:1,title:CHAPTERS[0],targetCharacters:'750~1000',purpose:'일하는 기본 방식과 그 안의 핵심 긴장을 발견한다. 두 특성이 함께 나타나는 이유와 구체적 결과를 한 사람의 작동 방식으로 설명한다. 독자가 예상하지 못한 관찰에 여울의 반응을 자연스럽게 섞는다.'},
+ {index:2,title:CHAPTERS[1],targetCharacters:'750~1000',purpose:'실제로 발휘되는 강점이 어떤 문제 해결 방식으로 드러나는지, 어떤 조건에서 성과가 되고 어떤 조건에서 묻히는지 비교한다. 1장의 성향 설명을 반복하지 않는다.'},
+ {index:3,title:CHAPTERS[2],targetCharacters:'750~1000',purpose:'맞는 환경과 맞지 않는 환경을 나란히 보여주고 역할·협업·자율성의 차이를 생활 언어로 설명한다. 한 장 전체를 조건 목록으로 만들지 않고 왜 그 환경에서 힘이 살아나는지 설명한다. 근거 없는 특정 직업을 추천하지 않는다.'},
+ {index:4,title:CHAPTERS[3],targetCharacters:'750~1000',purpose:'앞에서 강점이라고 한 것이 어떻게 독자의 발목을 잡을 수 있는지 반전과 결과를 구체적으로 풀이한다. 여울이 잠깐 웃다가 진지해지는 순간을 자연스럽게 만든다. 막연한 단점 나열이나 훈계로 끝내지 않는다.'},
+ {index:5,title:CHAPTERS[4],targetCharacters:'1700~2300',purpose:'입력된 모든 연도·월별 기간의 핵심 차이를 누락 없이 비교하되 날짜별 항목 낭독보다 큰 변화의 맥락을 먼저 잡는다. 월별 전환은 핵심 차이와 의미를 보여주고 절입 전후를 섞지 않는다. 대운은 계산상 경계로만 적고 새 길흉을 창작하지 않는다.'},
+ {index:6,title:CHAPTERS[5],targetCharacters:'750~1000',purpose:'앞선 장을 다시 요약하지 말고 가장 본질적인 선택 기준 한두 개로 묶어 독자에게 진심 어린 마지막 말을 남긴다. 여울 특유의 투박한 관심이 마지막에 드러나되 감동을 강요하거나 새로운 예언을 만들지 않는다.'},
 ];
 export function makeMessages(s){
  const system=[
@@ -57,6 +57,9 @@ export function makeMessages(s){
  '주인공은 분석 보고서가 아니라 여울과 독자의 대화 관계다. 여울은 중요한 근거에서 반응하고, 서로 충돌하는 성향을 포착해 놀리고, 가끔 반박하고, 진짜 걱정되는 부분에는 짧게 마음을 드러낸다. 매 문단마다 캐릭터 대사를 강제하지 말고 절제된 리듬을 유지한다.',
  '독자에게 직접 말하는 느낌을 유지하되 "당신은", "이 명식은", "이 사람은"을 문단마다 반복하지 않는다. 독자를 제삼자처럼 평가하지 말고 여울이 눈앞의 사람에게 발견한 점을 말한다. 다만 처음 만난 독자에게 사적인 친분이나 연애 감정을 전제하지 않는다.',
  '각 장에는 읽을 만한 핵심 발견이 있어야 하지만, 모든 장을 역설·질문·한 줄 명언으로 시작하거나 끝내지 않는다. 장마다 자연스러운 시작 방식과 감정 온도를 달리하고, 날카로운 문장은 내용이 무르익는 곳에만 둔다.',
+ '각 장은 짧은 보고서나 설명 요약이 아니라 읽을 만한 한 편의 이야기여야 한다. 1~4장과 6장은 특히 충분한 문단과 관찰을 갖춰야 한다. 앞 장에서 이미 설명한 기준·책임·개선·협업을 단어만 바꿔 반복하지 말고 새로운 인과관계를 해설한다. 5장의 연월운 때문에 나머지 장을 줄이지 않는다.',
+ '여울은 단순한 전달자가 아니라 본인이 독자의 특징을 읽고 한두 번 반응하는 사람이다. 이때 장난은 따뜻한 관찰에서 나오며 강요한 감정이나 가상의 사용자 대사에 기대지 않는다. 인상적인 반전 뒤에는 왜 그런지 실제 근거의 의미를 풀고, 그 지점이 독자의 선택에 어떤 차이를 만드는지까지 자연스럽게 이어간다.',
+ '편집본에서 지향한 여울의 거리감 예시: "잘할 수 있다는 것과 내가 맡아야 한다는 건 다른 말이에요." / "칭찬만 듣고 끝낼 생각은 아니죠?". 이 표현은 그대로 재사용하지 말고, 지나치게 친절한 상담사 대신 살짝 얄밉다가도 필요한 순간 진지해지는 태도만 참고한다.',
  '명식, 원국, 연구용, 근거가 없습니다, 여기엔 자료가 없습니다 등의 내부 절차 설명을 독자 앞에서 계속 말하지 않는다. 설명상 필요한 순간에만 간결하게 밝힌다. 직장 경험을 지어내거나 취업·승진 날짜를 단정하는 방식으로 몰입감을 만들지 않는다.',
  '시기별 정보는 단순한 연도·월별 목록이 아니라 흐름의 반전과 비교로 엮는다. 예: "2026년에 사람과 부딪힐 수 있는 문제를 정리했는데, 2027년엔 이번엔 본인 결정권이 문제네요." 이 문장도 그대로 복사하지 말고 실제 근거와 일치할 때만 쓴다.',
  '기존 6장 제목은 유지하되 회의록처럼 첫째 둘째 셋째 나열하거나 매 장 끝을 결론은 이렇습니다로 닫지 않는다. 캐릭터를 지키면서 같은 근거를 반복하지 않는다.',
@@ -67,7 +70,7 @@ export function makeMessages(s){
  '여섯 장의 역할은 다음과 같다: 1장은 일하는 기본 방식, 2장은 실제 강점, 3장은 맞는 환경과 역할, 4장은 강점이 부담으로 바뀌는 지점, 5장은 근거가 제공한 시기별 흐름, 6장은 앞선 발견을 연결한 커리어 판단 기준이다. 같은 직업 성향을 여섯 장에 복제하지 말고 각 장에서 새로운 발견을 제공한다.',
  '결과는 JSON 객체 하나만 출력: {"chapters":[{"index":1,"title":"고정 제목","body":"본문","evidenceIds":["근거 id"]},...]}.',
  ].join('\n');
- return [{role:'system',content:system},{role:'user',content:JSON.stringify({goal:'여울의 직업·커리어 개인화 사주 해설서. 6장 전체 5000~8000자 목표(반복으로 채우지 않기).',titles:CHAPTERS,chapterGuides:CHAPTER_GUIDES,sourceMaterial:{readingId:s.readingId,sourceKind:s.sourceKind,state:s.state,domain:s.domain,productionIssuance:s.productionIssuance??null,evidence:s.evidence,limitations:s.limitations}},null,2)}];
+ return [{role:'system',content:system},{role:'user',content:JSON.stringify({goal:'여울의 직업·커리어 개인화 사주 해설서. 6장 전체 5600~7000자 목표. 각 장 targetCharacters를 참고하되 분량 채우기용 반복은 금지하고, 5장 외의 장도 충분한 읽을거리를 만든다.',titles:CHAPTERS,chapterGuides:CHAPTER_GUIDES,sourceMaterial:{readingId:s.readingId,sourceKind:s.sourceKind,state:s.state,domain:s.domain,productionIssuance:s.productionIssuance??null,evidence:s.evidence,limitations:s.limitations}},null,2)}];
 }
 export function buildPlan(s){
  const source=validateSource(s);return {type:'DEEPSEEK_ONE_SHOT_RESEARCH',model:MODEL,sourceKind:source.sourceKind,productionIssuance:source.sourceKind==='issued_official_saju_reading',sourceHash:sha(source),sourceReadingId:source.readingId,evidenceCount:source.evidence.length,chapters:CHAPTERS,requestedCalls:1,officialWriterCalls:0,productionEnabled:false};
@@ -85,7 +88,7 @@ async function main(){
  if(process.env.GITHUB_ACTIONS)bad('LOCAL_ONLY_PRIVATE_INPUT');
  const key=process.env.OPENROUTER_API_KEY;if(!key?.startsWith('sk-or-v1-'))bad('OPENROUTER_KEY_MISSING');
  const output=resolve(out);mkdirSync(dirname(output),{recursive:true});
- const maxOutputTokens=14000, maxInputTokens=22000;
+ const maxOutputTokens=18000, maxInputTokens=22000;
  // Fail closed unless caller supplies currently verified, conservative per-million prices.
  const inRate=Number(a.inputUsdPerMillion),outRate=Number(a.outputUsdPerMillion);
  if(!(inRate>0&&outRate>0))bad('VERIFIED_PRICES_REQUIRED');
