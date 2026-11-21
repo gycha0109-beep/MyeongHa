@@ -31,3 +31,21 @@ node scripts/character-optimization/yeoul-career-reading-one-shot.mjs --source C
 5. 각 장의 서술 밀도와 비용 및 5,000~8,000자 목표
 
 자동 구조 검사는 **의미 보존 합격을 증명하지 않는다**. JSON 실패/중단도 원문을 비공개 저장하고 재요청하지 않는다.
+
+### 2026-11-21 — Saju 공식 렌더러 기반 연구 자료 수집
+
+Saju `main@b46a09c3`에서 독립 체크아웃·빌드 후, 동일한 엔진 경로(명식 계산 → Career Natal Claim registry → Interpretation → Composition Evidence → Canonical Semantic Bundle → Official Renderer)를 통해 **서로 다른 합성 명식 2건**을 수집했습니다. 공식 렌더러 출력이더라도 Production 발급 기록이 없으므로 연구 자료로만 분류합니다.
+
+| 구분 | Case A | Case B |
+|---|---:|---:|
+| Career semantic units | 7 | 6 |
+| Rendered sections | 4 | 3 |
+| reportHash prefix | `4636628935af` | `9150d5a26eac` |
+| production issuance | false | false |
+| paid product eligibility | false | false |
+
+실험 입력 파일과 원본은 개인 PC의 `Documents/MyeongHa-Yeoul-Reading-Results-20261121/`에 저장. GitHub에는 원본 JSON이나 특정 개인의 생년월일·출력 원문을 게시하지 않습니다. 연구 결과의 `sourceKind=saju_engine_derived_research_only`는 발급 공식 Reading으로 업그레이드하지 않습니다.
+
+`collect-yeoul-career-source.mjs`가 Saju 원본의 단위별 `canonicalText`, `claimId`, `sourceRefs`, `reportHash`를 추출하여 별도 Reader 연구 입력으로 변환합니다. 모델의 출력 길이 또는 서술 역량은 아직 검증하지 않았으며, 6–7개 근거만으로 5,000~8,000자를 충분히 채울 수 있다는 보장은 없습니다.
+
+기본 모델의 고객용 운영 경로나 공식 사주 해석 엔진·권한은 변경하지 않습니다.
