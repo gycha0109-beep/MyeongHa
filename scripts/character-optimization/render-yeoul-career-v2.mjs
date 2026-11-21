@@ -1,0 +1,30 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+const [resultPath,baseHtmlPath,markdownPath,htmlPath]=process.argv.slice(2).map(p=>resolve(p));
+const result=JSON.parse(readFileSync(resultPath,'utf8'));
+if(!result.structurallyValid||result.draft?.chapters?.length!==6||result.sourceKind!=='saju_engine_derived_research_only')throw Error('RESEARCH_DRAFT_REQUIRED');
+const chapters=result.draft.chapters;
+const h=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const paragraphize=s=>s.split(/\n\s*\n/u).filter(Boolean).map((p,i)=>'<p class="'+(i===0?'chapter-lead':'')+'">'+h(p).replaceAll('\n','<br>')+'</p>').join('\n');
+let html=readFileSync(baseHtmlPath,'utf8');
+const regex=/<section class="chapter" id="chapter-(\d)"[\s\S]*?<\/section>/gu;
+let replaced=0;
+html=html.replace(regex,(section,number)=>{
+ const ch=chapters[Number(number)-1];
+ if(!ch||ch.index!==Number(number))throw Error('CHAPTER_ORDER_MISMATCH');
+ const quote=ch.body.split(/\n\s*\n/u).filter(Boolean)[0].split(/(?<=[.!?])\s/u)[0].slice(0,95);
+ let updated=section.replace(/(<div class="chapter-content">)[\s\S]*?(<\/div>)/u,(_,a,b)=>a+paragraphize(ch.body)+b);
+ updated=updated.replace(/(<aside class="pullquote">[\s\S]*?<p>)[\s\S]*?(<\/p>)/u,(_,a,b)=>a+h(quote)+b);
+ if(updated===section)throw Error('HTML_CHAPTER_NOT_CHANGED_'+number);
+ replaced++;return updated;
+});
+if(replaced!==6)throw Error('HTML_REPLACEMENT_COUNT_'+replaced);
+html=html.replace(/나의 직업과<br><em>커리어<\/em>/,'나의 직업과<br><em>커리어</em>').replace(/일하는 모습부터, 잘하는 일과 지치게 만드는 조건까지\./,'타고난 직업 성향부터 2026~2030년의 흐름까지.');
+html=html.replaceAll('case A · 5,714','case A · 6,273');
+html=html.replace(/Source: Saju engine-derived synthetic research case A[^<]*/u,'Source: Saju synthetic research case A (female) · '+result.draft.bodyCharacters.toLocaleString('ko-KR')+' characters in paragraphs');
+const manifest=JSON.parse(readFileSync(resultPath+'.journal.json','utf8'));
+if(manifest.status!=='RESULT_SAVED')throw Error('INCOMPLETE_RUN');
+const md=['# 여울 — 나의 직업과 커리어 (시기 근거 연결 실험 v2)','', '> 합성 명식(여성) · DeepSeek V4.1 Flash 1017 · 연구용 · 판매용 공식 발급 아님','',...chapters.flatMap(c=>['## '+c.index+'장. '+c.title,'',c.body,'','<!-- evidence: '+c.evidenceIds.join(', ')+' -->',''])].join('\n');
+writeFileSync(markdownPath,md+'\n','utf8');writeFileSync(htmlPath,html,'utf8');
+for(const c of chapters){for(const p of c.body.split(/\n\s*\n/u).filter(Boolean)){if(!html.includes(h(p).replaceAll('\n','<br>')))throw Error('LOST_PARAGRAPH_CHAPTER_'+c.index)}}
+console.log(JSON.stringify({status:'HTML_AND_MARKDOWN_WRITTEN',chapters:6,characters:result.draft.bodyCharacters,htmlFile:htmlPath,markdownFile:markdownPath}));
