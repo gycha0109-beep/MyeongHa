@@ -10,3 +10,8 @@
 - 스크립트: `yeoul-claude-deepseek-research.mjs`(2단계 API), `recover-yeoul-deepseek-review.mjs`(확인된 실제 원응답 복구), `render-yeoul-two-model-reading.mjs`(Claude 본문 보존+DeepSeek 검토 펼치기).
 - 검증: 스크립트 구문 검사, 기존 연구 입력 계약 테스트 7건 통과, 장 6개·감수 6개·HTML 생성 성공. DeepSeek 감수 의견은 자동 수정하지 않음.
 - 다음 실험 시에는 17건을 근거에 맞게 국소 수정하고 여울의 실제 캐릭터 몰입감을 별도 평가해야 한다. 사용자 승인 없는 추가 유료 호출은 진행하지 않는다.
+
+## 2026-11-21 — 실험 결과의 채택 여부
+
+- Claude 집필 → DeepSeek 감수는 비교 실험으로만 보존한다. 사용자는 비용 대비 체감 품질 향상이 부족하다고 판단해 기존 DeepSeek 단일 호출 방식으로 돌아가기로 결정했다.
+- 후속 개선은 기존 단일 호출 프롬프트 안에서 진행하며 Claude 추가 호출이나 다단계 생성 경로를 기본 방식으로 사용하지 않는다.
