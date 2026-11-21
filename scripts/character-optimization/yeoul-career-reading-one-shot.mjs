@@ -46,7 +46,9 @@ export function makeMessages(s){
  '사주 근거를 그대로 나열하지 말고 여울 특유의 반응, 짓궂은 관찰, 현실적인 대비가 살아 있는 개인화 해설서 본문 전체를 작성한다.',
  '여섯 장의 고정 제목을 지키고 각 장은 근거를 설명하면서 읽을 맛이 있어야 한다. 별도 한마디 코너나 반복적인 말버릇은 필요 없다.',
  '독자에게 사실인 것처럼 구체적 과거 사례를 단정하지 않는다. 사례는 가능성을 설명하는 가정으로만 사용한다.',
- '증거가 부족한 내용은 생략하고 시기 근거가 없으면 5장에서 시기 예측 대신 조건부 커리어 흐름의 한계를 설명한다.',
+ '직업 성향과 연도별·월별 시기 근거를 구분하여 해설한다. 연도별 근거가 있을 경우 5장에서 실제 연도를 명시하고 연도 간 차이를 구체적으로 비교한다. 월별 근거는 해당 기간을 실제로 적어 변화 지점을 알려준다.',
+ '대운 구간의 시작·종료일은 계산 사실로 소개할 수 있지만, 대운 자체의 좋고 나쁨, 취업·승진·퇴사·이직 결과나 시기를 단정해서는 안 된다. 연구용 연·월운 또한 특정 사건 예측이 아니라 업무상의 주제와 대응 조건만 다룬다.',
+ '같은 직업 성향을 여섯 장에 복제하지 않는다. 각 장마다 새로운 근거, 다른 관찰, 시기별 대조, 실천적인 판단 기준을 제시한다.',
  '결과는 JSON 객체 하나만 출력: {"chapters":[{"index":1,"title":"고정 제목","body":"본문","evidenceIds":["근거 id"]},...]}.',
  ].join('\n');
  return [{role:'system',content:system},{role:'user',content:JSON.stringify({goal:'여울의 직업·커리어 개인화 사주 해설서. 6장 전체 5000~8000자 목표(반복으로 채우지 않기).',titles:CHAPTERS,sourceMaterial:{readingId:s.readingId,sourceKind:s.sourceKind,state:s.state,domain:s.domain,productionIssuance:s.productionIssuance??null,evidence:s.evidence,limitations:s.limitations}},null,2)}];
@@ -74,17 +76,23 @@ async function main(){
  const worst=(maxInputTokens*inRate+maxOutputTokens*outRate)/1e6;
  if(worst>a.maxUsd)bad('BUDGET_WORST_CASE_EXCEEDS_APPROVAL');
  const lock=output+'.lock';
+ const journal=output+'.journal.json';
+ const mark=(status,additional={})=>writeFileSync(journal,JSON.stringify({status,at:new Date().toISOString(),model:MODEL,sourceHash:plan.sourceHash,...additional},null,2)+'\n',{mode:0o600});
  writeFileSync(lock,JSON.stringify({model:MODEL,sourceHash:plan.sourceHash,approvedBudgetUsd:a.maxUsd,created:new Date().toISOString()}),{flag:'wx',mode:0o600});
+ mark('STARTED');
  const headers={Authorization:'Bearer '+key};
  const models=await fetch('https://openrouter.ai/api/v1/models',{headers,signal:AbortSignal.timeout(20000)});
  if(!models.ok||!(await models.json()).data?.some(m=>m.id===MODEL))bad('MODEL_NOT_AVAILABLE');
- const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+ mark('MODEL_REQUEST_STARTED');
+ const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{ 
   method:'POST',redirect:'error',signal:AbortSignal.timeout(180000),
   headers:{...headers,'Content-Type':'application/json','HTTP-Referer':'https://github.com/gycha0109-beep/MyeongHa','X-Title':'Yeoul Career Reading One Shot Research'},
   body:JSON.stringify({model:MODEL,messages:makeMessages(source),max_completion_tokens:maxOutputTokens,stream:false,provider:{allow_fallbacks:false,data_collection:'deny'}}),
  });
- if(!resp.ok)bad('MODEL_HTTP_'+resp.status);
+ if(!resp.ok){mark('MODEL_HTTP_ERROR',{httpStatus:resp.status});bad('MODEL_HTTP_'+resp.status)}
  const data=await resp.json();
+ mark('MODEL_RESPONSE_RECEIVED',{responseModel:data.model??null,finishReason:data.choices?.[0]?.finish_reason??null,usage:data.usage??null});
+ writeFileSync(output+'.raw-response.json',JSON.stringify(data,null,2)+'\n',{flag:'wx',mode:0o600});
  const result={...plan,status:'REVIEW_REQUIRED',finishReason:data.choices?.[0]?.finish_reason??null,usage:data.usage??null,budgetCapUsd:a.maxUsd};
  if(![MODEL,'deepseek-v4.1-flash-1017'].includes(data.model)||result.finishReason!=='stop'||!data.usage)bad('UNVERIFIED_MODEL_OR_TRUNCATED_RESPONSE');
  const content=data.choices?.[0]?.message?.content;if(typeof content!=='string')bad('EMPTY_RESPONSE');
@@ -92,6 +100,7 @@ async function main(){
  try{const draft=validateDraft(source,parsed);Object.assign(result,{draft,structurallyValid:true});}
  catch(err){Object.assign(result,{rawContent:content,structurallyValid:false,validationError:String(err.message)});}
  writeFileSync(output,JSON.stringify(result,null,2)+'\n',{flag:'wx',mode:0o600});
+ mark('RESULT_SAVED',{structurallyValid:result.structurallyValid,bodyCharacters:result.draft?.bodyCharacters??null});
  console.log(JSON.stringify({status:result.status,output,structurallyValid:result.structurallyValid,bodyCharacters:result.draft?.bodyCharacters??null,sourceHash:plan.sourceHash}));
 }
 if(process.argv[1]&&import.meta.url===new URL('file:///'+resolve(process.argv[1]).replaceAll('\\','/')).href)main().catch(e=>{console.error(String(e.message||e));process.exitCode=1});
