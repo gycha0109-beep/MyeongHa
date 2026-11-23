@@ -45,7 +45,7 @@ jobs:
         run: node scripts/saju/wealth-luna-real-source-one-shot.mjs "$SAMPLE"
       - name: Store private research HTML and exact model usage for review
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wealth-luna-real-saju-research
           path: |

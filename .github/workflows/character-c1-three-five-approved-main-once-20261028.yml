@@ -83,7 +83,7 @@ jobs:
           node scripts/character-c1-three-five-paid-eval-20261028.mjs --execute --approved-three-five-20261028
       - name: Upload exact generated research dialogue and usage journal even if held
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: c1-three-five-main-once-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/character-c1-three-five-main-20261028/
