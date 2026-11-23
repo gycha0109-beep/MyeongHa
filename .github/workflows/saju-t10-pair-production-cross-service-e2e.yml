@@ -1,10 +1,11 @@
-name: Saju T10 Pair Production Cross-Service E2E
+name: Saju T8 and T10 Production Cross-Service E2E
 
 on:
   pull_request:
     paths:
       - 'apps/api/src/*approved-saju*'
       - 'apps/api/src/saju-t10-*'
+      - 'apps/api/src/saju-production-reading-*'
       - 'apps/api/src/official-reading-record-*'
       - 'apps/api/src/reading-history-*'
       - 'apps/api/src/postgres-subject-execution.ts'
@@ -21,6 +22,7 @@ on:
     paths:
       - 'apps/api/src/*approved-saju*'
       - 'apps/api/src/saju-t10-*'
+      - 'apps/api/src/saju-production-reading-*'
       - 'apps/api/src/official-reading-record-*'
       - 'apps/api/src/reading-history-*'
       - 'apps/api/src/postgres-subject-execution.ts'
@@ -41,18 +43,18 @@ concurrency:
 
 jobs:
   signed-pair:
-    name: Pinned Saju process → PostgreSQL 17 → MyeongHa Reader
+    name: Pinned Saju T8 and T10 → PostgreSQL 17 → MyeongHa Reader
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - name: Checkout MyeongHa
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Checkout pinned approved T10 Saju authority
+      - name: Checkout pinned Saju relationship authority
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gycha0109-beep/Saju
-          ref: 5a1edd13fcf06ba7d83348015077f99ab5d6031e # Saju #2807
+          ref: 9536c073ec966d9671a582da5f5a789ef0de64c0 # Saju #2808
           path: .cross-service/saju
 
       - name: Setup Node
@@ -70,5 +72,9 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund --workspaces=false
           npm run build
 
-      - name: Verify three signed purchases through isolated PostgreSQL and Reader
+      - name: Verify general relationship, spouse and pair issuance on Saju
+        working-directory: .cross-service/saju
+        run: npx vitest run test/production-relationship-official-reading-issuer.test.ts test/product-host-t10-production-pair-issue.test.ts
+
+      - name: Verify signed purchases and both bundle Readings in isolated PostgreSQL
         run: node scripts/local/run-approved-saju14-local-stack.mjs --check-t10

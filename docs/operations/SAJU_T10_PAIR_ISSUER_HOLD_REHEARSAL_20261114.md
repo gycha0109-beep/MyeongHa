@@ -43,3 +43,10 @@
 - 구매별 보관함, 기록 목록·상세, 서명 Reader를 확인했다. 중복 요청은 구매와 발급을 재사용하며, 다른 상대의 기록, 타인 열람, 동의 철회, 환불 후 열람을 거부했다. 서명을 받은 직후 동의를 철회한 건은 보관본을 만들지 않았다.
 - 재실행은 Saju 체크아웃을 빌드한 뒤 `MYEONGHA_T10_SAJU_CHECKOUT`을 해당 체크아웃 경로로 지정하고 명하에서 `node scripts/local/run-approved-saju14-local-stack.mjs --check-t10`을 실행한다. 실제 Auth·PortOne·운영 DB 자격증명이 필요 없다.
 - 결합 상품의 별도 본인 T8 `연애운`은 대기 상태로 관찰했다. 기존 단일 명식 서명 원본이 필요하다. 운영 판매 HOLD와 `ROADMAP_IN_PROGRESS`를 유지한다.
+
+## 2026-11-23 — 같은 구매에서 본인 T8과 T10 독립 발급
+
+- 기존 개인 명식 작업자는 Saju의 고정된 `연애운` Release와 단일 명식 공개키·권한 지문으로 원본을 확인한다. 결합 구매에서 본인 T8과 T10을 독립 Reading으로 확정하고, 보관함과 각 Reader가 원래 서명 근거를 다시 사용함을 격리 PostgreSQL 17에서 검증했다.
+- 합성 결제의 중복 처리와 발급 시도 할당 전 작업자 Lease 종료를 검증했다. 결과를 받았는지 불명확한 전송 실패는 기존 조정 대기를 유지한다. 상대 동의 철회는 T10 열람에 적용하고, 환불은 결합 상품의 두 결과에 적용한다.
+- 소스의 `SAJU_T8_PRODUCTION_RELATIONSHIP_ISSUER_CONFIG`에는 `issuer`, `audience`, `keyId`, `engineVersion`, `releaseRef`, `privateKeyPkcs8Base64`를 넣는다. 명하의 기존 단일 명식 서명 신뢰 설정과 `relationship` Release를 이에 맞추며, `MYEONGHA_SAJU_SOURCE_AUTHORITY_HASH`는 고정 Saju 빌드의 `PRODUCTION_RELATIONSHIP_AUTHORITY_HASH`를 사용한다.
+- 기존 `--check-t10` 실행은 합성 키로 두 서명 계약을 검증하며 외부 결제·AI·운영 배포를 사용하지 않는다. 생시 미상에서 Canonical 십신 근거가 없으면 본인 T8 발급이 보류된다.

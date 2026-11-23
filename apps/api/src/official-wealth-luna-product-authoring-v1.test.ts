@@ -94,7 +94,7 @@ function fixture(axes:CharacterGroundingUnitViewV1['axis'][]=['wealth','responsi
   ]}},
  } as OfficialReadingRecordV1;
  const verifiedBinding:SignedNativeReadingToIssuedRecordBindingV1={
-  issuedReadingId:ID,issuedResponseHash:'sha256:v1:'+'a'.repeat(64),
+  issuedReadingId:ID,issuedResponseHash:`sha256:v1:${'a'.repeat(64)}` as const,
   canonicalGroundingHash:grounding.groundingHash,
   nativeSourceResponseHash:'c'.repeat(64),nativeExecutionAttemptId:'saju-execution-proof-id',
  };
@@ -117,7 +117,7 @@ describe('Signed native Saju -> existing Reader plan -> 6-chapter Luna product s
  it('rejects source hash drift and cross-owner Reader identity',()=>{
   const input=fixture();
   expect(()=>authorApprovedWealthProductSourceV1({
-   ...input,verifiedBinding:{...input.verifiedBinding,issuedResponseHash:'sha256:v1:'+'f'.repeat(64)},
+   ...input,verifiedBinding:{...input.verifiedBinding,issuedResponseHash:`sha256:v1:${'f'.repeat(64)}` as const},
   })).toThrow('origin');
   expect(()=>authorApprovedWealthProductSourceV1({
    ...input,issued:{...input.issued,readerCharacterIds:['seyeon']},

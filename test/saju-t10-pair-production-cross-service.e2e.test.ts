@@ -7,6 +7,10 @@ import { pathToFileURL } from 'node:url';
 import { Pool, type PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApprovedSajuT10PairIssuanceWorkerV1 } from '../apps/api/src/approved-saju-t10-pair-issuance-worker-v1.js';
+import { createApprovedSajuPaidIssuanceRunnerV1 } from '../apps/api/src/approved-saju-paid-issuance-runner-v1.js';
+import { readPostgresApprovedSajuCanonicalReaderV1 } from '../apps/api/src/postgres-approved-saju-reading-access-v1.js';
+import { executePostgresApprovedSajuIssuerJobTransactionV1 } from '../apps/api/src/postgres-subject-execution.js';
+import { createSajuProductionReadingIssueSourceV1 } from '../apps/api/src/saju-production-reading-issue-source-v1.js';
 import { createApprovedSajuT10PairReaderHttpV1 } from '../apps/api/src/approved-saju-t10-pair-reader-http-v1.js';
 import { handleOfficialReadingRecordRequestV1 } from '../apps/api/src/official-reading-record-http.js';
 import { handleReadingHistoryRequestV1 } from '../apps/api/src/reading-history-http.js';
@@ -23,8 +27,10 @@ const offerIds = ['first-counterpart', 'additional-counterpart', 'relationship-p
 const own = { calendarType: 'solar', date: '1990-05-15', time: '14:30', sex: 'unspecified' };
 const partner = { calendarType: 'solar', date: '1996-06-05', time: '09:30', sex: 'unspecified' };
 const releaseRef = 'isolated-compatibility';
+const relationshipRelease = 'isolated-relationship';
 const bearer = 'saju-pair-cross-service-test-only-bearer';
 const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+const relationshipKey = generateKeyPairSync('ed25519');
 
 type Scope = Parameters<typeof verifySajuT10ProductionPairIssueV1>[0]['scope'];
 type ProcessFactory = (env: Record<string, string>) => { server: Server; host: string };
@@ -32,15 +38,27 @@ type ProcessFactory = (env: Record<string, string>) => { server: Server; host: s
 let server: Server;
 let actualOrigin: string;
 let sourceCalls = 0;
+let relationshipCalls = 0;
+let relationshipAuthorityHash: string;
 async function startHost() {
   const sajuDir = resolve(process.env.MYEONGHA_T10_SAJU_CHECKOUT ?? '.cross-service/saju');
   const moduleUrl = pathToFileURL(resolve(sajuDir, 'dist/production-calculation-process.js'));
   const { createMyeonghwaProductionCalculationProcessV1 } = await import(moduleUrl.href) as {
     createMyeonghwaProductionCalculationProcessV1: ProcessFactory;
   };
+  const issuerUrl = pathToFileURL(resolve(sajuDir, 'dist/production/production-relationship-official-reading-issuer.js'));
+  const { PRODUCTION_RELATIONSHIP_AUTHORITY_HASH } = await import(issuerUrl.href) as {
+    PRODUCTION_RELATIONSHIP_AUTHORITY_HASH: string;
+  };
+  relationshipAuthorityHash = PRODUCTION_RELATIONSHIP_AUTHORITY_HASH;
   const runtime = createMyeonghwaProductionCalculationProcessV1({
     SAJU_PRODUCTION_HOST: '127.0.0.1',
     SAJU_PRODUCTION_SERVICE_BEARER: bearer,
+    SAJU_T8_PRODUCTION_RELATIONSHIP_ISSUER_CONFIG: JSON.stringify({
+      issuer: 'saju', audience: 'myeongha', keyId: 'relationship-cross-service-key',
+      engineVersion: 'test-engine', releaseRef: relationshipRelease,
+      privateKeyPkcs8Base64: relationshipKey.privateKey.export({ type: 'pkcs8', format: 'der' }).toString('base64'),
+    }),
     SAJU_T10_PRODUCTION_PAIR_ISSUER_CONFIG: JSON.stringify({
       issuer: 'saju', audience: 'myeongha', keyId: 'pair-cross-service-key',
       engineVersion: 'test-engine',
@@ -64,8 +82,9 @@ async function stopHost() {
 const sourceOrigin = 'https://saju-pair-test.example';
 const loopbackSourceFetch: typeof fetch = (url, init) => {
   const target = new URL(String(url));
-  if (target.origin !== sourceOrigin) throw Error('Unexpected T10 Source origin.');
-  sourceCalls++;
+  if (target.origin !== sourceOrigin) throw Error('Unexpected Saju Source origin.');
+  if (target.pathname === '/api/readings') relationshipCalls++;
+  else sourceCalls++;
   return fetch(actualOrigin + target.pathname, init);
 };
 
@@ -100,6 +119,35 @@ function source() {
 suite('real pinned Saju T10 Production issuer to MyeongHa Reading contract', () => {
   beforeAll(startHost);
   afterAll(stopHost);
+  it('rejects a valid T8 signature for substituted birth data and a changed authority pin', async () => {
+    const executedRequest = {
+      birth: { ...own, calendarType: 'solar' as const, sex: 'unspecified' as const }, reading: { text: '연애운' },
+    };
+    const binding = {
+      executionAttemptId: randomUUID(), sourceBirthRevisionId: randomUUID(),
+      sourceBirthInputHash: 'sha256:v1:' + 'a'.repeat(64), releaseRef: relationshipRelease,
+    };
+    for (const substituteBirth of [true, false]) {
+      const trust = relationshipTrust();
+      const source = createSajuProductionReadingIssueSourceV1({
+        ...trust, authorityHash: substituteBirth ? trust.authorityHash : '0'.repeat(64),
+        baseUrl: sourceOrigin, bearerToken: bearer, requireCanonicalReaderSource: true,
+        fetchImpl: async (_url, init) => fetch(actualOrigin + '/api/readings', {
+          ...init,
+          ...(substituteBirth ? { body: JSON.stringify({
+            ...executedRequest, birth: { ...executedRequest.birth, date: '1988-03-20', time: '09:00' },
+          }) } : {}),
+        }),
+      });
+      const signed = await source.adapter.requestPreparedReading!(executedRequest, binding);
+      expect(signed.response).toMatchObject({ state: 'delivered' });
+      expect(await source.sourceVerifier.verifyProductionIssue({
+        ...binding, executedRequest, sourceResponse: signed.response,
+        subjectId: randomUUID(), dbReadingId: randomUUID(), readingSessionId: randomUUID(),
+      })).toBeNull();
+    }
+  });
+
   it.each(offerIds)('preserves signed two-chart Korean source for %s', async offerId => {
     const scope = scopeFor(offerId);
     const purchaseIntentId = randomUUID();
@@ -201,8 +249,15 @@ function sourceTrust() {
   };
 }
 
+function relationshipTrust() {
+  return {
+    issuer: 'saju', audience: 'myeongha', keyId: 'relationship-cross-service-key',
+    authorityHash: relationshipAuthorityHash, verificationKey: relationshipKey.publicKey,
+  };
+}
+
 type OfferId = (typeof offerIds)[number];
-const readerCharacterId = 'seyeon';
+const readerCharacterId = 'seyeon' as const;
 const buyer = { subjectId: randomUUID(), authUserId: randomUUID() };
 const stranger = { subjectId: randomUUID(), authUserId: randomUUID() };
 const readerOrigin = 'http://127.0.0.1';
@@ -307,6 +362,14 @@ suite('signed T10 issuance, purchased archive and Reader on PostgreSQL 17', () =
       fetchImpl: loopbackSourceFetch,
     };
     const worker = createApprovedSajuT10PairIssuanceWorkerV1(workerOptions);
+    const runner = createApprovedSajuPaidIssuanceRunnerV1({
+      self: {
+        pool: issuerPool, engineKey: 'saju', engineVersion: 'test-engine',
+        source: { ...relationshipTrust(), baseUrl: sourceOrigin, bearerToken: bearer, fetchImpl: loopbackSourceFetch },
+        releases: { relationship: { releaseRef: relationshipRelease, readerCharacterId } },
+      },
+      pair: workerOptions,
+    });
     const recordRequest = (query: string, member = buyer) => ({
       request: new Request(readerOrigin + '/api/readings' + query, {
         headers: { Authorization: 'Bearer ' + member.authUserId },
@@ -349,14 +412,15 @@ suite('signed T10 issuance, purchased archive and Reader on PostgreSQL 17', () =
       `, [bundle]);
       await fixture.query(`
         insert into public.saju_domain_runtime(saju_domain,availability,capability_version,updated_at)
-        values ('compatibility','available','isolated-compatibility',now())
+        values ('compatibility','available','isolated-compatibility',now()),
+          ('relationship','available','isolated-relationship',now())
         on conflict (saju_domain) do nothing;
         insert into public.character_capabilities
           (id,content_bundle_id,character_id,saju_domain,role,can_initiate,capability_version)
         select gen_random_uuid(),catalog.content_bundle_id,catalog.character_id,
           runtime.saju_domain,'primary',true,runtime.capability_version
         from public.character_runtime_catalog catalog cross join public.saju_domain_runtime runtime
-        where catalog.character_id='seyeon' and runtime.saju_domain='compatibility'
+        where catalog.character_id='seyeon' and runtime.saju_domain in ('compatibility','relationship')
         on conflict (content_bundle_id,character_id,saju_domain) do nothing;
       `);
       for (const member of [buyer, stranger]) {
@@ -374,18 +438,75 @@ suite('signed T10 issuance, purchased archive and Reader on PostgreSQL 17', () =
       const first = await seedCounterpart(fixture, ownRevision, '1996-06-05');
       const additional = await seedCounterpart(fixture, ownRevision, '1993-11-09');
       const results = [];
+      let selfReading: string | undefined;
+      let reopenSelf: ((member?: typeof buyer) => ReturnType<typeof readPostgresApprovedSajuCanonicalReaderV1>) | undefined;
       for (const offer of offerIds) {
         const counterpart = offer === 'additional-counterpart' ? additional : first;
         const order = await buyComparison(fixture, offer, offer === 'relationship-plus-first' ? bundleRecord : firstRecord,
           ownRevision, counterpart.person);
         expect(await list(order.purchase)).toEqual(order.components.map(component => ({ component, state: 'pending' })));
         const calls = sourceCalls;
-        expect(await worker.runNext()).toEqual({ state: 'issued' });
-        expect(await worker.runNext()).toEqual({ state: 'idle' });
+        if (offer === 'relationship-plus-first') {
+          // Simulate a worker stopping after claiming T8 but before allocating
+          // an attempt. The next worker can reclaim the expired lease safely.
+          const claim = await executePostgresApprovedSajuIssuerJobTransactionV1({
+            pool: issuerPool, execute: client => client.query<{ job_id: string }>(
+              'select * from public.cmd_claim_approved_saju_issue_job_v1($1,$2)',
+              [randomUUID(), JSON.stringify({ relationship: relationshipRelease })],
+            ),
+          });
+          expect(claim.rows).toHaveLength(1);
+          await fixture.query("update public.outbox_events set lease_expires_at=now()-interval '1 second' where id=$1",
+            [claim.rows[0]!.job_id]);
+          expect(await runner.runOnce()).toEqual({ attempted: 2, issued: 2, held: 0, leaseExpired: 0, idle: false });
+          expect(await runner.runOnce()).toMatchObject({ attempted: 0, idle: true });
+          expect(relationshipCalls).toBe(1);
+        } else {
+          expect(await worker.runNext()).toEqual({ state: 'issued' });
+          expect(await worker.runNext()).toEqual({ state: 'idle' });
+        }
         expect(sourceCalls - calls).toBe(1);
         const items = await list(order.purchase);
         if (offer === 'relationship-plus-first') {
-          expect(items).toContainEqual({ component: 'relationship', state: 'pending' });
+          const individual = items.find(item => item.component === 'relationship');
+          expect(individual).toMatchObject({ state: 'ready' });
+          if (!individual?.readingId) throw Error('Purchase archive omitted the issued T8 Reading.');
+          selfReading = individual.readingId;
+          expect(items.find(item => item.component === 'compatibility')?.readingId).not.toBe(selfReading);
+          const { rows: [self] } = await fixture.query(`
+            select ref.response_snapshot_jsonb, ref.response_hash, ref.source_birth_input_hash,
+              session.source_birth_revision_id, session.target_birth_revision_id,
+              proof.proof_envelope
+            from public.readings r
+            join public.reading_sessions session on session.id=r.reading_session_id
+            join public.reading_refs ref on ref.reading_id=r.id and ref.execution_attempt_id=r.committed_execution_attempt_id
+            join commerce_saju_private.approved_source_issue_proofs_v1 proof on proof.reading_id=r.id
+            where r.id=$1
+          `, [selfReading]);
+          expect(self).toMatchObject({
+            source_birth_revision_id: ownRevision, target_birth_revision_id: null,
+            source_birth_input_hash: 'sha256:v1:' + hashJson({ date: '1990-05-15', time: '14:30' }),
+            proof_envelope: { payload: {
+              authorityHash: relationshipAuthorityHash, releaseRef: relationshipRelease, engineVersion: 'test-engine',
+            } },
+          });
+          expect(self.proof_envelope.readerSource.semanticSource.units.some((unit: { ruleRefs: { ruleId: string }[] }) =>
+            unit.ruleRefs.some(rule => rule.ruleId.startsWith('RULE-RELATIONSHIP-NATAL-')))).toBe(true);
+          const artifact = {
+            readingId: selfReading, responseSnapshotJsonb: self.response_snapshot_jsonb,
+            officialArtifactResponseHash: self.response_hash, sajuDomain: 'relationship' as const,
+            sajuEngineVersion: 'test-engine', readingContractVersion: 'myeonghwa-product-reading-response-v2',
+            productResponseState: 'delivered',
+          };
+          reopenSelf = (member = buyer) => readPostgresApprovedSajuCanonicalReaderV1({
+            authority: { pool: issuerPool, trusts: [relationshipTrust()] },
+            verifiedEvidence: { kind: 'member', verifiedAuthUserId: member.authUserId },
+            subjectId: member.subjectId, artifact,
+          });
+          expect((await reopenSelf()).grounding.units.length).toBeGreaterThan(0);
+          expect((await detail(selfReading)).status).toBe(200);
+          expect((await detail(selfReading, stranger)).status).toBe(404);
+          await expect(reopenSelf(stranger)).rejects.toThrow('Signed canonical Reader source is unavailable');
         }
         const pair = items.find(item => item.component === 'compatibility');
         expect(pair?.state).toBe('ready');
@@ -419,7 +540,9 @@ suite('signed T10 issuance, purchased archive and Reader on PostgreSQL 17', () =
         results.push({ ...order, readingId: pair.readingId });
       }
       const [firstOrder, otherOrder, bundleOrder] = results;
-      if (!firstOrder || !otherOrder || !bundleOrder) throw Error('T10 offer verification did not run.');
+      if (!firstOrder || !otherOrder || !bundleOrder || !selfReading || !reopenSelf) {
+        throw Error('Combined purchase verification did not run.');
+      }
       expect((await open(firstOrder.purchase, otherOrder.readingId)).status).toBe(404);
       const history = await handleReadingHistoryRequestV1(recordRequest(''));
       expect(history.status).toBe(200);
@@ -437,6 +560,10 @@ suite('signed T10 issuance, purchased archive and Reader on PostgreSQL 17', () =
         expect((await open(order.purchase, order.readingId)).status).toBe(404);
       }
       expect((await open(otherOrder.purchase, otherOrder.readingId)).status).toBe(200);
+      expect(await list(bundleOrder.purchase)).toEqual([
+        expect.objectContaining({ component: 'relationship', state: 'ready', readingId: selfReading }),
+      ]);
+      expect((await reopenSelf()).grounding.units.length).toBeGreaterThan(0);
       for (const order of results) {
         const cancelled = await fixture.query(
           'select pg_temp.approved_fixture_full_cancellation($1,clock_timestamp()) as refund', [order.receipt],
@@ -446,6 +573,8 @@ suite('signed T10 issuance, purchased archive and Reader on PostgreSQL 17', () =
         expect((await detail(order.readingId)).status).toBe(404);
         expect((await open(order.purchase, order.readingId)).status).toBe(404);
       }
+      expect((await detail(selfReading)).status).toBe(404);
+      await expect(reopenSelf()).rejects.toThrow('Signed canonical Reader source is unavailable');
       const withdrawalRecord = randomUUID();
       await fixture.query(`
         insert into public.commerce_saju_records_v1(id,subject_id,birth_revision_id) values ($1,$2,$3)
@@ -474,9 +603,11 @@ suite('signed T10 issuance, purchased archive and Reader on PostgreSQL 17', () =
       const { rows: proofRows } = await fixture.query(`
         select proof_envelope->'payload'->>'purchaseIntentId' as purchase
         from commerce_saju_private.approved_source_issue_proofs_v1
+        where proof_envelope->'payload' ? 'purchaseIntentId'
       `);
       expect(proofRows.map(row => row.purchase).sort()).toEqual(results.map(order => order.purchase).sort());
     } finally {
+      await runner.close();
       fixture?.release();
       await Promise.all([fixturePool.end(), memberPool.end(), issuerPool.end(), pairReaderPool.end()]);
     }

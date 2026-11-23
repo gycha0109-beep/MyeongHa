@@ -54,7 +54,7 @@ function input(){
  const valid=placement();
  return {
   issued:record(),placement:valid,
-  verifiedBinding:{issuedReadingId:ID,issuedResponseHash:'sha256:v1:'+valid.sourceResponseHash,
+  verifiedBinding:{issuedReadingId:ID,issuedResponseHash:`sha256:v1:${valid.sourceResponseHash}` as const,
     canonicalGroundingHash:valid.groundingHash,
     nativeSourceResponseHash:'c'.repeat(64),nativeExecutionAttemptId:'native-exec-proof-1'},
   requiredProtectedDisclosures:{'mandatory-caution':'해당 조건은 확정된 미래 사건을 뜻하지 않습니다.'},
@@ -80,7 +80,7 @@ describe('Approved 6-chapter Luna wealth authoring source',()=>{
   expect(buildNotionWealthSixChapterLunaSourceV1({...p,placement:{...p.placement,chapters:broken}})).toBeNull();
   expect(()=>buildNotionWealthSixChapterLunaSourceV1({...p,verifiedBinding:{...p.verifiedBinding,canonicalGroundingHash:'c'.repeat(64)}})).toThrow('origin');
   expect(()=>buildNotionWealthSixChapterLunaSourceV1({...p,requiredProtectedDisclosures:{}})).toThrow('disclosure');
-  expect(()=>buildNotionWealthSixChapterLunaSourceV1({...p,verifiedBinding:{...p.verifiedBinding,issuedResponseHash:'sha256:v1:'+'0'.repeat(64)}})).toThrow('origin');
+  expect(()=>buildNotionWealthSixChapterLunaSourceV1({...p,verifiedBinding:{...p.verifiedBinding,issuedResponseHash:`sha256:v1:${'0'.repeat(64)}` as const}})).toThrow('origin');
 
  });
 });
