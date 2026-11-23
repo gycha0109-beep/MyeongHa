@@ -20,6 +20,16 @@ const GROUPS = [
 ] as const;
 const PRICE = new Intl.NumberFormat('ko-KR');
 
+function archiveStatus(items: readonly ApprovedSajuPurchaseReadingV1[], offerId: Binding['approvedOfferId']) {
+  const offer = getApprovedSajuOfferV1(offerId);
+  if (!offer || items.length < offer.components.length) {
+    return '현재 열람 권한이 있는 풀이만 표시합니다. 구매 권한과 상대 동의를 확인해 주세요.';
+  }
+  return offer.components.every(component => items.some(item => item.component === component && item.state === 'ready'))
+    ? '구매한 정식 풀이가 모두 발급됐습니다. 아래에서 바로 확인할 수 있습니다.'
+    : '결제 확인 완료. 정식 풀이를 발급 중이며 자동으로 상태를 확인합니다.';
+}
+
 /** Mounted only by the isolated runtime, which supplies authenticated ports. */
 export function ApprovedSajuCheckoutPanel({ ports, selection }: {
   ports: ApprovedSajuCheckoutPanelPorts;
@@ -48,6 +58,8 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
     setVerified(false);
     setVerifyOnly(false);
     setArchive([]);
+    setSignedPair(null);
+    setRefunded(false);
     setMessage('');
     retryKey.current = null;
   }, [selection?.sequence, busy]);
@@ -59,9 +71,9 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
   // Continue checking the already-authorized, purchase-scoped archive until
   // every purchased component is issued. Never create another payment attempt.
   useEffect(() => {
-    const purchaseIntentId = binding?.purchaseIntentId;
-    if (!verified || !purchaseIntentId || ports.readArchive === undefined
+    if (!verified || !binding || ports.readArchive === undefined
       || !archive.some(item => item.state === 'pending')) return;
+    const { purchaseIntentId, approvedOfferId } = binding;
 
     if (pollingWindow.current?.purchaseIntentId !== purchaseIntentId) {
       pollingWindow.current = { purchaseIntentId, openedAt: Date.now(), failed: 0 };
@@ -85,9 +97,8 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
         if (pollingWindow.current?.purchaseIntentId !== purchaseIntentId) return;
         pollingWindow.current.failed = 0;
         setArchive(current);
-        setMessage(current.every(item => item.state === 'ready')
-          ? '구매한 정식 풀이가 모두 발급됐습니다. 아래에서 바로 확인할 수 있습니다.'
-          : '결제 확인 완료. 정식 풀이를 발급 중이며 자동으로 상태를 확인합니다.');
+        setSignedPair(pair => current.some(item => item.state === 'ready' && item.readingId === pair?.readingId) ? pair : null);
+        setMessage(archiveStatus(current, approvedOfferId));
       } catch {
         if (!active || pollingWindow.current?.purchaseIntentId !== purchaseIntentId) return;
         pollingWindow.current.failed++;
@@ -96,9 +107,9 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
       }
     }, 4_000);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [verified, binding?.purchaseIntentId, archive, ports]);
+  }, [verified, binding, archive, ports]);
 
-  async function loadArchive(purchaseIntentId: string) {
+  async function loadArchive({ purchaseIntentId, approvedOfferId }: Binding) {
     setSignedPair(null);
     if (ports.readArchive === undefined) {
       setMessage('테스트 결제를 확인했습니다.');
@@ -107,9 +118,7 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
     try {
       const items = await ports.readArchive(purchaseIntentId);
       setArchive(items);
-      setMessage(items.every(item => item.state === 'ready')
-        ? '구매한 정식 풀이가 모두 발급됐습니다. 아래에서 바로 확인할 수 있습니다.'
-        : '결제 확인 완료. 정식 풀이를 발급 중이며 자동으로 상태를 확인합니다.');
+      setMessage(archiveStatus(items, approvedOfferId));
     } catch {
       setArchive([]);
       setMessage('보관함을 아직 열 수 없습니다. 발급 상태를 다시 확인해 주세요.');
@@ -192,7 +201,7 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
     setBusy(true);
     try {
       if (verified && binding !== null) {
-        await loadArchive(binding.purchaseIntentId);
+        await loadArchive(binding);
         return;
       }
       const current = binding ?? await prepareApprovedSajuSandboxCheckoutV1({
@@ -211,7 +220,7 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
         });
       }
       setVerified(true);
-      await loadArchive(current.purchaseIntentId);
+      await loadArchive(current);
     } catch (error) {
       if (error instanceof PaymentAttemptBrowserServerVerificationTransportErrorV1) {
         setVerifyOnly(true);

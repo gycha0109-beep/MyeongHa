@@ -2,6 +2,7 @@
  * Local-only, disposable PostgreSQL 17 for the approved 14-offer Saju checkout.
  * --check: stage the complete schema, grant four separate DB logins and verify
  *          host-side TCP connections, then destroy the disposable container.
+ * --check-t10: verify signed pair issuance, archive and Reader with synthetic receipts.
  * --serve: also run the existing authorized Owner PortOne TEST checkout host.
  * Never connects to or alters the production database. No keys written to disk.
  */
@@ -180,8 +181,8 @@ function cleanup() {
 }
 const mode = process.argv[2];
 let exactReleasePins;
-if (mode !== '--check' && mode !== '--serve') {
-  console.error('Specify --check or --serve. Never targets Production.');
+if (!['--check', '--check-t10', '--serve'].includes(mode)) {
+  console.error('Specify --check, --check-t10 or --serve. Never targets Production.');
   process.exitCode = 2;
 } else {
   try {
@@ -256,7 +257,7 @@ if (mode !== '--check' && mode !== '--serve') {
     if (!rolesOutput.includes('SAJU14_LOCAL_ROLE_SEPARATION_READY')) {
       throw Error('Local DB role isolation was not established.');
     }
-    if (mode === '--serve' || process.env.MYEONGHA_SAJU_TEST_OWNER_AUTH_USER_ID) {
+    if (mode === '--serve' || (mode === '--check' && process.env.MYEONGHA_SAJU_TEST_OWNER_AUTH_USER_ID)) {
       const ownerId = process.env.MYEONGHA_SAJU_TEST_OWNER_AUTH_USER_ID;
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(ownerId)) {
         throw Error('An existing verified Supabase Owner account UUID is required.');
@@ -289,6 +290,26 @@ if (mode !== '--check' && mode !== '--serve') {
     }
     for (const [key, login, group] of roles) await checkLogin(port, login, pw[key], group);
     console.log('SAJU14_LOCAL_HOST_DB_READY: 14 offers, four distinct TCP executor accounts.');
+    if (mode === '--check-t10') {
+      const url = (user, password) => 'postgresql://' + user + ':' + password +
+        '@127.0.0.1:' + port + '/' + database;
+      const roleUrl = ([key, login]) => url(login, pw[key]);
+      const result = spawnSync(process.execPath, [
+        resolve(root, 'node_modules/vitest/vitest.mjs'), 'run',
+        'test/saju-t10-pair-production-cross-service.e2e.test.ts',
+      ], {
+        cwd: root, stdio: 'inherit', timeout: 120_000, windowsHide: true,
+        env: {
+          ...process.env,
+          MYEONGHA_RUN_SAJU_T10_PAIR_CROSS_SERVICE_E2E: '1',
+          MYEONGHA_T10_FIXTURE_DB_URL: url('postgres', adminPw),
+          MYEONGHA_T10_MEMBER_DB_URL: roleUrl(roles[0]),
+          MYEONGHA_T10_ISSUER_DB_URL: roleUrl(roles[2]),
+          MYEONGHA_T10_PAIR_READER_DB_URL: roleUrl(roles[3]),
+        },
+      });
+      if (result.status !== 0) throw Error('Isolated T10 cross-service verification failed.');
+    }
     if (mode === '--serve') {
       const member = roles[0], commerce = roles[1];
       const env = { ...process.env };
