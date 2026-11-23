@@ -54,7 +54,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gycha0109-beep/Saju
-          ref: 9536c073ec966d9671a582da5f5a789ef0de64c0 # Saju #2808
+          ref: d38412d3879bf59ffe7e928bce1183ebde67cc5e # Saju #2808
           path: .cross-service/saju
 
       - name: Setup Node
@@ -74,7 +74,9 @@ jobs:
 
       - name: Verify general relationship, spouse and pair issuance on Saju
         working-directory: .cross-service/saju
-        run: npx vitest run test/production-relationship-official-reading-issuer.test.ts test/product-host-t10-production-pair-issue.test.ts
+        run: |
+          npm run typecheck
+          npx vitest run test/production-relationship-official-reading-issuer.test.ts test/product-host-t10-production-pair-issue.test.ts
 
       - name: Verify signed purchases and both bundle Readings in isolated PostgreSQL
         run: node scripts/local/run-approved-saju14-local-stack.mjs --check-t10
