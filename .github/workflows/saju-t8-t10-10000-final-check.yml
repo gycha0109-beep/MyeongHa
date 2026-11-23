@@ -1,0 +1,36 @@
+name: Saju T8 T10 10000 Synthetic Signed Source Final Check
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/local/saju-t8-t10-10000-final-check.mjs'
+      - '.github/workflows/saju-t8-t10-10000-final-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  signed-synthetic-10000:
+    name: 10000 distinct signed synthetic T8 T10 Source requests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout MyeongHa
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout pinned Saju Source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gycha0109-beep/Saju
+          ref: d38412d3879bf59ffe7e928bce1183ebde67cc5e
+          path: .cross-service/saju
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Build Saju Source
+        working-directory: .cross-service/saju
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund --workspaces=false
+          npm run build
+      - name: Verify 10000 different signed synthetic T8 T10 requests
+        run: node scripts/local/saju-t8-t10-10000-final-check.mjs
