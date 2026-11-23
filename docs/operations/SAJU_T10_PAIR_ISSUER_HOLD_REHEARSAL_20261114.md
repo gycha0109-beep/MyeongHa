@@ -39,7 +39,7 @@
 
 ## 2026-11-23 — 실제 Saju 서명과 격리 보관함 확인
 
-- Saju [`b5a40ffb`](https://github.com/gycha0109-beep/Saju/commit/b5a40ffb24785764ba5b65df0cf0aba059b671bf)의 정식 계산 프로세스를 띄우고, 기존 격리 PostgreSQL 17 설치와 발급·회원·Reader 역할을 사용했다. 세 구매 유형에서 합성 영수증을 실제 구매 권한과 발급 큐로 처리하고, 실제 Saju 서명과 한국어 원문을 저장했다.
+- Saju `b5a40ffb`의 정식 계산 프로세스를 띄우고, 기존 격리 PostgreSQL 17 설치와 발급·회원·Reader 역할을 사용했다. 세 구매 유형에서 합성 영수증을 실제 구매 권한과 발급 큐로 처리하고, 실제 Saju 서명과 한국어 원문을 저장했다. CI는 동일한 실행 코드를 포함한 Saju main 병합을 고정한다. [Saju #2807](https://github.com/gycha0109-beep/Saju/pull/2807)
 - 구매별 보관함, 기록 목록·상세, 서명 Reader를 확인했다. 중복 요청은 구매와 발급을 재사용하며, 다른 상대의 기록, 타인 열람, 동의 철회, 환불 후 열람을 거부했다. 서명을 받은 직후 동의를 철회한 건은 보관본을 만들지 않았다.
 - 재실행은 Saju 체크아웃을 빌드한 뒤 `MYEONGHA_T10_SAJU_CHECKOUT`을 해당 체크아웃 경로로 지정하고 명하에서 `node scripts/local/run-approved-saju14-local-stack.mjs --check-t10`을 실행한다. 실제 Auth·PortOne·운영 DB 자격증명이 필요 없다.
 - 결합 상품의 별도 본인 T8 `연애운`은 대기 상태로 관찰했다. 기존 단일 명식 서명 원본이 필요하다. 운영 판매 HOLD와 `ROADMAP_IN_PROGRESS`를 유지한다.

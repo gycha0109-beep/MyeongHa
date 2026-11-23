@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gycha0109-beep/Saju
-          ref: b5a40ffb24785764ba5b65df0cf0aba059b671bf
+          ref: 5a1edd13fcf06ba7d83348015077f99ab5d6031e # Saju #2807
           path: .cross-service/saju
 
       - name: Setup Node
