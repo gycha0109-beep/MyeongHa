@@ -3,16 +3,32 @@ name: Saju T10 Pair Production Cross-Service E2E
 on:
   pull_request:
     paths:
-      - 'apps/api/src/saju-t10-production-pair-issue-source-v1.ts'
-      - 'apps/api/src/saju-t10-pair-official-product-reading-v1.ts'
+      - 'apps/api/src/*approved-saju*'
+      - 'apps/api/src/saju-t10-*'
+      - 'apps/api/src/official-reading-record-*'
+      - 'apps/api/src/reading-history-*'
+      - 'apps/api/src/postgres-subject-execution.ts'
+      - 'apps/web/src/commerce/ApprovedSajuCheckoutPanel.tsx'
+      - 'packages/contracts/src/approved-saju-catalog.ts'
+      - 'docs/operations/candidates/commerce_approved_saju_*.sql'
+      - 'scripts/local/*saju14*'
+      - 'test/db/approved_saju_purchase_fixtures.sql'
       - 'test/saju-t10-pair-production-cross-service.e2e.test.ts'
       - '.github/workflows/saju-t10-pair-production-cross-service-e2e.yml'
   push:
     branches:
       - main
     paths:
-      - 'apps/api/src/saju-t10-production-pair-issue-source-v1.ts'
-      - 'apps/api/src/saju-t10-pair-official-product-reading-v1.ts'
+      - 'apps/api/src/*approved-saju*'
+      - 'apps/api/src/saju-t10-*'
+      - 'apps/api/src/official-reading-record-*'
+      - 'apps/api/src/reading-history-*'
+      - 'apps/api/src/postgres-subject-execution.ts'
+      - 'apps/web/src/commerce/ApprovedSajuCheckoutPanel.tsx'
+      - 'packages/contracts/src/approved-saju-catalog.ts'
+      - 'docs/operations/candidates/commerce_approved_saju_*.sql'
+      - 'scripts/local/*saju14*'
+      - 'test/db/approved_saju_purchase_fixtures.sql'
       - 'test/saju-t10-pair-production-cross-service.e2e.test.ts'
       - '.github/workflows/saju-t10-pair-production-cross-service-e2e.yml'
 
@@ -25,7 +41,7 @@ concurrency:
 
 jobs:
   signed-pair:
-    name: Pinned Saju Production pair → MyeongHa official Reader
+    name: Pinned Saju process → PostgreSQL 17 → MyeongHa Reader
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -36,7 +52,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gycha0109-beep/Saju
-          ref: 8278c8cb72ae6dcbb7bd7edb8fb44b07c47c53b9
+          ref: b5a40ffb24785764ba5b65df0cf0aba059b671bf
           path: .cross-service/saju
 
       - name: Setup Node
@@ -54,7 +70,5 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund --workspaces=false
           npm run build
 
-      - name: Verify three Production pair signatures and Reading projection
-        env:
-          MYEONGHA_RUN_SAJU_T10_PAIR_CROSS_SERVICE_E2E: '1'
-        run: npx vitest run test/saju-t10-pair-production-cross-service.e2e.test.ts
+      - name: Verify three signed purchases through isolated PostgreSQL and Reader
+        run: node scripts/local/run-approved-saju14-local-stack.mjs --check-t10
