@@ -642,7 +642,7 @@ This inventory update authorizes no SKU, price, PSP, payment, entitlement, refun
 | Saju 전역 Production Interpretation | docs/product/22: PRODUCTION_RUNTIME_BLOCKED_BY_INTERPRETATION_AUTHORITY_GAPS |
 | 내부 상용 해석 정책 | Saju docs/product/43 및 MyeongHa docs/SAJU_INTERNAL_COMMERCIAL_INTERPRETATION_HANDOFF_20261113 |
 | Reading Profile 선택 | Saju src/reading/reading-profile-authorization.ts: 19개 intent shape 등록. 선택 권한은 의미 Claim·생성·Production 권한이 아님 |
-| 승인 상품 카탈로그 | MyeongHa packages/contracts/src/approved-saju-catalog.ts, 2026-11-06 고객 카탈로그 |
+| 카탈로그 코드 기준 | MyeongHa packages/contracts/src/approved-saju-catalog.ts, 2026-11-06 고객 카탈로그 엔트리 |
 
 **판정 원칙**
 
@@ -673,14 +673,14 @@ General Natal은 직업·사업·재물·관계 등 분야별 원국 해석을 �
 
 2026-11-24 현재 Saju main의 general-natal-integrated-reading-registry.ts는 기존 General T8 자산을 모은 연구 Pack이며 status=research다. #2817~#2820의 공통 원국 판단도 별도 Production 엔진이 아니라 연구 전용 후보 체인이다.
 
-### 4. 2026-11-06 승인 고객 카탈로그 — 해석 영역과 별도 관리
+### 4. 2026-11-06 고객 카탈로그 코드 — 해석 영역과 별도 관리
 
-MyeongHa main packages/contracts/src/approved-saju-catalog.ts는 2026-11-06 승인 고객 카탈로그를 코드로 보존한다. 총 14개 Offer다.
+MyeongHa main packages/contracts/src/approved-saju-catalog.ts에는 2026-11-06 고객 카탈로그의 14개 Offer 엔트리가 기록되어 있다. 다만 2026-11-24 제품 소유자 지침은 Business를 독립 상품으로 확정하지 말라고 명시한다. 따라서 아래 Business 단품 엔트리는 코드상 존재 사실로만 기록하며, 독립 판매 상품 권한으로 채택하거나 활성화하지 않는다. 이 문서 갱신은 해당 카탈로그 코드나 패키지 구성을 변경하지 않는다.
 
 | 구분 | Offer ID | 고객 상품명 | 가격 |
 |---|---|---|---:|
 | 단품 | career | 직업·커리어운 | 9,900원 |
-| 단품 | business | 사업운 | 9,900원 |
+| 코드 엔트리(독립 상품 권한 보류) | business | 사업운 | 9,900원 |
 | 단품 | wealth | 재물운 | 9,900원 |
 | 단품 | relationship | 나의 인연·관계운 | 9,900원 |
 | 단품 | year | 올해의 사주 | 7,900원 |
@@ -694,12 +694,12 @@ MyeongHa main packages/contracts/src/approved-saju-catalog.ts는 2026-11-06 승�
 | 패키지 | basic-month | 전체 사주 + 이번 달 | 33,800원 |
 | 패키지 | basic-year-month | 전체 사주 + 올해 + 이번 달 | 39,700원 |
 
-카탈로그 그룹은 단품 6종, 관계 비교 3종, 패키지 5종이다. 각 Offer는 필요한 Reading component의 조합을 나타낼 뿐 실제 Charge나 Entitlement Grant 권한을 부여하지 않는다.
+카탈로그 소스의 그룹 표시는 단품 6종, 관계 비교 3종, 패키지 5종이다. 다만 Business 단품 엔트리는 2026-11-24 지침과 정합성이 확인될 때까지 독립 상품으로 취급하지 않는다. 각 Offer는 필요한 Reading component의 조합을 나타낼 뿐 실제 Charge나 Entitlement Grant 권한을 부여하지 않는다.
 
 다음 구분을 고정한다.
 
 - **11개 해석 영역:** Career, Business, Wealth, Relationship, Family, Spouse, Annual, Monthly, Compatibility, Question-specific, Daewoon.
-- **14개 승인 구매 Offer:** 위 카탈로그 표.
+- **14개 카탈로그 코드 Offer 엔트리:** 위 표. 이는 14개 모두의 현행 판매 권한을 뜻하지 않으며, Business 단품은 독립 상품 권한 보류.
 - **19개 Reading Intent/Profile shape:** 소비자 요청에 따라 기존 Claim을 선택하는 계약이며 실제 Claim·해석 권한과 동일하지 않음.
 - **General Natal:** 공통 기반이며 별도 단독 유료 SKU가 아님. basic은 Career + Business + Wealth + Relationship 네 Reading의 패키지다.
 - Family, Spouse, Question-specific, Daewoon은 현재 승인 카탈로그의 독립 구매 Offer로 등록되어 있지 않다. 연구·선택 Profile 존재만으로 판매 상품을 만들지 않는다.
@@ -723,7 +723,8 @@ MyeongHa main packages/contracts/src/approved-saju-catalog.ts는 2026-11-06 승�
 
 #2821은 현재 6개 메뉴를 하나의 완성 범위로 설명하지만, 본 인벤토리의 11개 독립 해석 영역과 14개 승인 구매 Offer를 대체하지 않는다.
 - 여섯 메뉴는 구현 작업 범위일 수 있지만 전체 제품 메뉴 목록이 아니다.
-- 사업은 승인 카탈로그의 단품이지만, 그 사실만으로 #2821의 사업 해석 후보가 Production 의미 권한을 얻지는 않는다.
+- 사업은 별도 T8 해석 범위로만 취급한다. 2026-11-06 카탈로그 코드에 Business 단품 엔트리가 남아 있어도 2026-11-24 제품 소유자 지침에 따라 독립 상품으로 확정하거나 활성화하지 않는다.
+- #2821의 사업 해석 후보는 상품·SKU·가격 권한을 만들지 않는다.
 - #2821은 #2820 최신 HEAD 2a335dec63c6bdf7c36b73d7376fef144ce139b6보다 이전인 8ed2d3125872513b6bc14e9b829949cdb79c3624를 base로 사용한다.
 - 따라서 #2821은 11개 영역·현재 카탈로그·최신 공통 판단 체인과 정합성을 맞춘 뒤 별도 처리한다.
 
