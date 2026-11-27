@@ -9,3 +9,5 @@ supabase/.temp/
 supabase/.branches/
 .DS_Store
 .expo/
+scripts/local/.dev.vars
+scripts/local/.wrangler/

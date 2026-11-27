@@ -1,6 +1,11 @@
 import { handleSupabaseAuthRequestV1 } from '../apps/api/src/supabase-auth-http.js';
 import { handleSocialAuthStartRequestV1 } from '../apps/api/src/social-auth-start-http.js';
 import { approvedCloudflareAuthOriginV1, approvedCloudflareStage5HandoffV1 } from '../workers/cloudflare-auth-db-api.mjs';
+import {
+  isIsolatedLocalAuthRequestV1,
+  parseLocalAuthRuntimeConfigV1,
+  syncLocalAuthIdentityV1,
+} from '../apps/api/src/local-auth-dev-runtime.ts';
 
 const OWNED_ORIGINS = new Set([
   'https://myeongha.gycha0109.workers.dev',
@@ -44,7 +49,8 @@ export function cloudflareAuthRoute(request, env) {
   const url = new URL(request.url);
   const action = AUTH_ROUTES[url.pathname];
   if (action === undefined) return null;
-  if (!OWNED_ORIGINS.has(url.origin)) {
+  const localAuth = isIsolatedLocalAuthRequestV1(request, env);
+  if (!OWNED_ORIGINS.has(url.origin) && !localAuth) {
     // A custom Cloudflare host must be the exact host approved for Auth/DB.
     // Never trust a caller-provided Host, Origin, or arbitrary workers.dev alias.
     if (approvedCloudflareAuthOriginV1(request, env) !== url.origin ||
@@ -92,10 +98,19 @@ export async function handleCloudflareAuthRequest(request, env) {
   try {
     const rejected = await rateLimitCloudflareRequestV1(request, env, action);
     if (rejected !== null) return rejected;
+    const localConfig = isIsolatedLocalAuthRequestV1(request, env)
+      ? parseLocalAuthRuntimeConfigV1(env) : null;
     const result = action === 'social-start'
       ? await handleSocialAuthStartRequestV1({ request, env, webOrigin: new URL(request.url).origin })
       : await handleSupabaseAuthRequestV1({ request, env, action,
         approvedWebOrigin: new URL(request.url).origin });
+    if (localConfig !== null && result.status === 200 && action !== 'sign-out' && action !== 'social-start') {
+      let payload;
+      try { payload = await result.clone().json(); } catch { payload = null; }
+      const userId = payload?.ok === true && payload?.data?.status === 'authenticated'
+        ? payload.data.session?.user?.id : null;
+      if (typeof userId === 'string') await syncLocalAuthIdentityV1(localConfig, userId);
+    }
     return seal(result);
   } catch {
     return error('AUTH_UPSTREAM_UNAVAILABLE', 503);

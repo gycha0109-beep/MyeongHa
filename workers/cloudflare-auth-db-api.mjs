@@ -20,6 +20,24 @@ import {
 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import { PostgresMemberAuthRateLimitAdmissionPortV1 } from '../apps/api/src/postgres-member-auth-rate-limit.ts';
 import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
+import {
+  createLocalAuthSubjectPoolV1,
+  isIsolatedLocalAuthRequestV1,
+  localGoTrueMemberFetchV1,
+  parseLocalAuthRuntimeConfigV1,
+  syncLocalAuthIdentityV1,
+} from '../apps/api/src/local-auth-dev-runtime.ts';
+import { handleGuestBootstrapRequestV1 } from '../apps/api/src/guest-bootstrap-http.ts';
+import { createProductionGuestBootstrapCredentialIssuerPortV1 } from '../apps/api/src/production-guest-bootstrap-credential-issuer.ts';
+import { createProductionGuestBootstrapRuntimePortsV1 } from '../apps/api/src/production-guest-bootstrap-runtime.ts';
+import { handleMemberAuthRateLimitHttpV1 } from '../apps/api/src/member-auth-rate-limit-http.ts';
+import { handleBirthProfileCreateRequestV1 } from '../apps/api/src/birth-profile-create-http.ts';
+import { handleCurrentSubjectBirthProfileRequestV1 } from '../apps/api/src/current-subject-birth-profile-http.ts';
+import { handleBirthProfileReadRequestV1 } from '../apps/api/src/birth-profile-read-http.ts';
+import { createProductionRequestIdentityVerifierV1 } from '../apps/api/src/production-request-identity-verifier.ts';
+import { createProductionBirthInputFingerprintPortV1 } from '../apps/api/src/production-birth-input-fingerprint.ts';
+import { handleCurrentSubjectSajuCalculationRequestV1 } from '../apps/api/src/current-subject-saju-calculation-http.ts';
+import { createSajuProductionCalculationHttpAdapterV1 } from '../apps/api/src/saju-production-calculation-http-adapter.ts';
 
 const EXACT_MODE = 'approved-auth-db-v1';
 const EXACT_DB_TLS_RLS_APPROVAL = 'approved-isolated-tls-rls-v1';
@@ -270,6 +288,7 @@ export function approvedCloudflareAuthHostnameV1(hostname) {
 }
 
 export function approvedCloudflareAuthOriginV1(request, bindings) {
+  if (isIsolatedLocalAuthRequestV1(request, bindings)) return 'http://127.0.0.1:8787';
   if (bindings?.MYEONGHA_CLOUDFLARE_AUTH_DB_MODE !== EXACT_MODE) return null;
   const raw = bindings.MYEONGHA_CLOUDFLARE_AUTH_ORIGIN;
   if (typeof raw !== 'string') return null;
@@ -312,12 +331,22 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   const isBirthRead = route?.id === 'rewrite.birth-profile.id';
   const isGuestPromotion = route?.id === 'api.auth.promote-guest';
   const isCurrentBirth = route?.id === 'api.me.birth-profile';
+  const isSajuCalculation = route?.id === 'api.me.saju.calculation';
   const isSocialStart = route?.id === 'rewrite.social.start';
   const naverAction = Object.hasOwn(NAVER_ACTIONS, route?.id) ? NAVER_ACTIONS[route.id] : null;
   if (action === null && !isGuestBootstrap && !isMemberProfile && !isBirthCreate && !isBirthRead &&
-      !isGuestPromotion && !isCurrentBirth && !isSocialStart && naverAction === null) return null;
+      !isGuestPromotion && !isCurrentBirth && !isSajuCalculation && !isSocialStart && naverAction === null) return null;
   const origin = approvedCloudflareAuthOriginV1(request, bindings);
   if (origin === null) return null;
+  const localAuth = isIsolatedLocalAuthRequestV1(request, bindings);
+  // Calculation ingress remains closed on every production origin.
+  if (isSajuCalculation && !localAuth) return null;
+  let localConfig;
+  try {
+    if (localAuth) localConfig = parseLocalAuthRuntimeConfigV1(bindings);
+  } catch {
+    return unavailable();
+  }
   const url = new URL(request.url);
   // Only the verified social-complete exchange and the provider's Naver
   // endpoints may carry query parameters. No other rewrite marker is trusted.
@@ -332,7 +361,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   if (url.search !== '' && naverAction === null && !isSocialComplete) return denied();
   // Provider callback registration and Worker→DB TLS/RLS acceptance are
   // separately signed, not inferred from the Auth host or provider flags.
-  if (!approvedCloudflareStage5HandoffV1(
+  if (!localAuth && !approvedCloudflareStage5HandoffV1(
     bindings, origin, isSocialStart || isSocialComplete || naverAction !== null,
   )) return null;
   const expectedMethod = (isMemberProfile || isBirthRead || isCurrentBirth ||
@@ -350,6 +379,9 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
 
   let approvedDbConfig;
   try {
+    if (localAuth) {
+      approvedDbConfig = localConfig.userData;
+    } else {
     // This shared DB preflight must not require the Member sign-in rate-limit
     // secret for Guest bootstrap, OAuth start, profile reads or Birth routes.
     // The rate-limit runtime below validates its own independent secret.
@@ -366,6 +398,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       return unavailable();
     }
     approvedDbConfig = config;
+    }
   } catch (error) {
     // Temporary owner-only tail diagnostics: class name, never the exception
     // message, connection URL, certificate, request or authentication token.
@@ -381,21 +414,41 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   // pool injection. A Worker HTTP fetch owns a max-one-connection pool;
   // legacy Vercel calls without the option keep their unchanged defaults.
   function createSubjectPool() {
-    subjectPool = createCloudflareSubjectPoolV1(
-      approvedDbConfig, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
-    );
+    subjectPool = localAuth
+      ? createLocalAuthSubjectPoolV1(localConfig, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1)
+      : createCloudflareSubjectPoolV1(
+        approvedDbConfig, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+      );
     return subjectPool;
   }
   try {
     if (isGuestBootstrap) {
-      runtime = createProductionGuestBootstrapHttpRuntimeV1({
-        env: bindings, pool: createSubjectPool(),
-      });
-      result = await runtime.handleRequest({
-        request,
-        requestId: crypto.randomUUID(),
-        serverTime: new Date().toISOString(),
-      });
+      if (localAuth) {
+        const localPool = createSubjectPool();
+        const verifierFetch = localGoTrueMemberFetchV1(localConfig);
+        const runtimePorts = createProductionGuestBootstrapRuntimePortsV1({
+          request, config: localConfig.userData, pool: localPool, memberFetchImpl: verifierFetch,
+        });
+        const issuer = createProductionGuestBootstrapCredentialIssuerPortV1({
+          config: { guestSessionTtlSeconds: localConfig.guestSessionTtlSeconds },
+        });
+        result = await handleGuestBootstrapRequestV1({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+          identityResolverPort: runtimePorts.identityResolverPort,
+          tokenFingerprintPort: runtimePorts.tokenFingerprintPort,
+          authorityPort: runtimePorts.authorityPort,
+          credentialIssuerPort: issuer,
+        });
+      } else {
+        runtime = createProductionGuestBootstrapHttpRuntimeV1({
+          env: bindings, pool: createSubjectPool(),
+        });
+        result = await runtime.handleRequest({
+          request,
+          requestId: crypto.randomUUID(),
+          serverTime: new Date().toISOString(),
+        });
+      }
     } else if (isMemberProfile) {
       runtime = createProductionCurrentSubjectProfileRuntimeV1({
         env: bindings, pool: createSubjectPool(),
@@ -406,43 +459,91 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
         serverTime: new Date().toISOString(),
       });
     } else if (isBirthCreate) {
-      runtime = createProductionBirthProfileCreateRuntimeV1({
-        env: bindings, pool: createSubjectPool(),
-      });
-      result = await runtime.handleRequest({
-        request,
-        requestId: crypto.randomUUID(),
-        serverTime: new Date().toISOString(),
-      });
+      if (localAuth) {
+        const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({
+          config: localConfig.userData, memberFetchImpl: localGoTrueMemberFetchV1(localConfig),
+        });
+        result = await handleBirthProfileCreateRequestV1({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+          identityEvidenceVerifier, pool: createSubjectPool(),
+          idPort: { nextBirthProfileId: () => crypto.randomUUID(), nextBirthRevisionId: () => crypto.randomUUID() },
+          fingerprintPort: createProductionBirthInputFingerprintPortV1(bindings.MYEONGHA_LOCAL_BIRTH_INPUT_HMAC_K1_SECRET),
+        });
+      } else {
+        runtime = createProductionBirthProfileCreateRuntimeV1({
+          env: bindings, pool: createSubjectPool(),
+        });
+        result = await runtime.handleRequest({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+        });
+      }
     } else if (isBirthRead) {
-      // Existing HTTP handler accepts the public /api/birth-profiles/:id
-      // path directly; do not translate or trust Vercel rewrite markers.
-      runtime = createProductionBirthProfileReadRuntimeV1({
-        env: bindings, pool: createSubjectPool(),
-      });
-      result = await runtime.handleRequest({
-        request,
-        requestId: crypto.randomUUID(),
-        serverTime: new Date().toISOString(),
-      });
+      if (localAuth) {
+        result = await handleBirthProfileReadRequestV1({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+          identityEvidenceVerifier: createProductionRequestIdentityVerifierV1({
+            config: localConfig.userData, memberFetchImpl: localGoTrueMemberFetchV1(localConfig),
+          }),
+          pool: createSubjectPool(),
+        });
+      } else {
+        // Existing handler accepts the public /api/birth-profiles/:id path.
+        runtime = createProductionBirthProfileReadRuntimeV1({
+          env: bindings, pool: createSubjectPool(),
+        });
+        result = await runtime.handleRequest({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+        });
+      }
     } else if (isGuestPromotion) {
       runtime = createProductionGuestPromotionRuntimeV1({
-        env: bindings, pool: createSubjectPool(),
+        env: bindings,
+        ...(localAuth ? {
+          config: localConfig.userData,
+          pool: createSubjectPool(),
+          memberFetchImpl: localGoTrueMemberFetchV1(localConfig),
+        } : {}),
       });
       result = await runtime.handleRequest({
         request,
         requestId: crypto.randomUUID(),
         serverTime: new Date().toISOString(),
       });
+    } else if (isSajuCalculation) {
+      if (!localAuth || bindings.MYEONGHA_LOCAL_SAJU_SERVICE_ORIGIN !== 'http://127.0.0.1:15434' ||
+          typeof bindings.MYEONGHA_LOCAL_SAJU_SERVICE_BEARER !== 'string' ||
+          bindings.MYEONGHA_LOCAL_SAJU_SERVICE_BEARER.length < 32) {
+        result = unavailable();
+      } else {
+        result = await handleCurrentSubjectSajuCalculationRequestV1({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+          identityEvidenceVerifier: createProductionRequestIdentityVerifierV1({
+            config: localConfig.userData, memberFetchImpl: localGoTrueMemberFetchV1(localConfig),
+          }),
+          pool: createSubjectPool(),
+          sajuAdapter: createSajuProductionCalculationHttpAdapterV1({
+            baseUrl: bindings.MYEONGHA_LOCAL_SAJU_SERVICE_ORIGIN,
+            bearerToken: bindings.MYEONGHA_LOCAL_SAJU_SERVICE_BEARER,
+          }),
+        });
+      }
     } else if (isCurrentBirth) {
-      runtime = createProductionCurrentSubjectBirthProfileRuntimeV1({
-        env: bindings, pool: createSubjectPool(),
-      });
-      result = await runtime.handleRequest({
-        request,
-        requestId: crypto.randomUUID(),
-        serverTime: new Date().toISOString(),
-      });
+      if (localAuth) {
+        result = await handleCurrentSubjectBirthProfileRequestV1({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+          identityEvidenceVerifier: createProductionRequestIdentityVerifierV1({
+            config: localConfig.userData, memberFetchImpl: localGoTrueMemberFetchV1(localConfig),
+          }),
+          pool: createSubjectPool(),
+        });
+      } else {
+        runtime = createProductionCurrentSubjectBirthProfileRuntimeV1({
+          env: bindings, pool: createSubjectPool(),
+        });
+        result = await runtime.handleRequest({
+          request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
+        });
+      }
     } else if (isSocialStart) {
       result = await handleSocialAuthStartRequestV1({
         request,
@@ -465,23 +566,45 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       // The Vercel source defaults to max=4 and must remain unchanged.
       // Cloudflare injects a distinct request-owned pool with max=1, then
       // closes it on every success/error path after the Auth runtime settles.
-      const rateLimitConfig = parseProductionMemberAuthRateLimitConfigV1(bindings);
-      memberRateLimitPool = createCloudflareSubjectPoolV1(
-        rateLimitConfig, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
-      );
-      runtime = createProductionMemberAuthHttpRuntimeV1({
-        env: bindings,
-        admissionPort: new PostgresMemberAuthRateLimitAdmissionPortV1(memberRateLimitPool),
-        authHandler: (input) => handleSupabaseAuthRequestV1({
-          ...input,
-          webOrigin: origin,
-        }),
-      });
-      result = await runtime.handleRequest(isSocialComplete
-        ? { request, action: 'refresh', authAction: 'social-complete' }
-        : { request, action });
+      if (localAuth) {
+        memberRateLimitPool = createSubjectPool();
+        const next = () => handleSupabaseAuthRequestV1({
+          request, env: bindings, action: isSocialComplete ? 'social-complete' : action,
+          approvedWebOrigin: origin,
+        });
+        result = action === 'sign-out'
+          ? await next()
+          : await handleMemberAuthRateLimitHttpV1({
+            request,
+            action: isSocialComplete ? 'refresh' : action,
+            secret: localConfig.rateLimitSecret,
+            admissionPort: new PostgresMemberAuthRateLimitAdmissionPortV1(memberRateLimitPool),
+            next,
+          });
+      } else {
+        const rateLimitConfig = parseProductionMemberAuthRateLimitConfigV1(bindings);
+        memberRateLimitPool = createCloudflareSubjectPoolV1(
+          rateLimitConfig, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+        );
+        runtime = createProductionMemberAuthHttpRuntimeV1({
+          env: bindings,
+          admissionPort: new PostgresMemberAuthRateLimitAdmissionPortV1(memberRateLimitPool),
+          authHandler: (input) => handleSupabaseAuthRequestV1({
+            ...input,
+            approvedWebOrigin: origin,
+          }),
+        });
+        result = await runtime.handleRequest(isSocialComplete
+          ? { request, action: 'refresh', authAction: 'social-complete' }
+          : { request, action });
+      }
     }
   } catch (error) {
+    if (localAuth && (isBirthCreate || isSajuCalculation)) {
+      const kind = error instanceof Error ? error.name : 'Unknown';
+      const code = typeof error?.code === 'string' && /^[A-Za-z0-9_]{2,20}$/.test(error.code) ? error.code : 'NO_CODE';
+      console.warn('LOCAL_SAJU_ROUTE_FAILURE', route.id, kind, code);
+    }
     if (isMemberProfile) {
       // Bounded categories only. Never log SQL, credentials, request, user data,
       // arbitrary error messages, stacks, hostname, or provider response bodies.
