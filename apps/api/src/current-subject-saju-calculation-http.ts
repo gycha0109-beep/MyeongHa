@@ -353,6 +353,35 @@ export interface BoundCurrentBirthContextV1 {
   readonly profile: BirthProfileReadResponseV1;
 }
 
+export async function readCurrentSelfBirthProfileInTransactionV1(
+  client: PostgresTransactionQueryV1,
+  subjectId: string,
+): Promise<BirthProfileReadResponseV1> {
+  const locator = await getCurrentSelfBirthProfileLocator({
+    resolvedSubjectId: subjectId,
+    authorityPort: new TransactionSelfBirthProfileLocatorPortV1(client),
+  });
+  if (locator.birthProfile === null || locator.birthProfile.currentRevision === null) {
+    throw new ApiCommandError('NOT_FOUND', 'Current self Birth Profile is required.');
+  }
+  const profile = await getBirthProfile({
+    resolvedSubjectId: subjectId,
+    birthProfileId: locator.birthProfile.birthProfileId,
+    authorityPort: new TransactionBirthProfileReadPortV1(client),
+  });
+  if (
+    profile.profileKind !== 'self' ||
+    profile.archivedAt !== null ||
+    profile.currentRevision.revisionId !== locator.birthProfile.currentRevision.revisionId ||
+    profile.currentRevision.revisionNo !== locator.birthProfile.currentRevision.revisionNo
+  ) {
+    throw new Error(
+      'Current self Birth Profile changed or drifted across the authoritative transaction read.',
+    );
+  }
+  return profile;
+}
+
 /** Capture the transaction-resolved owner and its current Birth revision together. */
 export async function readBoundCurrentBirthContextV1(
   input: ReadBoundCurrentBirthContextInputV1,
@@ -361,31 +390,7 @@ export async function readBoundCurrentBirthContextV1(
     pool: input.pool,
     verifiedEvidence: input.verifiedEvidence,
     execute: async ({ resolvedSubject, client }) => {
-      const locator = await getCurrentSelfBirthProfileLocator({
-        resolvedSubjectId: resolvedSubject.subjectId,
-        authorityPort: new TransactionSelfBirthProfileLocatorPortV1(client),
-      });
-      if (locator.birthProfile === null || locator.birthProfile.currentRevision === null) {
-        throw new ApiCommandError('NOT_FOUND', 'Current self Birth Profile is required.');
-      }
-
-      const profile = await getBirthProfile({
-        resolvedSubjectId: resolvedSubject.subjectId,
-        birthProfileId: locator.birthProfile.birthProfileId,
-        authorityPort: new TransactionBirthProfileReadPortV1(client),
-      });
-
-      if (
-        profile.profileKind !== 'self' ||
-        profile.archivedAt !== null ||
-        profile.currentRevision.revisionId !== locator.birthProfile.currentRevision.revisionId ||
-        profile.currentRevision.revisionNo !== locator.birthProfile.currentRevision.revisionNo
-      ) {
-        throw new Error(
-          'Current self Birth Profile changed or drifted across the authoritative transaction read.',
-        );
-      }
-
+      const profile = await readCurrentSelfBirthProfileInTransactionV1(client, resolvedSubject.subjectId);
       return Object.freeze({ resolvedSubject, profile });
     },
   });

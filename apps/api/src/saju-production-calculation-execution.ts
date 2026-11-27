@@ -18,7 +18,12 @@ function invalidCurrentRevision(message: string): never {
 export function bindCurrentBirthProfileRevisionForSajuV1(
   profile: BirthProfileReadResponseV1,
 ): SajuBirthRevisionBindingV1 {
-  const current = profile.currentRevision;
+  return bindBirthRevisionForSajuV1(profile.currentRevision);
+}
+
+export function bindBirthRevisionForSajuV1(
+  current: BirthProfileReadResponseV1['currentRevision'],
+): SajuBirthRevisionBindingV1 {
   const revisionRef = current.revisionId.trim();
   if (revisionRef.length === 0) {
     return invalidCurrentRevision('Current Birth Profile revisionId must be non-empty.');

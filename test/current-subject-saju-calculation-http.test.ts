@@ -11,11 +11,16 @@ import type {
   PostgresSubjectPoolV1,
 } from '../apps/api/src/postgres-subject-execution.js';
 import type { SajuProductionCalculationHttpAdapterV1 } from '../apps/api/src/saju-production-calculation-http-adapter.js';
+import { readBoundSajuComparisonBirthsV1 } from '../apps/api/src/saju-bound-comparison-births-v1.js';
+import { executeSajuComparisonPreviewV1 } from '../apps/api/src/saju-comparison-preview-execution-v1.js';
 
 const SUBJECT_ID = '11111111-1111-4111-8111-111111111111';
 const AUTH_USER_ID = '22222222-2222-4222-8222-222222222222';
 const BIRTH_PROFILE_ID = '33333333-3333-4333-8333-333333333333';
 const REVISION_ID = '44444444-4444-4444-8444-444444444444';
+const TARGET_ID = '55555555-5555-4555-8555-555555555555';
+const TARGET_BIRTH_ID = '66666666-6666-4666-8666-666666666666';
+const TARGET_REVISION_ID = '77777777-7777-4777-8777-777777777777';
 
 function artifactFixture(): SajuProductionCalculationIngressArtifactV1 {
   return {
@@ -33,6 +38,7 @@ interface DatabaseFixtureOptions {
   readonly locatorRevisionId?: string;
   readonly locatorRevisionNo?: number;
   readonly omitSelfBirthProfile?: boolean;
+  readonly targetRevisionId?: string;
   readonly events?: string[];
 }
 
@@ -41,7 +47,7 @@ function createPool(options: DatabaseFixtureOptions = {}): PostgresSubjectPoolV1
   const connection: PostgresSubjectConnectionV1 = {
     async query<Row = Record<string, unknown>>(
       text: string,
-      _values?: readonly unknown[],
+      values?: readonly unknown[],
     ): Promise<PostgresQueryResultV1<Row>> {
       events.push(text);
 
@@ -93,6 +99,27 @@ function createPool(options: DatabaseFixtureOptions = {}): PostgresSubjectPoolV1
           ] as unknown as readonly Row[],
         };
       }
+      if (text.includes('qry_target_person_v1')) {
+        if (values?.[0] !== SUBJECT_ID || values[1] !== TARGET_ID) {
+          throw Object.assign(new Error('Target unavailable'), {
+            constraint: 'qry_target_person_unavailable',
+          });
+        }
+        return { rows: [{
+          targetPersonId: TARGET_ID,
+          displayLabel: 'private label',
+          relationshipLabel: null,
+          birthProfileId: TARGET_BIRTH_ID,
+          currentBirthRevisionId: options.targetRevisionId ?? TARGET_REVISION_ID,
+          currentRevisionNo: 2,
+          currentCalendarType: 'solar',
+          currentBirthDate: '2000-03-19',
+          currentBirthTime: null,
+          currentTimeKnown: false,
+          currentIsLeapMonth: false,
+          currentSex: null,
+        }] as unknown as readonly Row[] };
+      }
 
       throw new Error(`Unexpected SQL in test: ${text}`);
     },
@@ -108,6 +135,190 @@ function createPool(options: DatabaseFixtureOptions = {}): PostgresSubjectPoolV1
     },
   };
 }
+
+describe('owner-bound comparison revisions', () => {
+  const pinned = {
+    verifiedEvidence: { kind: 'member', verifiedAuthUserId: AUTH_USER_ID } as const,
+    targetPersonId: TARGET_ID,
+    sourceBirthRevisionId: REVISION_ID,
+    targetBirthRevisionId: TARGET_REVISION_ID,
+  };
+
+  it('resolves both exact revisions under one member transaction and leaves unknown time unset', async () => {
+    const events: string[] = [];
+    const result = await readBoundSajuComparisonBirthsV1({ ...pinned, pool: createPool({ events }) });
+    expect(result).toMatchObject({
+      subjectId: SUBJECT_ID, targetPersonId: TARGET_ID,
+      sourceBirthRevisionId: REVISION_ID, targetBirthRevisionId: TARGET_REVISION_ID,
+      previewRequest: {
+        birth: { date: '2001-07-14', time: '15:20' },
+        partnerBirth: { date: '2000-03-19', time: null },
+      },
+    });
+    expect(JSON.stringify(result.previewRequest)).not.toContain(TARGET_ID);
+    expect(JSON.stringify(result)).not.toContain('private label');
+    expect(events.filter(event => event === 'BEGIN')).toHaveLength(1);
+    expect(events.slice(-2)).toEqual(['COMMIT', 'RELEASE']);
+  });
+
+  it('rejects a stale target revision and another member’s target', async () => {
+    const events: string[] = [];
+    const differentId = '88888888-8888-4888-8888-888888888888';
+    await expect(readBoundSajuComparisonBirthsV1({
+      ...pinned, pool: createPool({ events, targetRevisionId: differentId }),
+    })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(events.slice(-2)).toEqual(['ROLLBACK', 'RELEASE']);
+    await expect(readBoundSajuComparisonBirthsV1({
+      ...pinned, targetPersonId: differentId, pool: createPool(),
+    })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  const env = {
+    MYEONGHA_SAJU_SERVICE_ORIGIN: 'https://saju.example.test',
+    MYEONGHA_SAJU_SERVICE_BEARER: 'synthetic-service-credential',
+  };
+  const pillar = { status: 'resolved', value: '甲子' };
+  function response(overrides: Record<string, unknown> = {}) {
+    return Response.json({
+      lifecycle: 'internal_preview_only', coverage: 'calculation_facts_only',
+      generatedInterpretationClaims: false, mayPublish: false, mayPersist: false, maySell: false,
+      subjects: [
+        { role: 'self', pillars: { year: pillar, month: pillar, day: pillar, hour: pillar } },
+        { role: 'partner', pillars: { year: pillar, month: pillar, day: pillar, hour: { status: 'unavailable' } } },
+      ],
+      ...overrides,
+    }, { headers: { 'x-myeonghwa-reading-lifecycle': 'preview' } });
+  }
+
+  it('dispatches the owner-bound inputs only after exact-use authorization and rechecks it on return', async () => {
+    const events: string[] = [];
+    const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
+      expect(events.slice(-2)).toEqual(['COMMIT', 'RELEASE']);
+      expect(url).toBe('https://saju.example.test/api/preview/compatibility-charts');
+      expect(init.redirect).toBe('manual');
+      const body = JSON.parse(String(init.body));
+      expect(Object.keys(body)).toEqual(['birth', 'partnerBirth']);
+      expect(body.partnerBirth).toEqual({ calendarType: 'solar', date: '2000-03-19', time: null });
+      expect(JSON.stringify(body)).not.toContain(TARGET_ID);
+      return response();
+    });
+    const admit = vi.fn(async () => true);
+    const result = await executeSajuComparisonPreviewV1({
+      ...pinned, env, pool: createPool({ events }), fetchImpl, useAuthority: { admit },
+    });
+    expect(result).toMatchObject({ lifecycle: 'internal_preview_only', maySell: false });
+    expect(admit).toHaveBeenCalledTimes(2);
+    expect(admit).toHaveBeenNthCalledWith(1, {
+      purpose: 'saju_comparison_preview', subjectId: SUBJECT_ID, targetPersonId: TARGET_ID,
+      sourceBirthRevisionId: REVISION_ID, targetBirthRevisionId: TARGET_REVISION_ID,
+    });
+    expect(events.filter(event => event === 'BEGIN')).toHaveLength(2);
+  });
+
+  it('blocks missing authorization before dispatch and suppresses results if authorization is withdrawn', async () => {
+    const fetchImpl = vi.fn(async () => response());
+    const request = { ...pinned, env, pool: createPool(), fetchImpl };
+    await expect(executeSajuComparisonPreviewV1(request)).rejects.toMatchObject({ code: 'CAPABILITY_UNAVAILABLE' });
+    await expect(executeSajuComparisonPreviewV1({
+      ...request, useAuthority: { admit: async () => false },
+    })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    const admit = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    await expect(executeSajuComparisonPreviewV1({
+      ...request, useAuthority: { admit },
+    })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a source response that claims to provide an interpretation', async () => {
+    await expect(executeSajuComparisonPreviewV1({
+      ...pinned, env, pool: createPool(), useAuthority: { admit: async () => true },
+      fetchImpl: async () => response({ generatedInterpretationClaims: true }),
+    })).rejects.toMatchObject({ code: 'SAJU_TEMPORARILY_UNAVAILABLE' });
+  });
+
+  it('binds opt-in structural evidence to the source chart and refuses missing or altered evidence', async () => {
+    const match = {
+      kind: 'branch_clash', component: 'branch',
+      subject: { factPath: 'subject.pillars.year.value.branch', value: '子' },
+      target: { factPath: 'target.pillars.day.value.branch', value: '午' },
+      sourceIds: ['source-clash-table'], definitionContentHash: 'a'.repeat(64),
+      pairwiseMeaningAuthorized: false,
+    };
+    const own = { year: pillar, month: pillar, day: pillar, hour: pillar };
+    const partner = { ...own, day: { status: 'resolved', value: '庚午' }, hour: { status: 'unavailable' } };
+    const subjects = [{ role: 'self', pillars: own }, { role: 'partner', pillars: partner }];
+    const evidence = { version: 'myeonghwa-cross-chart-structural-evidence-v1', matches: [match] };
+    const fetchImpl = vi.fn(async (_url: string) => response({ subjects, evidence }));
+    const admit = vi.fn(async () => true);
+    const input = { ...pinned, env, pool: createPool(), useAuthority: { admit }, includeStructuralEvidence: true as const };
+    const result = await executeSajuComparisonPreviewV1({ ...input, fetchImpl });
+    expect(fetchImpl).toHaveBeenCalledWith('https://saju.example.test/api/preview/compatibility-evidence', expect.anything());
+    expect(admit).toHaveBeenCalledTimes(2);
+    expect(result.structuralEvidence).toEqual({
+      version: evidence.version, pairwiseT10Admitted: false, matches: [{
+        ...match, subject: { slot: 'year', value: '子' }, target: { slot: 'day', value: '午' },
+      }],
+    });
+    for (const badEvidence of [
+      undefined,
+      { ...evidence, matches: [match, match] },
+      { ...evidence, matches: [{ ...match, target: { ...match.target, value: '子' } }] },
+      { ...evidence, matches: [{ ...match, pairwiseMeaningAuthorized: true }] },
+    ]) {
+      await expect(executeSajuComparisonPreviewV1({
+        ...input, fetchImpl: async () => response({ subjects, evidence: badEvidence }),
+      })).rejects.toMatchObject({ code: 'SAJU_TEMPORARILY_UNAVAILABLE' });
+    }
+
+    const dayMatch = { ...match, subject: { ...match.subject, factPath: 'subject.pillars.day.value.branch' } };
+    const candidate = {
+      scope: 'traditional_marital_palace_comparison' as const,
+      review: 'unreviewed', pairwiseT10Admitted: false, state: 'candidate_factor',
+      sourceInterpretation: 'challenging_factor', kind: 'branch_clash',
+      source: {
+        id: 'SRC-NAM-KIM-2018-MARITAL-PALACE-PAIR', doi: '10.22143/HSS21.9.2.9',
+        authorCopySha256: 'adda4474baf27754ca25efed615bdffdc96f55726e0495d42b0e894395c475c0',
+        locators: ['p. 108'],
+      },
+    };
+    const explicitScope = { ...input, candidateScope: candidate.scope };
+    const valid = await executeSajuComparisonPreviewV1({
+      ...explicitScope,
+      fetchImpl: async (_url, init) => {
+        expect(JSON.parse(String(init.body)).candidateScope).toBe(candidate.scope);
+        return response({ subjects, evidence: { ...evidence, matches: [dayMatch], maritalDayBranchCandidate: candidate } });
+      },
+    });
+    expect(valid).toMatchObject({ maySell: false, maritalDayBranchCandidate: {
+      state: 'candidate_factor', sourceInterpretation: 'challenging_factor', pairwiseT10Admitted: false,
+      match: { subject: { slot: 'day', value: '子' }, target: { slot: 'day', value: '午' } },
+    } });
+    expect(admit).toHaveBeenLastCalledWith(expect.objectContaining({ purpose: 'saju_marital_comparison_review' }));
+    const blockedFetch = vi.fn(async () => response());
+    await expect(executeSajuComparisonPreviewV1({
+      ...explicitScope, fetchImpl: blockedFetch,
+      useAuthority: { admit: async ({ purpose }) => purpose === 'saju_comparison_preview' },
+    })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(blockedFetch).not.toHaveBeenCalled();
+    for (const altered of [
+      { ...candidate, sourceInterpretation: 'supportive_factor' },
+      { ...candidate, pairwiseT10Admitted: true },
+      { ...candidate, source: { ...candidate.source, authorCopySha256: 'f'.repeat(64) } },
+    ]) {
+      await expect(executeSajuComparisonPreviewV1({
+        ...explicitScope, fetchImpl: async () => response({
+          subjects, evidence: { ...evidence, matches: [dayMatch], maritalDayBranchCandidate: altered },
+        }),
+      })).rejects.toMatchObject({ code: 'SAJU_TEMPORARILY_UNAVAILABLE' });
+    }
+    await expect(executeSajuComparisonPreviewV1({
+      ...explicitScope, fetchImpl: async () => response({
+        subjects, evidence: { ...evidence, maritalDayBranchCandidate: candidate },
+      }),
+    })).rejects.toMatchObject({ code: 'SAJU_TEMPORARILY_UNAVAILABLE' });
+  });
+});
 
 function verifier(
   verified = true,
