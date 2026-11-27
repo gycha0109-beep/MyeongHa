@@ -626,3 +626,149 @@ entitlement implementation         = FORBIDDEN
 Product Layer, Character Layer, or LLM may not fill the missing resolver or General Natal semantics.
 
 This inventory update authorizes no SKU, price, PSP, payment, entitlement, refund, or Commerce behavior change.
+
+---
+
+## 2026-11-24 — 11개 독립 해석 영역 및 현재 상품 카탈로그 재대조
+
+> 이 절은 기존 2026-09 및 2026-11-13 감사 기록을 보존하는 최신 스냅샷이다. 아래 표를 2026-11-24 현재의 전체 메뉴 인벤토리로 사용한다.
+
+### 1. 관측 기준점
+
+| 저장소 | 관측 기준 |
+|---|---|
+| Saju | main @ 9e9231b181b4c848b26be6eec1ef4a55a17debf9 |
+| MyeongHa | main @ 5e27103e2fa98cb860bdcd1fe93d1a6998e8725c |
+| Saju 전역 Production Interpretation | docs/product/22: PRODUCTION_RUNTIME_BLOCKED_BY_INTERPRETATION_AUTHORITY_GAPS |
+| 내부 상용 해석 정책 | Saju docs/product/43 및 MyeongHa docs/SAJU_INTERNAL_COMMERCIAL_INTERPRETATION_HANDOFF_20261113 |
+| Reading Profile 선택 | Saju src/reading/reading-profile-authorization.ts: 19개 intent shape 등록. 선택 권한은 의미 Claim·생성·Production 권한이 아님 |
+| 카탈로그 코드 기준 | MyeongHa packages/contracts/src/approved-saju-catalog.ts, 2026-11-06 고객 카탈로그 엔트리 |
+
+**판정 원칙**
+
+- 11개 항목은 독립적으로 상태를 조사해야 하는 해석 영역이다. 11개가 모두 판매 SKU라는 뜻은 아니다.
+- Reading Profile authorized는 기존 Claim 선택 권한일 뿐, 해당 의미의 존재·정확성·Production 승인을 뜻하지 않는다.
+- 계산 가능, Preview 가능, 연구용 Claim 존재, 서명된 Source 발급, Official Reading, Reader 재열람, 실제 판매 가능을 서로 다른 상태로 기록한다.
+- 외부 학술기관·전문가의 추가 승인은 전역 출시 선행 조건이 아니다. 다만 명하가 채택한 내부 규칙의 정확성, 입력·기간·상대 결속, 발급·서명·구매·동의·Reader·환불·복구 무결성은 필수다.
+
+### 2. 11개 해석 영역 인벤토리
+
+| 독립 해석 영역 | 계산·기존 자산 | 방법론·Rule·Claim 상태 | Profile / 실제 Runtime | 실측·통합 근거 | 2026-11-24 판정 및 남은 것 |
+|---|---|---|---|---|---|
+| **1. 직업·커리어 T8** | Canonical 명식 및 T5 십신 계산, career-natal-multifactor-report.ts, career-natal-reading-candidate.ts | 후보 0.5.0-research; Methodology/Pack/Rule 연구 상태, reviewer unreviewed | career:natal 선택 프로필. 연구 Preview 보고서 존재 | 기존 500건 MUR: 114 complete / 364 partial / 22 insufficient. #2812는 main 기반 미병합 PR, 후속 #2819/#2820 회귀에 포함 | 연구·Preview 가능, Production 의미 권한 없음. 직업 결론별 T5/T6 연결, 지원·제약 조건 및 공식 발급 경로가 남음 |
+| **2. 사업 T8** | Canonical 명식, business-natal-multifactor-report.ts, business-natal-reading-candidate.ts | 후보 0.8.0-research; Methodology/Pack/Rule 연구 상태, reviewer unreviewed | business:natal 선택 프로필. 사업 전용 Preview 보고서 존재 | 기존 500건 MUR: 257 complete / 237 partial / 6 insufficient. #2813은 #2815 위에 쌓인 미병합 PR이며 #2819/#2820 회귀에 포함 | 연구·Preview 가능, Production 의미 권한 없음. 운영·교환·자원·의사결정 질문에 필요한 독립 결론과 공식 발급이 남음 |
+| **3. 재물 T8** | Canonical 명식, wealth-natal-multifactor-report.ts, 지장간 별도 관측 채널 | 후보 0.4.0-research; 지장간 방법론·Pack·Rule 연구 상태, reviewer unreviewed | wealth:natal 선택 프로필. 재물 Preview 보고서 존재 | 500건 최신 기록: 498개 재물 섹션(428 complete / 70 partial), 2건은 재성 근거 자체가 없어 insufficient. #2816 미병합 | 연구·Preview 가능, Production 의미 권한 없음. 무근거 2건을 채우지 않고 자원 형성·교환·유지·배분을 실제 근거에 맞춰 공식 발급하는 작업이 남음 |
+| **4. 나의 인연·관계 T8** | relationship-natal-reading-candidate.ts, relationship-natal-multifactor-report.ts; 제한된 관계 일반 규칙 및 승인 문구 프로필 | 연구 후보가 존재. 별도로 relationship:natal:general 전용 서명 발급기가 정확한 Claim·Rule·문구·근거 프로필을 검사 | relationship:natal:general 선택 프로필 및 Preview. Saju #2808 일반 연애운 서명 Source 경로가 main에 병합됨 | 기존 500건 MUR: 162 complete / 334 partial / 4 insufficient. MyeongHa #3402가 본인 T8과 T10 독립 발급·Reader/보관함을 격리 PG17에서 검증해 main 병합. #3403의 10,000건 Source 요청 CI 통과 | 현재 가장 구체적인 단일 명식 서명 발급·Reader 연결 범위. 좁은 Release를 전역 Production Authority나 실제 공개 판매 승인으로 확대 해석하지 않음. 결제·운영 배포·전체 판매는 별도 HOLD |
+| **5. 가족 T8 — 부모·자녀** | family-birth-research-runtime.ts, 부모/자녀 관측 Preview, 기존 Family 연구 자료 | 가족 결과를 주장하는 승인 T8 Claim/Production Pack은 확인되지 않음. Runtime은 mayClaimFamilyOutcome=false, familyMeaningStatus=family_t8_source_authority_not_established | 부모·자녀 scope 선택 프로필 존재. Runtime은 계산 사실 및 연구 불가 사유만 제공 | 부모/자녀 scope와 입력·동의 검사는 존재하나 가족 결과 해석의 공식 발급 증거 없음 | 계산 사실·연구만 가능. 부모·자녀 관계 결과를 임의 추론하지 않으며 각 범위의 독립 T8 의미·근거·Claim 권한 미완료 |
+| **6. 배우자 T8** | 배우자 위치·일지 연구 자료, relationship-spouse-t8-engine-producer.ts, spouse 전용 Production candidate/delivery 경로 | 제한된 위치 기반 후보가 존재하나 전체 배우자 해석 권한으로 확정되지 않음 | spouse 선택 프로필 및 제한된 후보 경로 존재 | production-spouse-official-reading-candidate-authority.ts에서 implementationAuthorized=true이나 Production transport/semantic delivery/persistence/public/commerce 권한은 모두 false, production=HOLD | 제한적 구현 후보만 허용. 배우자 역할·성별·관계 결과를 미확정 규칙으로 단정하지 않으며 공식 전달 권한 미완료 |
+| **7. 연간 T9** | general-annual-reading-candidate.ts, 연간 Narrative Profile, 서울 달력연도·입춘·대운 구간 계산 | 후보 0.1.0-research; 내부 정책 Source, Methodology/Rule/Pack 연구 상태, reviewer unreviewed | general:annual 선택 프로필. annual-monthly-birth-research-runtime.ts는 internal_research_only, mayPublish=false, maySell=false, mayGrantOfficialAuthority=false | 기존 500/3,000건 기간 회귀 및 #2762 기간·서명 연결 PR 존재. #2762는 open | 기간 계산·연구 해설 가능, 공식 연간 의미 미완료. 연간 결론별 원국·대운·세운 근거, 문장·기간 일치 및 정식 Reader 발급 검증 필요 |
+| **8. 월간 T9** | general-monthly-reading-candidate.ts, 월별 Narrative Profile, 절입 전후 구간 및 월주 계산 | 후보 0.1.0-research; 내부 정책 Source, Methodology/Rule/Pack 연구 상태, reviewer unreviewed | general:monthly 선택 프로필. 두 절입 구간을 분리하는 연구 Runtime 존재 | 기존 500/3,000건 기간 회귀 및 #2762 기간·서명 연결 PR 존재. #2762는 open | 절입 구간별 계산·연구 해설 가능, 공식 월간 의미 미완료. 요청 월·두 절입 구간·적용 시점·원국 접점의 정확한 문장 및 재열람 검증 필요 |
+| **9. 궁합 T10** | 두 Canonical 명식, 일간·일지·타주 관계 관측, compatibility-two-birth-research-runtime.ts | 명하 내부 채택 T10 규칙 및 조건부 관계 설명 구현. 결혼 성공·이별·외도 등 결과 예언은 허용되지 않음 | compatibility:natal 선택 프로필 및 두 명식 연구 Runtime. 별도 두 명식 Source·Reader 경로 존재 | Saju #2763 및 #2808/#2809 병합. #2809는 T10 내부 5단계 해석·발급·Reader 통합 트랙 완료 기록. MyeongHa #3402는 세 비교 구성의 독립 발급·Reader·동의/환불 경계를 격리 PG17에서 검증. #3403의 10,000건 합성 Source 요청 검증 통과 | 내부 T10 해석·서명 Source·Reader 통합 검증 완료 범위. #2809 완료는 T10 내부 트랙 한정이며 실제 결제·운영 배포·판매 활성화는 별도 HOLD |
+| **10. 질문별 T11** | question-related-natal-reading.ts; 기존 다섯 원국 보고서에서 질문과 일치하는 이미 존재하는 T8 근거 문단 선택 | 독립 T11 질문 해석 Claim/Rule/Production Pack은 확인되지 않음. 질문 라우팅은 의미를 새로 만들지 않음 | question_specific:natal 선택 프로필. 기존 근거 범위 제한 Preview | 질문별 연구 Preview 및 기존 T8 Claim 연결 검사 존재 | 기존 T8 근거의 질문별 재배치만 가능. 질문 자체로 새 명리 의미를 만들거나 T11 공식 풀이로 취급할 수 없음 |
+| **11. 대운·인생 단계** | life-stage-birth-research-runtime.ts, 현재·다음 대운 구간 계산 및 표시 | 계산된 대운 구간과 실제 사건·성과·길흉 해석은 별개. 전용 T9 life_stage Production 의미 Producer 미확인 | life_stage 선택 프로필. Runtime은 internal_research_only, interpretationStatus=source_authority_not_established, 게시·판매 권한 없음 | 실제 기준 시각과 대운 구간 계산을 검사하는 연구 Runtime 존재 | 대운 계산 사실만 가능. 사건·길흉·성과를 해석하는 독립 의미·근거·공식 발급 미완료 |
+
+### 3. 공통 원국 기반과 메뉴 수의 구분
+
+General Natal은 직업·사업·재물·관계 등 분야별 원국 해석을 위한 공통 기반이다. 폐지된 단독 General 유료 상품을 재출시하거나 공통 원국 판단을 11개 독립 해석 영역 중 하나 또는 별도 SKU로 세지 않는다.
+
+2026-11-24 현재 Saju main의 general-natal-integrated-reading-registry.ts는 기존 General T8 자산을 모은 연구 Pack이며 status=research다. #2817~#2820의 공통 원국 판단도 별도 Production 엔진이 아니라 연구 전용 후보 체인이다.
+
+### 4. 2026-11-06 고객 카탈로그 코드 — 해석 영역과 별도 관리
+
+MyeongHa main packages/contracts/src/approved-saju-catalog.ts에는 2026-11-06 고객 카탈로그의 14개 Offer 엔트리가 기록되어 있다. 다만 2026-11-24 제품 소유자 지침은 Business를 독립 상품으로 확정하지 말라고 명시한다. 따라서 아래 Business 단품 엔트리는 코드상 존재 사실로만 기록하며, 독립 판매 상품 권한으로 채택하거나 활성화하지 않는다. 이 문서 갱신은 해당 카탈로그 코드나 패키지 구성을 변경하지 않는다.
+
+| 구분 | Offer ID | 고객 상품명 | 가격 |
+|---|---|---|---:|
+| 단품 | career | 직업·커리어운 | 9,900원 |
+| 코드 엔트리(독립 상품 권한 보류) | business | 사업운 | 9,900원 |
+| 단품 | wealth | 재물운 | 9,900원 |
+| 단품 | relationship | 나의 인연·관계운 | 9,900원 |
+| 단품 | year | 올해의 사주 | 7,900원 |
+| 단품 | month | 이번 달의 사주 | 4,900원 |
+| 관계 비교 | first-counterpart | 첫 번째 상대방과 관계 비교 | 12,900원 |
+| 관계 비교 | additional-counterpart | 두 번째 이후 상대방 1명당 | 9,900원 |
+| 관계 비교 결합 | relationship-plus-first | 나의 인연·관계운 + 첫 관계 비교 | 19,900원 |
+| 패키지 | career-economy | 커리어·경제 패키지 | 24,900원 |
+| 패키지 | basic | 전체 사주 기본 | 29,900원 |
+| 패키지 | basic-year | 전체 사주 + 올해 | 35,800원 |
+| 패키지 | basic-month | 전체 사주 + 이번 달 | 33,800원 |
+| 패키지 | basic-year-month | 전체 사주 + 올해 + 이번 달 | 39,700원 |
+
+카탈로그 소스의 그룹 표시는 단품 6종, 관계 비교 3종, 패키지 5종이다. 다만 Business 단품 엔트리는 2026-11-24 지침과 정합성이 확인될 때까지 독립 상품으로 취급하지 않는다. 각 Offer는 필요한 Reading component의 조합을 나타낼 뿐 실제 Charge나 Entitlement Grant 권한을 부여하지 않는다.
+
+다음 구분을 고정한다.
+
+- **11개 해석 영역:** Career, Business, Wealth, Relationship, Family, Spouse, Annual, Monthly, Compatibility, Question-specific, Daewoon.
+- **14개 카탈로그 코드 Offer 엔트리:** 위 표. 이는 14개 모두의 현행 판매 권한을 뜻하지 않으며, Business 단품은 독립 상품 권한 보류.
+- **19개 Reading Intent/Profile shape:** 소비자 요청에 따라 기존 Claim을 선택하는 계약이며 실제 Claim·해석 권한과 동일하지 않음.
+- **General Natal:** 공통 기반이며 별도 단독 유료 SKU가 아님. basic은 Career + Business + Wealth + Relationship 네 Reading의 패키지다.
+- Family, Spouse, Question-specific, Daewoon은 현재 승인 카탈로그의 독립 구매 Offer로 등록되어 있지 않다. 연구·선택 Profile 존재만으로 판매 상품을 만들지 않는다.
+
+구형 docs/PAID_PRODUCT_CATALOG_V1.md의 saju.general_natal.deep.v1 및 9,900원 General 단독 상품 정의는 SUPERSEDED / HISTORICAL이며 현행 카탈로그 권한으로 사용하지 않는다.
+
+### 5. 관련 PR·검증의 현재 상태
+
+#### Saju
+
+| PR | 범위 | 현재 상태 |
+|---|---|---|
+| #2762 | 연·월운 기간 고정 및 보호된 Source 연결 | OPEN. 기간 해석·정식 발급 연결의 남은 검증 대상 |
+| #2763 | 두 명식 구조 근거 및 T10 | MERGED. T10 내부 5단계 완료 기록은 #2809에 한정 |
+| #2808 | 본인 일반 연애운 T8 서명 발급기 | MERGED. 좁은 relationship:natal:general Release |
+| #2809 | T10 내부 발급·Reader 5단계 인수 | MERGED. 실제 결제·공개 판매 완료 아님 |
+| #2812 → #2816 → #2814 → #2815 → #2813 → #2817 → #2818 → #2819 → #2820 | 직업·재물·기간·관계·사업 및 공통 원국 판단의 순차 구현 체인 | 전부 OPEN / 미병합. #2812~#2816은 비-Draft, #2817~#2820은 Draft |
+| #2821 | 여섯 메뉴 해석 완성 설계 초안 | OPEN / Draft. 아래 정합성 검토 전 병합 금지 |
+
+#2819의 500건·10,000건·메뉴 및 발급 회귀(run 45307584481)와 #2820의 동일 회귀(run 45345809083)는 각각 전체 성공이다. 두 실행은 해당 시점의 순차 PR 체인에 대한 검사이며 미병합 PR을 main에 반영한 것으로 간주하지 않는다. #2812~#2818의 개별 HEAD에는 GitGuardian 검사만 확인되었고, 후속 #2819/#2820의 전체 회귀가 해당 선행 변경을 포함한다.
+
+#2821은 현재 6개 메뉴를 하나의 완성 범위로 설명하지만, 본 인벤토리의 11개 독립 해석 영역과 14개 승인 구매 Offer를 대체하지 않는다.
+- 여섯 메뉴는 구현 작업 범위일 수 있지만 전체 제품 메뉴 목록이 아니다.
+- 사업은 별도 T8 해석 범위로만 취급한다. 2026-11-06 카탈로그 코드에 Business 단품 엔트리가 남아 있어도 2026-11-24 제품 소유자 지침에 따라 독립 상품으로 확정하거나 활성화하지 않는다.
+- #2821의 사업 해석 후보는 상품·SKU·가격 권한을 만들지 않는다.
+- #2821은 #2820 최신 HEAD 2a335dec63c6bdf7c36b73d7376fef144ce139b6보다 이전인 8ed2d3125872513b6bc14e9b829949cdb79c3624를 base로 사용한다.
+- 따라서 #2821은 11개 영역·현재 카탈로그·최신 공통 판단 체인과 정합성을 맞춘 뒤 별도 처리한다.
+
+#### MyeongHa
+
+| PR / Issue | 현재 상태 | 이번 인벤토리에서의 의미 |
+|---|---|---|
+| #3402 | MERGED to main | 본인 T8 + T10 독립 발급, 격리 PG17 보관함·Reader·동의 철회·환불 검증 |
+| #3403 | OPEN, 필수 CI 3/3 SUCCESS | 합성 입력 10,000건의 T8/T10 Source 서명 요청 검증. 운영 구매/DB 쓰기 10,000건이나 실제 결제 증거는 아님 |
+| #3159 | OPEN, 문서 전용 | 승인 카탈로그와 Reader Preview 추적 문서. 카탈로그 코드 자체는 main에 존재 |
+| #3131 | OPEN | 보호된 상담형 AI 생성 및 Reader 비교 Shadow. 실모델 유료 실행·공개 기능이 아님 |
+| #3207 | OPEN | GEPA 오프라인 공통 계약. 실제 GEPA 최적화·유료 탐색·운영 승격 아님 |
+| #3295 | OPEN | 6개 캐릭터 Chat/Reader 출시 범위 정렬. 공개 활성화 아님 |
+| #932 | OPEN Issue | Character Saju Rendering 공유 Grounding 구현의 상위 추적 항목 |
+
+현재 main 기준 주요 미완료 운영·권리 이슈:
+- #1034 — 유료 Product와 정확한 Reading artifact 결속 및 실제 구매/재열람 검증
+- #1887 — Production migration-history 정합성 및 DR 복구 증거
+- #2200 — Seyeon Production Chat 500 오류와 보류된 DB RPC 연결
+- #2318 — 유료 해설 보호 본문·파생 기록의 보관/삭제/복원 인수
+- #2503 — Legal & Compliance L1~L5
+- #2025 — Vercel Hobby 상업 이용 제한 해소 결정
+- #1871 — 격리 스테이징 인프라·운영 권한 및 R01–R14 실증
+
+#3402의 격리 검증 및 #3403의 10,000건 Source 요청 CI 통과는 실제 결제, Production DB 배포, 상업 운영, 공개 판매의 증거가 아니다. 운영 판매 HOLD는 유지한다.
+
+### 6. 현재 결론과 다음 실행 경계
+
+| 항목 | 현재 판정 |
+|---|---|
+| 11개 독립 해석 영역 인벤토리 | 현재 기준으로 분리 완료 |
+| 14개 승인 Offer 카탈로그 | main 코드에서 확인 |
+| 19개 Reading Profile shape | 선택 계약 존재 |
+| Saju 기존 7단계 기술 검증 | 기존 범위 VERIFIED, 불필요한 재실행 금지 |
+| Saju 전체 Production Authority | BLOCKED |
+| Relationship T8 좁은 서명 경로 | 존재, 전체 권한으로 확대 금지 |
+| T10 내부 해석·발급·Reader | #2809 범위 완료 |
+| Career / Business / Wealth T8 | 연구·Preview, 공식 발급 미완료 |
+| Family / Spouse T8 | 범위별 의미 권한 미완료 |
+| Annual / Monthly T9 | 연구 및 기간 계약, 공식 의미 미완료 |
+| Question-specific T11 | 기존 근거 선택, 독립 T11 의미 미완료 |
+| Daewoon | 계산 사실, 독립 기간 해석 미완료 |
+| MyeongHa actual sale | HOLD |
+
+다음 구현은 새 엔진이나 추가 메뉴를 만들지 않는다. 우선 최신 미병합 Saju 체인(#2812~#2820)의 선행 관계·전체 회귀·연구 권한 경계를 유지하면서, 각 메뉴가 실제로 소비하는 기존 T5/T6/T8/T9 근거와 한국어 문단의 의미 연결을 완성한다. #2821은 위 상품·메뉴 구분과 최신 HEAD 정합성을 수정한 뒤 처리한다.
+
+이 갱신은 카탈로그 가격·상품·결제·Entitlement·Production 권한을 변경하지 않는다.
